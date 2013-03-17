@@ -1,4 +1,5 @@
 
+
 set(RT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 
 set(RT_SOURCE_FILES
@@ -40,11 +41,46 @@ set(RT_SOURCE_FILES
 
   shading/distribution.cpp
   shading/shadetree.cpp
+
+  compiler/types.cpp
+  compiler/symboltable.cpp
+  compiler/operations.cpp
+  compiler/builtin_ops.cpp
+
+  compiler/ast/ast.cpp
+  compiler/ast/literal.cpp
+  compiler/ast/expression.cpp
+  compiler/ast/variable.cpp
+  compiler/ast/function.cpp
+  compiler/ast/statement.cpp
+  compiler/ast/control.cpp
   )
 
-include_directories(${RT_INCLUDE_DIR})
-add_library(raytrace SHARED ${RT_SOURCE_FILES})
-#add_executable(raytrace ${RT_SOURCE_FILES} ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
+find_package(BISON)
+find_package(FLEX)
+bison_target(rtl_parser compiler/language/rtlparser.y ${CMAKE_CURRENT_BINARY_DIR}/rtlparser.cpp)
+flex_target(rtl_scanner compiler/language/rtlscanner.l ${CMAKE_CURRENT_BINARY_DIR}/rtlscanner.cpp COMPILE_FLAGS "--header-file=${CMAKE_CURRENT_BINARY_DIR}/rtlscanner.hpp" )
+add_flex_bison_dependency(rtl_scanner rtl_parser)
+
+set(RT_PARSER_LEXER_SOURCE ${BISON_rtl_parser_OUTPUTS} ${FLEX_rtl_scanner_OUTPUTS})
+
+set(LLVM_INCLUDE_DIR /usr/local/include)
+set(LLVM_DEFINITIONS -D_DEBUG -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS)
+set(LLVM_LIB_DIR /usr/local/lib)
+set(LLVM_LIBS LLVMX86AsmParser LLVMX86Disassembler LLVMX86CodeGen LLVMSelectionDAG LLVMAsmPrinter
+  LLVMMCParser LLVMX86Desc LLVMX86Info LLVMX86AsmPrinter LLVMX86Utils LLVMJIT LLVMRuntimeDyld
+  LLVMExecutionEngine LLVMCodeGen LLVMScalarOpts LLVMInstCombine LLVMTransformUtils LLVMipa
+  LLVMAnalysis LLVMTarget LLVMMC LLVMObject LLVMCore LLVMSupport)
+
+include_directories(${RT_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+link_directories(${LLVM_LIB_DIR})
+add_definitions(${LLVM_DEFINITIONS})
+
+#add_library(raytrace SHARED ${RT_SOURCE_FILES})
+add_executable(raytrace ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE} ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
+
+target_link_libraries(raytrace ${LLVM_LIBS} pthread m dl)
+
 set_target_properties(raytrace
   PROPERTIES
   COMPILE_FLAGS "-std=c++0x"
