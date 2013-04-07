@@ -19,11 +19,11 @@ namespace raytrace {
     class conditional_statement : public statement {
     public:
 
-      conditional_statement(const expression_ptr &cond,
+      conditional_statement(parser_state *st, const expression_ptr &cond,
 			    const statement_ptr &if_branch, const statement_ptr &else_branch);
       virtual ~conditional_statement() {}
 
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
     private:
 
@@ -36,40 +36,32 @@ namespace raytrace {
     class for_loop_statement : public statement {
     public:
 
-      for_loop_statement(const statement_ptr &init,
+      for_loop_statement(parser_state *st,
+			 const statement_ptr &init,
 			 const expression_ptr &cond,
 			 const expression_ptr &after,
-			 const statement_ptr &body,
-			 var_symbol_table *variables, func_symbol_table *functions,
-			 control_state *control);
+			 const statement_ptr &body);
 
       virtual ~for_loop_statement() {}
 
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
     private:
 
       statement_ptr init, body;
       expression_ptr cond, after;
       
-      var_symbol_table *variables;
-      func_symbol_table *functions;
-      control_state *control;
     };
 
     /* Break Statement */
     class break_statement : public statement {
     public:
 
-      break_statement(control_state *control);
+      break_statement(parser_state *st);
       virtual ~break_statement() {}
 
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual bool is_terminator() { return true; }
-
-    private:
-
-      control_state *control;
 
     };
 
@@ -77,16 +69,12 @@ namespace raytrace {
     class continue_statement : public statement {
     public:
 
-      continue_statement(control_state *control);
+      continue_statement(parser_state *st);
       virtual ~continue_statement() {}
 
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual bool is_terminator() { return true; }
-
-    private:
-
-      control_state *control;
-
+      
     };
 
   };

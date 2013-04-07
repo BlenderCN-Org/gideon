@@ -1,6 +1,7 @@
 #ifndef RT_AST_NODE_HPP
 #define RT_AST_NODE_HPP
 
+#include "compiler/errors.hpp"
 #include "compiler/symboltable.hpp"
 #include "compiler/gen_state.hpp"
 
@@ -12,6 +13,7 @@ namespace raytrace {
     struct parser_state {
       variable_symbol_table variables;
       function_symbol_table functions;
+      type_table types;
       control_state control;
     };
     

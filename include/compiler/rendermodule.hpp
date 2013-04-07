@@ -34,6 +34,8 @@ namespace raytrace {
     //Request information about exported symbols from each global declaration.
     void load_exports();
 
+    void optimize(llvm::Module *module);
+
   };
 
 };

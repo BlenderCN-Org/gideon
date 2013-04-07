@@ -6,69 +6,93 @@
 #include "llvm/IRBuilder.h"
 #include "llvm/Module.h"
 
+#include <stdexcept>
+#include <boost/unordered_map.hpp>
+
+#include "compiler/errors.hpp"
+
 namespace raytrace {
   
-  /* Enum defining the various types supported by the shader language. */
-  enum type_code {
-    BOOL,
-    INT,
-    FLOAT,
-    FLOAT4,
-    RAY,
-    VOID,
-    OTHER
-  };
+  /* Describes an instance of a type. */
+  class type;
+  typedef std::shared_ptr<type> type_spec;
+  typedef codegen<type_spec, compile_error>::value typecheck_value;
+  typedef codegen<type_spec, compile_error>::vector typecheck_vector;
 
-  /* Returns the type code equivalent to this C++ type. */
-  template<typename T>
-  type_code get_type_code();
+  typedef errors::argument_value_join<codegen_value, typecheck_value>::result_value_type typed_value;
+  typedef errors::argument_value_join<codegen_value, typecheck_value>::result_type typed_value_container;
+  typedef codegen<typed_value, compile_error>::vector typed_value_vector;
 
-  typedef void (*llvm_gen_destroy_func)(llvm::Value *addr, llvm::Module *module, llvm::IRBuilder<> &builder);
+  /* A table of types. */
+  typedef boost::unordered_map< std::string, std::shared_ptr<type> > type_table;
+  void initialize_types(type_table &tt);
 
-  /* Provides info about a particular built-in type. */
-  struct type_traits {
-    std::string name, code;
-    type_code type;
 
-    bool is_primitive;
-    bool is_scalar;
-    size_t size;
-    
-    llvm_gen_destroy_func destroy;
-  };
-
-  /* Returns the type_traits struct associated with this type code. */
-  template<type_code T>
-  type_traits get_type_traits();
-  type_traits get_type_traits(type_code t);
   
-  /* Type specifier used for variable declarations, function arguments/return types, etc. */
-  struct type_spec {
-    type_code t;
-
-    type_spec() : t(type_code::OTHER) {}
-    type_spec(type_code t) : t(t) {}
+  /* Describes a type in the Gideon Render Language. */
+  class type {
+  public:
     
-    bool base_equal(const type_spec &rhs);
-
-    bool operator==(const type_spec &rhs);
-    bool operator!=(const type_spec &rhs) { return !(*this == rhs); }
-    llvm::Type *llvm_type() const;
+    //type information
+    const std::string name, type_id;
+    const bool is_differentiable;
     
-    void destroy(llvm::Value *addr, llvm::Module *module, llvm::IRBuilder<> &builder);
+    bool operator==(const type &rhs) const { return type_id == rhs.type_id; }
+    bool operator!=(const type &rhs) const { return !(*this == rhs); }
 
-    std::string get_arg_code() const;
+    //casting
+    virtual bool can_cast_to(const type &other, /* out */ int &cost) const {
+      if (*this == other) {
+	cost = 0;
+	return true;
+      }
+
+      cost = std::numeric_limits<int>::max();
+      return false;
+    };
+    virtual llvm::Value* gen_cast(const type &other, llvm::Value *value,
+				  llvm::Module *module, llvm::IRBuilder<> &builder) const { throw std::runtime_error("Invalid cast"); }
+
+    //destruction/copy
+    virtual codegen_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const { return nullptr; }
+    virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return nullptr; }
+    
+    virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return value; }
+    
+    virtual codegen_value create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
+
+    virtual llvm::Type *llvm_type() const = 0;
+
+    //operations
+    virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+
+    virtual codegen_value op_less(llvm::Module *module, llvm::IRBuilder<> &builder,
+				  codegen_value &lhs, codegen_value &rhs) const;
+    
+  protected:
+
+    type_table *types;
+    
+    type(type_table *types,
+	 const std::string &name, const std::string &type_id, bool is_differentiable = false) : types(types), name(name), type_id(type_id), is_differentiable(is_differentiable) { }
+    
+    compile_error arg_count_mismatch(unsigned int expected, unsigned int found) const;
+    
   };
 
-  llvm::Type *get_llvm_primitive_type(const type_code t);
-  llvm::Type *get_llvm_tuple_type(const type_code t, unsigned int n);
-  llvm::Type *get_llvm_chunk_type(const type_code t);
-  llvm::Type *get_llvm_type(const type_code t);
   
   /* Type constructors */
+
+  llvm::Value *make_llvm_float3(llvm::Module *module, llvm::IRBuilder<> &builder,
+				type_table &types,
+				llvm::Value *x, llvm::Value *y, llvm::Value *z);
   
   llvm::Value *make_llvm_float4(llvm::Module *module, llvm::IRBuilder<> &builder,
+				type_table &types,
 				llvm::Value *x, llvm::Value *y, llvm::Value *z, llvm::Value *w);
+  
+
 };
 
 #endif

@@ -2,6 +2,9 @@
 #include "math/vector.hpp"
 #include "geometry/ray.hpp"
 
+#include "compiler/types/primitive.hpp"
+#include "compiler/types/special.hpp"
+
 #include "llvm/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 
@@ -12,120 +15,67 @@ using namespace raytrace;
 using namespace std;
 using namespace llvm;
 
-/** Type Codes **/
-
-namespace raytrace {
-  template<> type_code get_type_code<bool>() { return BOOL; }
-  template<> type_code get_type_code<int>() { return INT; }
-  template<> type_code get_type_code<float>() { return FLOAT; }
-  template<> type_code get_type_code<float4>() { return FLOAT4; }
-
-  template<> type_code get_type_code<ray>() { return RAY; }
-  template<> type_code get_type_code<void>() { return VOID; }
-};
-
-/** Type Traits **/
-
-namespace raytrace {
-  template<> type_traits get_type_traits<type_code::BOOL>() { return {"bool", "b", type_code::BOOL, true, true, sizeof(bool), NULL}; }
-  template<> type_traits get_type_traits<type_code::INT>() { return {"int", "i", type_code::INT, true, true, sizeof(int), NULL}; }
-  template<> type_traits get_type_traits<type_code::FLOAT>() { return {"float", "f", type_code::FLOAT, true, true, sizeof(float), NULL}; }
-
-  template<> type_traits get_type_traits<type_code::FLOAT4>() { return {"vec4", "v4", type_code::FLOAT4, false, false, sizeof(float4), NULL}; }
-  template<> type_traits get_type_traits<type_code::RAY>() { return {"ray", "r", type_code::RAY, false, true, sizeof(ray), NULL}; }
-
-  template<> type_traits get_type_traits<type_code::VOID>() { return {"void", "v", type_code::VOID, true, true, 0, NULL}; }
-  template<> type_traits get_type_traits<type_code::OTHER>() { return {"other", "0", type_code::OTHER, true, false, 0, NULL}; }
-}
-
-type_traits raytrace::get_type_traits(type_code t) {
-  switch (t) {
-  case BOOL: return get_type_traits<BOOL>();
-  case INT: return get_type_traits<INT>();
-  case FLOAT: return get_type_traits<FLOAT>();
-
-  case FLOAT4: return get_type_traits<FLOAT4>();
-  case RAY: return get_type_traits<RAY>();
-
-  case VOID: return get_type_traits<VOID>();
-  case OTHER:
-  default:
-    return get_type_traits<OTHER>();
-  }
-}
-
-/** Destructors **/
-
-bool raytrace::type_spec::base_equal(const type_spec &rhs) {
-  return (t == rhs.t);
-}
-
-bool raytrace::type_spec::operator==(const type_spec &rhs) {
-  return base_equal(rhs);
-}
-
-Type *raytrace::type_spec::llvm_type() const {
-  return get_llvm_type(t);
-}
-
-void raytrace::type_spec::destroy(Value *addr, Module *module, IRBuilder<> &builder) {
-  type_traits tt = get_type_traits(t);
-  if (tt.destroy) tt.destroy(addr, module, builder);
-}
-
-string raytrace::type_spec::get_arg_code() const {
-  type_traits tt = get_type_traits(t);
-  return tt.code;
-}
-
-Type *raytrace::get_llvm_primitive_type(const type_code t) {
-  switch (t) {
-  case BOOL:
-    return Type::getInt1Ty(getGlobalContext());
-  case INT:
-    return Type::getInt32Ty(getGlobalContext());
-  case FLOAT:
-    return Type::getFloatTy(getGlobalContext());
-  case VOID:
-    return Type::getVoidTy(getGlobalContext());
-  case OTHER:
-  default:
-    throw runtime_error("Invalid type.");
-  }
-}
-
-Type *raytrace::get_llvm_tuple_type(const type_code t, unsigned int n) {
-  vector<Type*> types(n, get_llvm_primitive_type(t));
-  return StructType::get(getGlobalContext(), ArrayRef<Type*>(types), true);
-}
-
-Type *raytrace::get_llvm_chunk_type(const type_code t) {
-  type_traits tt = get_type_traits(t);
-  size_t num_bytes = tt.size;
-  return ArrayType::get(Type::getInt8Ty(getGlobalContext()), num_bytes);
-}
-
-Type *raytrace::get_llvm_type(const type_code t) {
-  type_traits tt = get_type_traits(t);
-
-  if (tt.is_primitive) return get_llvm_primitive_type(t);
-
-  switch (t) {
-  case FLOAT4:
-    return get_llvm_tuple_type(FLOAT, 4);
-  case RAY:
-    return get_llvm_chunk_type(RAY);
-  default:
-    throw runtime_error("Invalid type.");
-  }
+void raytrace::initialize_types(type_table &tt) {
+  typedef shared_ptr<type> type_ptr;
   
+  tt["void"] = type_ptr(new void_type(&tt));
+  tt["bool"] = type_ptr(new bool_type(&tt));
+  tt["int"] = type_ptr(new int_type(&tt));
+  tt["float"] = type_ptr(new float_type(&tt));
+  tt["string"] = type_ptr(new string_type(&tt));
+
+  tt["vec3"] = type_ptr(new float3_type(&tt));
+  tt["vec4"] = type_ptr(new float4_type(&tt));
+  
+  tt["scene_ptr"] = type_ptr(new scene_ptr_type(&tt));
+  tt["ray"] = type_ptr(new ray_type(&tt));
+  tt["isect"] = type_ptr(new intersection_type(&tt));
+}
+
+/** Type Base Class **/
+
+codegen_value type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args) const {
+  stringstream ss;
+  ss << "Type '" << name << "' has no constructor.";
+  return compile_error(ss.str());
+}
+
+codegen_value type::op_add(Module *module, IRBuilder<> &builder,
+			   codegen_value &lhs, codegen_value &rhs) const {
+  stringstream ss;
+  ss << "Type '" << name << "' does not support addition.";
+  return compile_error(ss.str());
+}
+
+codegen_value type::op_less(Module *module, IRBuilder<> &builder,
+			   codegen_value &lhs, codegen_value &rhs) const {
+  stringstream ss;
+  ss << "Type '" << name << "' does not support less than comparison.";
+  return compile_error(ss.str());
+}
+
+compile_error type::arg_count_mismatch(unsigned int expected, unsigned int found) const {
+  stringstream ss;
+  ss << "Error with type '" << name << "': Expected " << expected << " arguments, found " << found << ".";
+  return compile_error(ss.str());
 }
 
 /** Constructors **/
 
+Value *raytrace::make_llvm_float3(Module *, IRBuilder<> &builder,
+				  type_table &types,
+				  Value *x, Value *y, Value *z) {
+  llvm::Value *v = builder.CreateInsertValue(UndefValue::get(types["vec3"]->llvm_type()),
+					     x, ArrayRef<unsigned int>(0), "new_vec3");
+  v = builder.CreateInsertValue(v, y, ArrayRef<unsigned int>(1));
+  v = builder.CreateInsertValue(v, z, ArrayRef<unsigned int>(2));
+  return v;
+}
+
 Value *raytrace::make_llvm_float4(Module *, IRBuilder<> &builder,
+				  type_table &types,
 				  Value *x, Value *y, Value *z, Value *w) {
-  llvm::Value *v = builder.CreateInsertValue(UndefValue::get(get_llvm_type(FLOAT4)),
+  llvm::Value *v = builder.CreateInsertValue(UndefValue::get(types["vec4"]->llvm_type()),
 					     x, ArrayRef<unsigned int>(0), "new_vec4");
   v = builder.CreateInsertValue(v, y, ArrayRef<unsigned int>(1));
   v = builder.CreateInsertValue(v, z, ArrayRef<unsigned int>(2));

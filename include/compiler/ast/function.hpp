@@ -17,21 +17,20 @@ namespace raytrace {
     class func_call : public expression {
     public:
 
-      func_call(const std::string &fname,
-		const std::vector<expression_ptr> &args,
-		func_symbol_table *func_symtab);
+      func_call(parser_state *st, const std::string &fname,
+		const std::vector<expression_ptr> &args);
       virtual ~func_call() {}
       
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual type_spec typecheck();
 
     private:
 
       std::string fname;
       std::vector<expression_ptr> args;
-      func_symbol_table *func_symtab;
 
-      std::string get_symtab_name();
+      function_key get_key() const;
+      
     };
 
     /* 
@@ -43,17 +42,16 @@ namespace raytrace {
     public:
       
       //Locally defined functions.
-      prototype(const std::string &name, const type_spec &return_type,
-		const std::vector<function_argument> &args, func_symbol_table *func_symtab);
+      prototype(parser_state *st, const std::string &name, const type_spec &return_type,
+		const std::vector<function_argument> &args);
 
       //Externally defined functions.
-      prototype(const std::string &name, const std::string &extern_name,
-		const type_spec &return_type, const std::vector<function_argument> &args,
-		func_symbol_table *func_symtab);
-
+      prototype(parser_state *st, const std::string &name, const std::string &extern_name,
+		const type_spec &return_type, const std::vector<function_argument> &args);
+      
       virtual ~prototype() {}
 
-      virtual llvm::Function *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
       const std::string &function_name() { return name; }
       void set_external(const std::string &extern_name);
@@ -71,10 +69,10 @@ namespace raytrace {
       std::vector<function_argument> args;
       bool external;
       
-      func_symbol_table *func_symtab;
-
+      function_key get_key() const;
+      
       //checks to see if this function has been previously defined (and if so, do the prototypes match).
-      llvm::Function *check_for_entry();
+      codegen_value check_for_entry();
     };
 
     typedef std::shared_ptr<prototype> prototype_ptr;
@@ -83,21 +81,19 @@ namespace raytrace {
     class function : public global_declaration {
     public:
       
-      function(const prototype_ptr &defn, const statement_list &body,
-	       var_symbol_table *symtab, control_state *control);
+      function(parser_state *st, const prototype_ptr &defn, const statement_list &body);
       virtual ~function() {}
 
-      virtual llvm::Function *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
     private:
 
       prototype_ptr defn;
       statement_list body;
-      var_symbol_table *symtab;
-      control_state *control;
-
-      llvm::AllocaInst *create_argument_alloca(llvm::Function *f, const function_argument &arg_name);
       
+      llvm::AllocaInst *create_argument_alloca(llvm::Function *f, const function_argument &arg_name);
+      codegen_value create_function(llvm::Value *& val, llvm::Module *module, llvm::IRBuilder<> &builder);
+
     };
 
     typedef std::shared_ptr<function> function_ptr;
@@ -106,16 +102,15 @@ namespace raytrace {
     class return_statement : public statement {
     public:
       
-      return_statement(const expression_ptr &expr, control_state *control);
+      return_statement(parser_state *st, const expression_ptr &expr);
       virtual ~return_statement() {}
 
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual bool is_terminator() { return true; }
 
     private:
       
       expression_ptr expr;
-      control_state *control;
 
     };
     

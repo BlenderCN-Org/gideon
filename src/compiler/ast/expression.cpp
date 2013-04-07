@@ -4,30 +4,38 @@
 #include <iostream>
 
 using namespace std;
-using namespace raytrace::ast;
+using namespace raytrace;
 using namespace llvm;
 
 /** Expression Base **/
 
-Value *raytrace::ast::expression::codegen_ptr(Module *module, IRBuilder<> &builder) {
-  throw runtime_error("Cannot convert expression to lvalue");
+codegen_value raytrace::ast::expression::codegen_ptr(Module *module, IRBuilder<> &builder) {
+  return compile_error("Cannot convert expression to lvalue");
+}
+
+typecheck_value ast::expression::typecheck_safe() {
+  try { return typecheck(); }
+  catch (compile_error &e) { return e; }
 }
 
 /** Binary Expression **/
 
-raytrace::ast::binary_expression::binary_expression(const string &op, const expression_ptr &lhs, const expression_ptr &rhs) :
-  expression(), op(op), lhs(lhs), rhs(rhs)
+raytrace::ast::binary_expression::binary_expression(parser_state *st, const string &op, const expression_ptr &lhs, const expression_ptr &rhs) :
+  expression(st), op(op), lhs(lhs), rhs(rhs)
 {
   
 }
 
 raytrace::type_spec raytrace::ast::binary_expression::typecheck() {
   if (op == "+") return get_add_result_type(lhs, rhs);
-  if (op == "<") return { type_code::BOOL };
+  if (op == "<") return state->types["bool"];
 }
 
-Value *raytrace::ast::binary_expression::codegen(Module *module, IRBuilder<> &builder) {
-  if (op == "+") return generate_add(lhs, rhs, module, builder);
-  if (op == "<") return generate_less_than(lhs, rhs, module, builder);
+codegen_value raytrace::ast::binary_expression::codegen(Module *module, IRBuilder<> &builder) {
+  try {
+    if (op == "+") return generate_add(lhs, rhs, state->types, module, builder);
+    if (op == "<") return generate_less_than(lhs, rhs, state->types, module, builder);
+  }
+  catch (compile_error &e) { return e; }
 }
 

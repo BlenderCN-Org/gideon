@@ -7,15 +7,18 @@ namespace raytrace {
 
   namespace ast {
     
+    template<typename T>
+    type_spec get_literal_type(parser_state *st);
+
     //Template class for literals.
     template<typename T>
     class literal : public expression {
     public:
       
-      literal(const T& v) : expression(get_type_code<T>()), value(v) {}
+      literal(parser_state *st, const T& v) : expression(st, get_literal_type<T>(st)), value(v) {}
       virtual ~literal() { }
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
-      virtual type_spec typecheck() { return { get_type_code<T>() }; }
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual type_spec typecheck() { return { get_literal_type<T>(state) }; }
       
     private:
       

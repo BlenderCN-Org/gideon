@@ -42,10 +42,18 @@ set(RT_SOURCE_FILES
   shading/distribution.cpp
   shading/shadetree.cpp
 
+  compiler/rendermodule.cpp
   compiler/types.cpp
+  compiler/errors.cpp
   compiler/symboltable.cpp
   compiler/operations.cpp
-  compiler/builtin_ops.cpp
+  compiler/llvm_helper.cpp
+
+  compiler/builtin_ops.cpp  
+  compiler/gd_std.cpp
+
+  compiler/types/primitive.cpp
+  compiler/types/special.cpp
 
   compiler/ast/ast.cpp
   compiler/ast/literal.cpp
@@ -76,7 +84,7 @@ include_directories(${RT_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 link_directories(${LLVM_LIB_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
-#add_library(raytrace SHARED ${RT_SOURCE_FILES})
+#add_library(raytrace SHARED ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE})
 add_executable(raytrace ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE} ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
 
 target_link_libraries(raytrace ${LLVM_LIBS} pthread m dl)

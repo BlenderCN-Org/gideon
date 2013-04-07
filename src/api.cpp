@@ -3,18 +3,79 @@
 #include "geometry/triangle.hpp"
 #include "scene/bvh.hpp"
 #include "scene/bvh_builder.hpp"
+
+#include "compiler/gd_std.hpp"
+
 #include "vm/vm.hpp"
 #include "vm/instruction.hpp"
 #include "vm/standard.hpp"
 #include "vm/program.hpp"
+
+#include "compiler/rendermodule.hpp"
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/ExecutionEngine/JIT.h"
+#include "llvm/Support/TargetSelect.h"
+#include "llvm/Support/DynamicLibrary.h"
+
+#include <dlfcn.h>
 
 #include <random>
 #include <functional>
 
 #include <math.h>
 
+#include <fstream>
+#include <sstream>
+
 using namespace std;
 using namespace raytrace;
+using namespace llvm;
+using namespace gideon::rl;
+
+#define GDRL_DLL_EXPORT __attribute__ ((visibility ("default")))
+
+extern "C" GDRL_DLL_EXPORT void gde_print_coords(int x, int y) {
+  cout << "Coordinates (" << x << ", " << y << ")" << endl;
+}
+
+extern "C" void gde_isect_normal(intersection *i, scene_data *sdata, float3 *N) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[i->prim_idx];
+  int3 &tri = s->triangle_verts[prim.data_id];
+  vector<float3> &verts = s->vertices;
+
+  *N = compute_triangle_normal(verts[tri.x], verts[tri.y], verts[tri.z]);
+}
+
+extern "C" int gde_draw_coords(int x, int y, int idx, float depth, void *out) {
+  float *rgba_out = reinterpret_cast<float*>(out);
+  float v = (depth < 0.0) ? 0.0 : depth;
+  //v = expf(-0.2f * depth);
+
+  rgba_out[idx] = v;
+  rgba_out[idx+1] = v;
+  rgba_out[idx+2] = v;
+  rgba_out[idx+3] = 1.0f;
+  return idx + 4;
+}
+
+extern "C" float gde_scene_trace(ray *r, void *sptr) {
+  scene_data *sdata = reinterpret_cast<scene_data*>(sptr);
+  scene *s = sdata->s;
+  bvh &accel = *sdata->accel;
+
+  float depth = s->main_camera.clip_end;
+  intersection nearest;
+  
+  unsigned int aabb_checked, prim_checked;
+  if (accel.trace(*r, nearest, aabb_checked, prim_checked)) depth = nearest.t;
+  return depth;
+}
+
+extern "C" void gde_print_ray(ray *r) {
+  cout << "Origin: (" << r->o.x << ", " << r->o.y << ", " << r->o.z << ")" << endl;
+  cout << "Direction: (" << r->d.x << ", " << r->d.y << ", " << r->d.z << ")" << endl;
+}
 
 /* Code used by the Blender Python Plugin. */
 extern "C" {
@@ -131,7 +192,7 @@ extern "C" {
     cout << "Primitive Count: " << s->primitives.size() << endl;
     cout << "Resolution: [" << s->resolution.x << ", " << s->resolution.y << "]" << endl;
 
-    transform id{
+    raytrace::transform id{
       {
 	{1.0f, 0.0f, 0.0f, 0.0f},
 	{0.0f, 1.0f, 0.0f, 0.0f},
@@ -140,7 +201,7 @@ extern "C" {
       }
     };
 
-    transform translate{
+    raytrace::transform translate{
       {
 	{1.0f, 0.0f, 0.0f, 2.0f},
 	{0.0f, 1.0f, 0.0f, 2.0f},
@@ -201,313 +262,46 @@ extern "C" {
     s->resolution = {resolution_x, resolution_y};
   }
 
+
   void scene_demo_render_prog(void *sptr,
 			      /* out */ float *rgba_out) {
+    InitializeNativeTarget();
+    
     scene *s = reinterpret_cast<scene*>(sptr);
 
     cout << "Building scene BVH..." << endl;
     bvh accel = build_bvh_centroid_sah(s);
     cout << "...done." << endl;
-
-    vm svm(s, &accel);
-    svm.output.rgba_out = rgba_out;
-    svm.output.pixel_idx = 0;
-
-    instruction_set is = create_standard_instruction_set();
-
-    /* build a simple distribution function */
-    program reflect;
-    reflect.constants.get<float3>(0) = {1.0f, 1.0f, 1.0f};
-    reflect.constants.get<float>(0) = 1.0f;
     
-    reflect.constants.get<int>(0) = 0;
+    scene_data sd;
+    sd.s = s;
+    sd.accel = &accel;
+    scene_data *sd_loc = &sd;
 
-    vector<string> bsdf_code({
-	//read sigma parameter
-	"movi_f_iC 0 0",
-
-	  //evaluate the bsdf
-	  "debug_oren_nayar 0 0 0 2 4",
-	  
-	  //multiply it by the color
-	  "mul_f_f3C 5 0 0",
-	  
-	  //copy out elements and build result
-	  "vector_elem_f3 0 5 0",
-	  "vector_elem_f3 1 5 1",
-	  "vector_elem_f3 2 5 2",
-	  "mov_f_fC 3 0",
-	  "merge4_f 0 0 1 2 3" //merge all components with 1.0 alpha and save to result register
-	  });
+    ifstream render_file("/home/curtis/Projects/relatively-crazy/tests/render_loop.gdl");
+    string source((istreambuf_iterator<char>(render_file)), istreambuf_iterator<char>());
+    cout << "Source Code: " << endl << source << endl;
+    render_module render("test_loop", source);
+    Module *module = render.compile();
+    verifyModule(*module);
+    module->dump();
     
-    assemble(is, reflect.code, bsdf_code);
-    s->distributions.push_back(distribution_function("oren-nayar", distribution_function::DIFFUSE,
-						     &reflect, 0, 0,
-						     {{"sigma", sizeof(float)}}));
+    string load_err;
+    sys::DynamicLibrary dylib = sys::DynamicLibrary::getPermanentLibrary("libraytrace.so", &load_err);
+    cout << "Result of Library Load: " << load_err << endl;
 
-    cout << "Distribution Parameter Size: " << s->distributions[0].param_size() << endl;
-
-
-    program render;
-
-    parameter_list results(2*sizeof(int));
-
-    //setup constants
-    render.constants.get<int>(0) = s->resolution.x;
-    render.constants.get<int>(1) = s->resolution.y;
-    render.constants.get<int>(2) = 0;
-    render.constants.get<int>(3) = 1;
-    render.constants.get<int>(7) = sizeof(int);
-    render.constants.get<int>(8) = 0; //ID of the distribution
-    render.constants.get<int>(9) = 12; //# of shadow samples per light
-
-    render.constants.get<float>(0) = s->resolution.x;
-    render.constants.get<float>(1) = s->resolution.y;
-    render.constants.get<float>(2) = s->main_camera.clip_end;
-    render.constants.get<float>(3) = 0.0f;
-
-    render.constants.get<float>(4) = epsilon;
-    render.constants.get<float>(5) = 1.0f;
-
-    render.constants.get<float>(6) = 0.8f; //shading parameter - sigma
+    string error_str;
+    ExecutionEngine *engine = EngineBuilder(module).setErrorStr(&error_str).create();
+    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_scene")), (void*)&sd_loc);
+    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_output")), (void*)&rgba_out);
     
-    render.constants.get<float3>(0) = {0.0f, 0.0f, 1.0f};
-    render.constants.get<float3>(1) = {0.0f, 0.0f, 0.0f};
+    void *fptr = engine->getPointerToFunction(module->getFunction("gdi_2_main_i_i"));
+    void (*render_entry)(int, int) = (void (*)(int, int))(fptr);
 
-    render.constants.get<string>(0) = "attribute:my_colors";
-    render.constants.get<string>(1) = "uv:UVMap";
-    render.constants.get<string>(2) = "Number of Lights: ";
+    render_entry(s->resolution.x, s->resolution.y);
+    //render_entry(3, 3);
 
-    vector<string> radiance_func({
-	//-- light shading routine
-	//f3R(-2) = position to illuminate
-	//f3R(-3) = shading location normal
-	//f3R(-4) = color at shading location
-	//f3R(-5) = direction of eye
-	//returns f3R(-1)
-
-	//instantiate the bsdf
-	"mov_i_iC 8 8",
-	  "mov_f_fC 0 6",
-
-	  "distribution_create 0 8",
-	  "distribution_get_params 1 0",
-	  "movp_f_iC 1 0 2", //copy sigma to input
-	  "shader_scale_f3 0 -4 0", //scale the shader by the surface color
-	  
-	  "mov_f3_f3C -1 1",
-	  
-	  "mov_i_iC 2 9",
-	  "conv_i_to_f 5 2",
-	  "mov_f_fC 6 5",
-	  "div_f_f 6 6 5", //1 / num_samples
-
-	  "light_count 2",
-	  "mov_i_iC 3 2", //loop counter = 0
-	  "save_pc_offset 4 1",
-	  
-	  "mov_i_iC 9 2", //sample counter = 0
-	  "save_pc_offset 10 1",
-
-	  //sample a location
-	  "mov_f_fC 0 3",
-	  "random_f 2",
-	  "random_f 3",
-	  "light_sample_position 0 3 -2 2 3",
-	  
-	  //remove w-component (light sample returns float4)
-	  "vector_elem_f4 2 0 0",
-	  "vector_elem_f4 3 0 1",
-	  "vector_elem_f4 4 0 2",
-	  "merge3_f 0 2 3 4",
-	  
-	  //build illumination direction & ray
-	  "sub_f3_f3 1 0 -2",
-	  "normalize_f3 2 1",
-
-	  //setup ray bounds
-	  "mov_f_fC 1 4", //near - epsilon
-	  "length_f3 2 1", //far - distance to light source + epsilon
-	  "add_f_fC 2 2 4",
-	  
-	  "build_ray 0 -2 2 1 2",
-	  
-	  //cast shadow ray
-	  "trace 6 0 0 7 8",
-	  
-	  //if not in shadow - evaluate illumination
-	  "save_pc_offset 7 11",
-	  "jump_nz_R 6 7",
-	  
-	  //evaluate the surface's bsdf at this point
-	  "shader_eval 1 0 -3 -2 -2 2 -5",
-	  "vector_elem_f4 2 1 0",
-	  "vector_elem_f4 3 1 1",
-	  "vector_elem_f4 4 1 2",
-	  "merge3_f 4 2 3 4",
-	  
-	  "light_eval_radiance 3 3 0 2", //evaluate incoming radiance
-	  "elem_mul_f3_f3 3 3 4", //multiply by illumination factor
-	  "mul_f_f3 3 6 3", //scale by sample count
-	  "add_f3_f3 -1 -1 3", //add to result
-
-	  "add_i_iC 9 9 3", //sample counter++
-	  "sub_i_iC 5 9 9", //tmp = sample_counter - num_samples
-	  "jump_nz_R 5 10",
-	  
-	  "add_i_iC 3 3 3", //counter++
-	  "sub_i_i 5 3 2", //tmp = counter - light_count
-	  "jump_nz_R 5 4",
-	  
-	  "jump_R 1", //return
-	  });
-
-    vector<string> shader({
-	//-- shading routine
-	//isectR(-1) - ray intersection
-	//rayR(-1) - ray
-	//returns f3R(-1)
-	
-	//access vertex color
-	"isect_u_v -1 1 2",
-	  "mov_f_fC 3 3",
-	  "merge3_f 124 1 2 3",
-	  "isect_primitive 0 -1",
-	  "isect_depth -1 -1",
-	  "prim_attribute_f3 3 124 0 0 1 2", //fR3 f3R0 primR0 stringC0 fR1 fR2
-	  
-	  //check for a UVMap attribute too
-	  "prim_attribute_f2 3 0 0 1 1 2",
-	  
-	  "save_pc_offset 2 5",
-	  "jump_z_R 3 2",
-	  
-	  "vector_elem_f2 1 0 0",
-	  "vector_elem_f2 2 0 1",
-	  "merge3_f 124 1 2 3",
-	  
-	  //gather illumination from the lights
-	  "prim_geometry_normal 125 0 1 2",
-	  "point_on_ray 126 -1 -1", 
-	  "ray_dir 123 -1",
-	  
-	  "stack_push",
-	  "mov_i_iC 0 6", //load function address
-	  "save_pc_offset 1 2",
-	  "jump_R 0",
-	  "stack_pop",
-	  
-	  "mov_f3_f3 -1 127",
-	  
-	  //compute the number of lights
-	  "light_count 3",
-	  "debug_to_string_i 0 3",
-	  "mov_s_sC 1 2",
-	  "string_concat 0 1 0",
-	  //"debug_print_str 0",
-	  
-	  "jump_R 1",
-	  });
-
-    vector<string> pixel_draw({
-	//-- pixel draw routine
-	//fR(-1) - pixel x coordinate
-	//fR(-2) - pixel y coordinate
-	//iR(-1) - aabb test count (in/out)
-	//iR(-2) - primitive test count (in/out)
-	
-	"gen_camera_ray 0 -1 -2",
-	  "trace 2 0 127 3 4",
-	  "mov_ray_ray 127 0",
-	  
-	  //record statistics
-	  "add_i_i -1 -1 3",
-	  "add_i_i -2 -2 4",
-	  
-	  "save_pc_offset 3 10",
-	  "jump_z_R 2 3", //skip the next few instructions if the ray didn't hit
-	  
-	  //ray-hit something - let's shade it
-	  "stack_push",
-	  "mov_i_iC 0 5", //load function address
-	  "save_pc_offset 1 2",
-	  "jump_R 0",
-	  "stack_pop",
-	  "mov_f3_f3 0 127", //copy the returned color into the register that will be drawn		   
-	  
-	  "save_pc_offset 3 4",
-	  "jump_R 3",
-	  
-	  //did not hit, so write black
-	  "mov_f_fC 0 3",
-	  "merge3_f 0 0 0 0",
-	  
-	  "debug_write_color 0", //write to the output buffer
-	  
-	  //return
-	  "jump_R 1",
-      });
-    
-    //define a program to trace a ray at each point and record depth
-    vector<string> code({
-	//-- main loop start
-	
-	//initialize statistics
-	"mov_i_iC 127 2",
-	  "mov_i_iC 126 2",
-	  
-	  //set the loop counters
-	  "save_pc_offset 3 2",
-	  "mov_i_iC 1 2",
-	  
-	  "save_pc_offset 4 2",
-	  "mov_i_iC 0 2",
-
-	  //get pixel float coordinates
-	  "conv_i_to_f 127 0",
-	  "conv_i_to_f 126 1",
-
-	  //"debug_print 0 1",
-	  
-	  //call render function
-	  "stack_push",
-	  "mov_i_iC 0 4", //load function address
-	  "save_pc_offset 1 2", //save return address
-	  "jump_R 0", //execute the function
-	  "stack_pop",
-	  
-	  //next pixel
-	  "add_i_iC 0 0 3", //x++
-	  "sub_i_iC 2 0 0", //(x - resolution_x)
-	  "jump_nz_R 2 4",
-	  
-	  //next column
-	  "add_i_iC 1 1 3", //y++
-	  "sub_i_iC 2 1 1", //(y - resolution_y)
-	  "jump_nz_R 2 3",
-	  
-	  //all done, write statistics to output
-	  "movo_i_iC 127 2",
-	  "movo_i_iC 126 7",
-	  "jump -1",
-	  });
-    
-    render.constants.get<int>(4) = static_cast<int>(code.size()); //location of the pixel draw routine
-    code.insert(code.end(), pixel_draw.begin(), pixel_draw.end());
-
-    render.constants.get<int>(5) = static_cast<int>(code.size()); //location of the shader routine
-    code.insert(code.end(), shader.begin(), shader.end());
-
-    render.constants.get<int>(6) = static_cast<int>(code.size()); //location of the lighting routine
-    code.insert(code.end(), radiance_func.begin(), radiance_func.end());
-    
-    assemble(is, render.code, code);
-    
-    cout << "Num Instructions: " << render.code.size() << endl;
-    svm.execute(render, 0, NULL, &results);
-
-    cout << "Total Number AABB Checks: " << results.get<int>(0) << endl;
-    cout << "Total Number Prim Checks: " << results.get<int>(sizeof(int)) << endl;
+    delete engine;
   }
 
   void scene_demo_render_nice(void *sptr,

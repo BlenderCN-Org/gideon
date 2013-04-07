@@ -8,6 +8,7 @@
 #include "llvm/Analysis/Verifier.h"
 
 #include "compiler/types.hpp"
+#include "compiler/ast/node.hpp"
 
 #include <memory>
 #include <stdexcept>
@@ -17,23 +18,24 @@ namespace raytrace {
   namespace ast {
     
     /* Base class for expressions */
-    class expression {
+    class expression : public ast_node {
     public:
 
-      expression() : result_type(type_code::OTHER) {}
-      expression(const type_code &rt) : result_type(rt) {}
+      expression(parser_state *st) : ast_node(st), result_type(st->types["void"]) {}
+      expression(parser_state *st, const type_spec &rt) : ast_node(st), result_type(rt) {}
       
       virtual ~expression() {}
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
 
-      virtual llvm::Value *codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual bool has_ptr() { return false; } //returns true if this expression has an address
       
       virtual type_spec typecheck() = 0;
+      typecheck_value typecheck_safe();
       
     protected:
 
-      type_code result_type;
+      type_spec result_type;
       
     };
 
@@ -43,10 +45,10 @@ namespace raytrace {
     class binary_expression : public expression {
     public:
       
-      binary_expression(const std::string &op, const expression_ptr &lhs, const expression_ptr &rhs);
+      binary_expression(parser_state *st, const std::string &op, const expression_ptr &lhs, const expression_ptr &rhs);
       virtual ~binary_expression() {}
       
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
       virtual type_spec typecheck();
       

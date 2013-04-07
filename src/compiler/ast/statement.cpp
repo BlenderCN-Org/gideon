@@ -6,13 +6,13 @@ using namespace llvm;
 
 /* Expression Statement */
 
-raytrace::ast::expression_statement::expression_statement(const expression_ptr &expr) :
-  statement(), expr(expr)
+raytrace::ast::expression_statement::expression_statement(parser_state *st, const expression_ptr &expr) :
+  statement(st), expr(expr)
 {
 
 }
 
-Value *raytrace::ast::expression_statement::codegen(Module *module, IRBuilder<> &builder) {
+codegen_value raytrace::ast::expression_statement::codegen(Module *module, IRBuilder<> &builder) {
   return expr->codegen(module, builder);
 }
 
@@ -24,30 +24,39 @@ raytrace::ast::statement_list::statement_list(const vector<statement_ptr> &state
   
 }
 
-void raytrace::ast::statement_list::codegen(Module *module, IRBuilder<> &builder) {
+codegen_void raytrace::ast::statement_list::codegen(Module *module, IRBuilder<> &builder) {
+  codegen_void result = nullptr;
+
   for (auto it = statements.begin(); it != statements.end(); it++) {
-    (*it)->codegen(module, builder);
-    if ((*it)->is_terminator()) return; //ignore all statements after a terminator
+    codegen_value val = (*it)->codegen(module, builder);
+    codegen_void stmt_rt = errors::codegen_ignore_value(val);
+    result = errors::merge_void_values(result, stmt_rt);
+    
+    if ((*it)->is_terminator()) break; //ignore all statements after a terminator
   }
+  
+  return result;
 }
 
 /* Scoped Statements */
 
-raytrace::ast::scoped_statement::scoped_statement(const statement_list &stmt_list,
-						  var_symbol_table *variables, func_symbol_table *functions) :
-  statement(),
-  statements(stmt_list), variables(variables), functions(functions)
+raytrace::ast::scoped_statement::scoped_statement(parser_state *st, const statement_list &stmt_list) :
+  statement(st), statements(stmt_list)
 {
   
 }
 
-Value *raytrace::ast::scoped_statement::codegen(Module *module, IRBuilder<> &builder) {
-  variables->scope_push();
-  functions->scope_push();
+codegen_value raytrace::ast::scoped_statement::codegen(Module *module, IRBuilder<> &builder) {
+  state->variables.scope_push();
+  state->functions.scope_push();
 
-  statements.codegen(module, builder);
+  typedef errors::argument_value_join<codegen_void, codegen_void, codegen_void>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> add_null_value = [] (arg_val_type &) -> codegen_value { return nullptr; };
 
-  functions->scope_pop(module, builder);
-  variables->scope_pop(module, builder); 
-  return NULL;
+  codegen_void rt = statements.codegen(module, builder);
+
+  codegen_void fpop = state->functions.scope_pop(module, builder);
+  codegen_void vpop = state->variables.scope_pop(module, builder);
+
+  return errors::codegen_call_args(add_null_value, rt, vpop, fpop);
 }

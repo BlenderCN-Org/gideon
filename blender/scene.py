@@ -4,7 +4,7 @@ from math import *
 import itertools
 
 #Clean up this loader a bit.
-cdll.LoadLibrary('/home/curtis/Projects/raytrace/build/src/libraytrace.so')
+cdll.LoadLibrary('/home/curtis/Projects/relatively-crazy/build/src/libraytrace.so')
 LibRaytrace = CDLL('libraytrace.so')
 LibRaytrace.rt_scene_init.restype = c_void_p
 

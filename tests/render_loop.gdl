@@ -1,0 +1,76 @@
+scene __gd_scene;
+scene __gd_output;
+
+extern void print(int x, int y) : gde_print_coords;
+extern int my_draw(int x, int y, int idx, float depth, scene out) : gde_draw_coords;
+
+extern void __print_ray(output ray r) : gde_print_ray;
+void print_ray(ray r) { __print_ray(r); }
+
+string make_a_string() {
+  //string s = "hello there";
+  //return s;
+  return "hello there";
+}
+
+//Temporary Functions
+extern void __isect_normal(output isect i, scene s, output vec3 N) : gde_isect_normal;
+vec3 isect:normal(isect i) {
+  vec3 N;
+  __isect_normal(i, __gd_scene, N);
+  return N;
+}
+
+//Standard Library Functions
+extern float __ray_max_dist(output ray r) : gde_ray_max_dist;
+float ray:max_dist(ray r) { return __ray_max_dist(r); }
+
+extern bool __trace(output ray r, output isect i, scene s) : gde_trace;
+bool trace(ray r, output isect hit) { return __trace(r, hit, __gd_scene); }
+
+extern float __isect_dist(output isect i) : gde_isect_dist;
+float isect:distance(isect i) { return __isect_dist(i); }
+
+extern void __camera_shoot_ray(int x, int y, scene s, output ray r) : gde_camera_shoot_ray;
+ray camera:shoot_ray(int x, int y) {
+  ray r;
+  __camera_shoot_ray(x, y, __gd_scene, r);
+  return r;
+}
+
+//Vector Operations
+extern float __dot_v3(output vec3 a, output vec3 b) : gde_dot_v3;
+float dot(vec3 a, vec3 b) { return __dot_v3(a, b); }
+
+extern void __normalize_v3(output vec3 v, output vec3 n) : gde_normalize_v3;
+vec3 normalize(vec3 v) { vec3 r; __normalize_v3(v, r); return r; }
+
+//Draw Functions
+int draw(int x, int y, int idx, float depth) {
+  return my_draw(x, y, idx, depth, __gd_output);
+}
+
+//Entry Point
+void main(int x_size, int y_size) {
+  int idx = 0;
+  isect ray_hit;
+  vec3 up = vec3(0.0, 0.0, 1.0);
+  string my_str = "hello there";
+  string uninit;
+  
+  for (int i = 0; i < y_size; i = i + 1) {
+    for (int j = 0; j < x_size; j = j + 1) {
+      ray r = camera:shoot_ray(j, i);
+      float depth = 0.0; //ray:max_dist(r);
+      
+      if (trace(r, ray_hit)) {
+	vec3 norm = isect:normal(ray_hit);
+	depth = dot(up, norm);
+      }
+      idx = draw(j, i, idx, depth);
+    }
+  }
+
+  uninit = my_str;
+  my_str = "wassup y'all";
+}

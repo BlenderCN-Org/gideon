@@ -18,13 +18,13 @@ namespace raytrace {
   namespace ast {
 
     /* Generic statement node. */
-    class statement {
+    class statement : public ast_node {
     public:
 
-      statement() {}
+      statement(parser_state *st) : ast_node(st) {}
       virtual ~statement() {}
 
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
       virtual bool is_terminator() { return false; }
     };
 
@@ -34,10 +34,10 @@ namespace raytrace {
     class expression_statement : public statement {
     public:
 
-      expression_statement(const expression_ptr &expr);
+      expression_statement(parser_state *st, const expression_ptr &expr);
       virtual ~expression_statement() {}
 
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       
     private:
       
@@ -50,7 +50,7 @@ namespace raytrace {
     public:
 
       statement_list(const std::vector<statement_ptr> &statements);
-      void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
     private:
 
@@ -62,17 +62,14 @@ namespace raytrace {
     class scoped_statement : public statement {
     public:
 
-      scoped_statement(const statement_list &stmt_list,
-		       var_symbol_table *variables, func_symbol_table *functions);
+      scoped_statement(parser_state *st, const statement_list &stmt_list);
       virtual ~scoped_statement() { }
 
-      virtual llvm::Value *codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
     private:
-
+      
       statement_list statements;
-      var_symbol_table *variables;
-      func_symbol_table *functions;
       
     };
 

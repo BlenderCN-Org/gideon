@@ -49,6 +49,27 @@ namespace raytrace {
 				  codegen_value &lhs, codegen_value &rhs) const;
   };
 
+  //Strings
+  class string_type : public type {
+  public:
+
+    string_type(type_table *types);
+
+    virtual llvm::Type *llvm_type() const;
+    
+    virtual codegen_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
+
+    virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
+    
+  private:
+
+    llvm::Type *str_type_value;
+
+  };
+
+  //Vector Types
+
   class float4_type : public type {
   public:
     
@@ -57,6 +78,23 @@ namespace raytrace {
 
     virtual codegen_value create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
 
+    virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+
+  private:
+
+    llvm::Type *type_value;
+
+  };
+
+  class float3_type : public type {
+  public:
+    
+    float3_type(type_table *types);
+    virtual llvm::Type *llvm_type() const;
+    
+    virtual codegen_value create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
+    
     virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
 				 codegen_value &lhs, codegen_value &rhs) const;
 
