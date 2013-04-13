@@ -25,7 +25,6 @@ function_key ast::func_call::get_key() const {
 
 codegen_value raytrace::ast::func_call::codegen(Module *module, IRBuilder<> &builder) {
   function_symbol_table::entry_type *entry = nullptr;
-  
   try { entry = &state->functions.get(get_key()); }
   catch (compile_error &e) { return e; }
   

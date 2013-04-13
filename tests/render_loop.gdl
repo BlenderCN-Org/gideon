@@ -1,17 +1,41 @@
 scene __gd_scene;
 scene __gd_output;
+scene __gd_rng;
 
 extern void print(int x, int y) : gde_print_coords;
-extern int my_draw(int x, int y, int idx, float depth, scene out) : gde_draw_coords;
+extern int my_draw(int x, int y, int idx, float depth, output vec3 color, output vec2 uv, scene out) : gde_draw_coords;
+
+extern void __print_string(output string s) : gde_print_string;
+void print_string(string s) { __print_string(s); }
 
 extern void __print_ray(output ray r) : gde_print_ray;
 void print_ray(ray r) { __print_ray(r); }
 
-string make_a_string() {
-  //string s = "hello there";
-  //return s;
-  return "hello there";
+extern bool __isect_attribute(output isect i, output string name, scene s, output vec3 color) : gde_isect_get_attribute3;
+bool isect:attribute(isect i, string name, output vec3 color) {
+  return __isect_attribute(i, name, __gd_scene, color);
 }
+
+extern bool __isect_attribute(output isect i, output string name, scene s, output vec2 color) : gde_isect_get_attribute2;
+bool isect:attribute(isect i, string name, output vec2 color) {
+  return __isect_attribute(i, name, __gd_scene, color);
+}
+
+extern int __scene_num_lights(scene s) : gde_scene_num_lights;
+int scene:num_lights() { return __scene_num_lights(__gd_scene); }
+
+extern void __scene_get_light(scene s, int id, output light l) : gde_scene_get_light;
+light scene:get_light(int id) {
+  light l;
+  __scene_get_light(__gd_scene, id, l);
+  return l;
+}
+
+extern float __random(scene rng) : gde_gen_random;
+float random() { return __random(__gd_rng); }
+
+extern void __dir_to_point(output vec4 P, output vec3 O, output vec3 D, output vec3 nD) : gde_dir_to_point;
+void dir_to_point(vec4 P, vec3 O, output vec3 D, output vec3 nD) { __dir_to_point(P, O, D, nD); }
 
 //Temporary Functions
 extern void __isect_normal(output isect i, scene s, output vec3 N) : gde_isect_normal;
@@ -20,6 +44,41 @@ vec3 isect:normal(isect i) {
   __isect_normal(i, __gd_scene, N);
   return N;
 }
+
+extern void __ray_point(output ray r, float t, output vec3 P) : gde_ray_point;
+vec3 ray:point(ray r, float t) {
+  vec3 P;
+  __ray_point(r, t, P);
+  return P;
+}
+
+extern void __light_sample_position(light lt, output vec3 P, float rand_u, float rand_v,
+				    output vec4 P_out) : gde_light_sample_position;
+vec4 light:sample_position(light lt, vec3 P, float rand_u, float rand_v) {
+  vec4 P_out;
+  __light_sample_position(lt, P, rand_u, rand_v, P_out);
+  return P_out;
+}
+
+extern void __light_eval_radiance(light lt, output vec3 P, output vec3 I,
+				  output vec3 R) : gde_light_eval_radiance;
+vec3 light:eval_radiance(light lt, vec3 P, vec3 I) {
+  vec3 R;
+  __light_eval_radiance(lt, P, I, R);
+  return R;
+}
+
+extern void __vec4_to_vec3(output vec4 v4, output vec3 v3) : gde_vec4_to_vec3;
+vec3 vec4_to_vec3(vec4 v) { vec3 v3; __vec4_to_vec3(v, v3); return v3; }
+
+extern void __vec3_comp_mul(output vec3 lhs, output vec3 rhs, output vec3 result) : gde_vec3_comp_mul;
+vec3 comp_mul(vec3 lhs, vec3 rhs) { vec3 rt; __vec3_comp_mul(lhs, rhs, rt); return rt; }
+
+extern void __vec3_scale(output vec3 v, float k, output vec3 result) : gde_vec3_scale;
+vec3 scale(vec3 v, float k) { vec3 r; __vec3_scale(v, k, r); return r; }
+
+extern void __gen_shadow_ray(output vec3 P, output vec3 P_lt, output ray r) : gde_gen_shadow_ray;
+ray gen_shadow_ray(vec3 P, vec3 P_lt) { ray r; __gen_shadow_ray(P, P_lt, r); return r; }
 
 //Standard Library Functions
 extern float __ray_max_dist(output ray r) : gde_ray_max_dist;
@@ -46,8 +105,8 @@ extern void __normalize_v3(output vec3 v, output vec3 n) : gde_normalize_v3;
 vec3 normalize(vec3 v) { vec3 r; __normalize_v3(v, r); return r; }
 
 //Draw Functions
-int draw(int x, int y, int idx, float depth) {
-  return my_draw(x, y, idx, depth, __gd_output);
+int draw(int x, int y, int idx, float depth, vec3 color, vec2 uv) {
+  return my_draw(x, y, idx, depth, color, uv, __gd_output);
 }
 
 //Entry Point
@@ -55,22 +114,51 @@ void main(int x_size, int y_size) {
   int idx = 0;
   isect ray_hit;
   vec3 up = vec3(0.0, 0.0, 1.0);
-  string my_str = "hello there";
-  string uninit;
   
+  int num_lights = scene:num_lights();
+  int num_samples = 8;
+  float inv_num_samples = 0.125;
+
   for (int i = 0; i < y_size; i = i + 1) {
     for (int j = 0; j < x_size; j = j + 1) {
       ray r = camera:shoot_ray(j, i);
-      float depth = 0.0; //ray:max_dist(r);
-      
+      vec3 L = vec3(0.0, 0.0, 0.0);
+
       if (trace(r, ray_hit)) {
 	vec3 norm = isect:normal(ray_hit);
-	depth = dot(up, norm);
+	vec3 P = ray:point(r, isect:distance(ray_hit));
+	
+	for (int l_id = 0; l_id < num_lights; l_id = l_id + 1) {
+	  light lt = scene:get_light(l_id);
+
+	  for (int sample_id = 0; sample_id < num_samples; sample_id = sample_id + 1) {
+	    vec4 P_lt4 = light:sample_position(lt, P, random(), random());
+	    vec3 P_lt = vec4_to_vec3(P_lt4);
+
+	    vec3 I;
+	    vec3 nI;
+	    dir_to_point(P_lt4, P, I, nI);
+	    
+	    ray shadow_ray = gen_shadow_ray(P, P_lt);
+	    isect shadow_hit;
+	    
+	    if (trace(shadow_ray, shadow_hit)) { }
+	    else {
+	      vec3 R = light:eval_radiance(lt, P_lt, I);
+	      float fac = dot(nI, norm);
+	      
+	      L = L + scale(scale(R, fac), inv_num_samples);
+	    }
+	  }
+	}
       }
-      idx = draw(j, i, idx, depth);
+
+      vec2 uv_coords = vec2(1.0, 1.0);
+      vec3 color = vec3(1.0, 1.0, 1.0);
+      bool has_color = isect:attribute(ray_hit, "attribute:my_colors", color);
+      has_color = isect:attribute(ray_hit, "uv:UVMap", uv_coords);
+      
+      idx = draw(j, i, idx, 1.0, L, uv_coords);
     }
   }
-
-  uninit = my_str;
-  my_str = "wassup y'all";
 }

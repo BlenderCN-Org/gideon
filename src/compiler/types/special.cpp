@@ -18,3 +18,9 @@ Type *intersection_type::llvm_type() const {
   Type *byte_type = Type::getInt8Ty(getGlobalContext());
   return ArrayType::get(byte_type, sizeof(intersection));
 }
+
+//Light Source
+
+Type *light_type::llvm_type() const {
+  return Type::getInt32PtrTy(getGlobalContext());
+}

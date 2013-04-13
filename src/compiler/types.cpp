@@ -3,6 +3,7 @@
 #include "geometry/ray.hpp"
 
 #include "compiler/types/primitive.hpp"
+#include "compiler/types/vector.hpp"
 #include "compiler/types/special.hpp"
 
 #include "llvm/LLVMContext.h"
@@ -24,12 +25,14 @@ void raytrace::initialize_types(type_table &tt) {
   tt["float"] = type_ptr(new float_type(&tt));
   tt["string"] = type_ptr(new string_type(&tt));
 
+  tt["vec2"] = type_ptr(new float2_type(&tt));
   tt["vec3"] = type_ptr(new float3_type(&tt));
   tt["vec4"] = type_ptr(new float4_type(&tt));
   
   tt["scene_ptr"] = type_ptr(new scene_ptr_type(&tt));
   tt["ray"] = type_ptr(new ray_type(&tt));
   tt["isect"] = type_ptr(new intersection_type(&tt));
+  tt["light"] = type_ptr(new light_type(&tt));
 }
 
 /** Type Base Class **/
@@ -61,6 +64,15 @@ compile_error type::arg_count_mismatch(unsigned int expected, unsigned int found
 }
 
 /** Constructors **/
+
+Value *raytrace::make_llvm_float2(Module *, IRBuilder<> &builder,
+				  type_table &types,
+				  Value *x, Value *y) {
+  Value *v = builder.CreateInsertValue(UndefValue::get(types["vec2"]->llvm_type()),
+				       x, ArrayRef<unsigned int>(0), "new_vec2");
+  v = builder.CreateInsertValue(v, y, ArrayRef<unsigned int>(1));
+  return v;
+}
 
 Value *raytrace::make_llvm_float3(Module *, IRBuilder<> &builder,
 				  type_table &types,

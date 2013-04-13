@@ -36,6 +36,8 @@ namespace raytrace {
     //type information
     const std::string name, type_id;
     const bool is_differentiable;
+
+    virtual bool is_iterator() const { return false; }
     
     bool operator==(const type &rhs) const { return type_id == rhs.type_id; }
     bool operator!=(const type &rhs) const { return !(*this == rhs); }
@@ -83,6 +85,10 @@ namespace raytrace {
 
   
   /* Type constructors */
+
+  llvm::Value *make_llvm_float2(llvm::Module *module, llvm::IRBuilder<> &builder,
+				type_table &types,
+				llvm::Value *x, llvm::Value *y);
 
   llvm::Value *make_llvm_float3(llvm::Module *module, llvm::IRBuilder<> &builder,
 				type_table &types,

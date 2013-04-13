@@ -20,12 +20,14 @@ namespace raytrace {
     class ast_node { 
     public:
 
-      ast_node(parser_state *st) : state(st) { }
+      ast_node(parser_state *st,
+	       unsigned int line_no = 0, unsigned int column_no = 0) : state(st), line_no(line_no), column_no(column_no) { }
       virtual ~ast_node() { }
       
     protected:
 
       parser_state *state;
+      unsigned int line_no, column_no;
 
     };
 

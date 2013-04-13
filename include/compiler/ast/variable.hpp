@@ -29,7 +29,8 @@ namespace raytrace {
     public:
 
       variable_decl(parser_state *st, const std::string &name,
-		    const type_spec &type, const expression_ptr &init);
+		    const type_spec &type, const expression_ptr &init,
+		    unsigned int line_no, unsigned int column_no);
       virtual ~variable_decl() {}
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);

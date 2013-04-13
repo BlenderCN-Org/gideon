@@ -36,7 +36,7 @@ codegen_value raytrace::ast::conditional_statement::codegen(Module *module, IRBu
     //generate code for if-block
     builder.SetInsertPoint(if_bb);
     
-    if (if_branch) if_branch->codegen(module, builder);
+    codegen_value if_val = (if_branch ? if_branch->codegen(module, builder) : nullptr);
     if (!builder.GetInsertBlock()->getTerminator()) builder.CreateBr(merge_bb); //only go to the merge block if we don't return
     
     if_bb = builder.GetInsertBlock();
@@ -45,7 +45,7 @@ codegen_value raytrace::ast::conditional_statement::codegen(Module *module, IRBu
     func->getBasicBlockList().push_back(else_bb);
     builder.SetInsertPoint(else_bb);
     
-    if (else_branch) else_branch->codegen(module, builder);
+    codegen_value else_val = (else_branch ? else_branch->codegen(module, builder) : nullptr);
     if (!builder.GetInsertBlock()->getTerminator()) builder.CreateBr(merge_bb);
     
     else_bb = builder.GetInsertBlock();
@@ -53,8 +53,10 @@ codegen_value raytrace::ast::conditional_statement::codegen(Module *module, IRBu
     //merge block
     func->getBasicBlockList().push_back(merge_bb);
     builder.SetInsertPoint(merge_bb);
-    
-    return cond_val;
+
+    typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
+    boost::function<codegen_value (arg_val_type &)> check_branches = [cond_val] (arg_val_type &) -> codegen_value { return cond_val; };
+    return errors::codegen_call_args(check_branches, if_val, else_val);
   };
   
   return errors::codegen_call_args(op, cond_val, t);

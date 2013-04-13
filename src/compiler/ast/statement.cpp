@@ -54,7 +54,7 @@ codegen_value raytrace::ast::scoped_statement::codegen(Module *module, IRBuilder
   boost::function<codegen_value (arg_val_type &)> add_null_value = [] (arg_val_type &) -> codegen_value { return nullptr; };
 
   codegen_void rt = statements.codegen(module, builder);
-
+  
   codegen_void fpop = state->functions.scope_pop(module, builder);
   codegen_void vpop = state->variables.scope_pop(module, builder);
 

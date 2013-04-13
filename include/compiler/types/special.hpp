@@ -21,6 +21,14 @@ namespace raytrace {
 
   };
 
+  class light_type : public type {
+  public:
+
+    light_type(type_table *types) : type(types, "light", "lt") { }
+    virtual llvm::Type *llvm_type() const;
+
+  };
+
 };
 
 #endif

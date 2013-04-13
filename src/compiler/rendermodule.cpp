@@ -33,6 +33,7 @@ void render_module::parse_source() {
   
   if (yylex_init(&scanner)) { throw runtime_error("Could not initialize yylex"); }
   YY_BUFFER_STATE state = yy_scan_string(source.c_str(), scanner);
+  yyset_lineno(1, scanner);
   
   ast::gideon_parser_data gd_data { &parser, &top, &dependencies };
   if (yyparse(scanner, &gd_data)) { throw runtime_error("Parser error"); }  
@@ -67,7 +68,7 @@ Module *render_module::compile() {
     codegen_void val = raytrace::errors::codegen_ignore_value(gen_val);
     result = errors::merge_void_values(result, val);
   }
-
+  
   boost::apply_visitor(report, result);
 
   optimize(module);
@@ -97,4 +98,5 @@ void render_module::optimize(Module *module) {
 
   Module::FunctionListType &funcs = module->getFunctionList();
   for (auto it = funcs.begin(); it != funcs.end(); it++) fpm.run(*it);
+  
 }

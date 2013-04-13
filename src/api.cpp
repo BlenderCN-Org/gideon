@@ -38,6 +38,14 @@ extern "C" GDRL_DLL_EXPORT void gde_print_coords(int x, int y) {
   cout << "Coordinates (" << x << ", " << y << ")" << endl;
 }
 
+struct sdata {
+  char is_const;
+  char *data;
+};
+extern "C" void gde_print_string(sdata *str) {
+  cout << str->data << endl;
+}
+
 extern "C" void gde_isect_normal(intersection *i, scene_data *sdata, float3 *N) {
   scene *s = sdata->s;
   primitive &prim = s->primitives[i->prim_idx];
@@ -47,14 +55,56 @@ extern "C" void gde_isect_normal(intersection *i, scene_data *sdata, float3 *N) 
   *N = compute_triangle_normal(verts[tri.x], verts[tri.y], verts[tri.z]);
 }
 
-extern "C" int gde_draw_coords(int x, int y, int idx, float depth, void *out) {
+extern "C" void gde_ray_point(ray *r, float t, float3 *P) {
+  *P = r->point_on_ray(t);
+}
+
+extern "C" void gde_light_sample_position(light *lt, float3 *P, float rand_u, float rand_v,
+					  float4 *P_out) {
+  *P_out = lt->sample_position(*P, rand_u, rand_v);
+}
+
+extern "C" void gde_light_eval_radiance(light *lt, float3 *P, float3 *I, /* out */ float3 *R) {
+  *R = lt->eval_radiance(*P, *I);
+}
+
+extern "C" void gde_dir_to_point(float4 *P, float3 *O, /* out */ float3 *D, /* out */ float3 *nD) {
+  *D = normalize(*O - float3{P->x, P->y, P->z});
+  *nD = -1.0f * (*D);
+}
+
+extern "C" void gde_vec3_scale(float3 *v, float k, float3 *result) {
+  *result = k * (*v);
+}
+
+extern "C" void gde_vec3_comp_mul(float3 *lhs, float3 *rhs, float3 *result) {
+  *result = (*lhs) * (*rhs);
+}
+
+extern "C" void gde_vec4_to_vec3(float4 *v4, float3 *v3) {
+  *v3 = float3{v4->x, v4->y, v4->z};
+}
+
+extern "C" int gde_scene_num_lights(scene_data *sdata) {
+  return static_cast<int>(sdata->s->lights.size());
+}
+
+extern "C" void gde_scene_get_light(scene_data *sdata, int id, light **light_id) {
+  *light_id = &sdata->s->lights[id];
+}
+
+extern "C" float gde_gen_random(boost::function<float ()> *rng) {
+  return (*rng)();
+};
+
+extern "C" int gde_draw_coords(int x, int y, int idx, float depth, float3 *color, float2 *uv, void *out) {
   float *rgba_out = reinterpret_cast<float*>(out);
   float v = (depth < 0.0) ? 0.0 : depth;
   //v = expf(-0.2f * depth);
 
-  rgba_out[idx] = v;
-  rgba_out[idx+1] = v;
-  rgba_out[idx+2] = v;
+  rgba_out[idx] = v * color->x * uv->x;
+  rgba_out[idx+1] = v * color->y * uv->y;
+  rgba_out[idx+2] = v * color->z;
   rgba_out[idx+3] = 1.0f;
   return idx + 4;
 }
@@ -72,9 +122,63 @@ extern "C" float gde_scene_trace(ray *r, void *sptr) {
   return depth;
 }
 
+extern "C" bool gde_isect_get_attribute3(intersection *i,
+					 sdata *name, scene_data *sdata,
+					 /* out */ float3 *color) {
+  string attr_name(name->data);
+  scene *s = sdata->s;
+
+  primitive &prim = s->primitives[i->prim_idx];
+  int3 &tri = s->triangle_verts[prim.data_id];
+  vector<float3> &verts = s->vertices;
+
+  int object_id = prim.object_id;
+  object *obj = s->objects[object_id];
+  if (obj->attributes.find(attr_name) == obj->attributes.end()) return false;
+
+  int attr_id = prim.data_id - obj->tri_range.x;
+  attribute *attr = obj->attributes[attr_name];
+  float3 *val = attr->data<float3>(attr_id);
+
+  float inv = 1.0f - i->u - i->v;
+  *color = i->u*val[1] + i->v*val[2] + inv*val[0];
+  return true;
+}
+
+extern "C" bool gde_isect_get_attribute2(intersection *i,
+					 sdata *name, scene_data *sdata,
+					 /* out */ float2 *color) {
+  string attr_name(name->data);
+  scene *s = sdata->s;
+
+  primitive &prim = s->primitives[i->prim_idx];
+  int3 &tri = s->triangle_verts[prim.data_id];
+  vector<float3> &verts = s->vertices;
+
+  int object_id = prim.object_id;
+  object *obj = s->objects[object_id];
+  if (obj->attributes.find(attr_name) == obj->attributes.end()) return false;
+
+  int attr_id = prim.data_id - obj->tri_range.x;
+  attribute *attr = obj->attributes[attr_name];
+  float2 *val = attr->data<float2>(attr_id);
+
+  float inv = 1.0f - i->u - i->v;
+  *color = i->u*val[1] + i->v*val[2] + inv*val[0];
+  return true;
+}
+
 extern "C" void gde_print_ray(ray *r) {
   cout << "Origin: (" << r->o.x << ", " << r->o.y << ", " << r->o.z << ")" << endl;
   cout << "Direction: (" << r->d.x << ", " << r->d.y << ", " << r->d.z << ")" << endl;
+}
+
+extern "C" void gde_gen_shadow_ray(float3 *P, float3 *P_lt, ray *r) {
+  float3 dLt = (*P_lt) - (*P);
+  float dist = length(dLt);
+  float3 I = normalize(dLt);
+
+  *r = {*P, I, 5.0f*epsilon, dist + 5.0f*epsilon};
 }
 
 /* Code used by the Blender Python Plugin. */
@@ -278,9 +382,14 @@ extern "C" {
     sd.accel = &accel;
     scene_data *sd_loc = &sd;
 
+    uniform_real_distribution<float> uniform_dist(0.0f, 1.0f);
+    mt19937 rand_engine;
+    boost::function<float ()> rng = bind(uniform_dist, rand_engine);
+    auto rng_ptr = &rng;
+
     ifstream render_file("/home/curtis/Projects/relatively-crazy/tests/render_loop.gdl");
     string source((istreambuf_iterator<char>(render_file)), istreambuf_iterator<char>());
-    cout << "Source Code: " << endl << source << endl;
+    //cout << "Source Code: " << endl << source << endl;
     render_module render("test_loop", source);
     Module *module = render.compile();
     verifyModule(*module);
@@ -294,7 +403,8 @@ extern "C" {
     ExecutionEngine *engine = EngineBuilder(module).setErrorStr(&error_str).create();
     engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_scene")), (void*)&sd_loc);
     engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_output")), (void*)&rgba_out);
-    
+    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_rng")), (void*)&rng_ptr);
+
     void *fptr = engine->getPointerToFunction(module->getFunction("gdi_2_main_i_i"));
     void (*render_entry)(int, int) = (void (*)(int, int))(fptr);
 

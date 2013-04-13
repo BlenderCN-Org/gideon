@@ -11,6 +11,7 @@
   int yyerror(YYLTYPE *yylloc, yyscan_t scanner, ast::gideon_parser_data *gd_data, const char *msg) {
     std::cerr << "Parser Error: " << msg << std::endl;
     std::cerr << "Column: " << yylloc->first_column << std::endl;
+    std::cerr << "Line Number: " << yylloc->last_line << std::endl;
   }
  %}
 
@@ -62,8 +63,11 @@
 %token <i> INTEGER_LITERAL BOOL_LITERAL
 %token <f> FLOAT_LITERAL
 %token <tspec> FLOAT_TYPE INT_TYPE BOOL_TYPE VOID_TYPE STRING_TYPE
+
 %token <tspec> RAY_TYPE INTERSECTION_TYPE
-%token <tspec> FLOAT3_TYPE FLOAT4_TYPE SCENE_PTR_TYPE
+%token <tspec> LIGHT_TYPE SCENE_PTR_TYPE
+
+%token <tspec> FLOAT2_TYPE FLOAT3_TYPE FLOAT4_TYPE
 
 %token <i> EXTERN
 token <i> OUTPUT
@@ -141,7 +145,7 @@ global_declaration
  : function_definition { $$ = $1; }
  | function_prototype ';' { $$ = $1; }
  | external_function_declaration { $$ = $1; }
- | typespec IDENTIFIER ';' { $$ = ast::global_declaration_ptr(new ast::global_variable_decl(gd_data->state, $2, $1)); }
+| typespec IDENTIFIER ';' { $$ = ast::global_declaration_ptr(new ast::global_variable_decl(gd_data->state, $2, $1)); }
  | import_declaration
  ;
 
@@ -189,10 +193,13 @@ outputspec
 
 simple_typename
  : FLOAT_TYPE { $$ = gd_data->state->types["float"]; }
+ | FLOAT2_TYPE { $$ = gd_data->state->types["vec2"]; }
  | FLOAT3_TYPE { $$ = gd_data->state->types["vec3"]; }
  | FLOAT4_TYPE { $$ = gd_data->state->types["vec4"]; }
 
+ | LIGHT_TYPE { $$ = gd_data->state->types["light"]; }
  | SCENE_PTR_TYPE { $$ = gd_data->state->types["scene_ptr"]; }
+ 
  | RAY_TYPE { $$ = gd_data->state->types["ray"]; }
  | INTERSECTION_TYPE { $$ = gd_data->state->types["isect"]; }
 
@@ -254,8 +261,8 @@ local_declaration
  ;
 
 variable_declaration
- : typespec IDENTIFIER '=' expression ';' { $$ = ast::statement_ptr(new ast::variable_decl(gd_data->state, $2, $1, $4)); }
- | typespec IDENTIFIER ';' { $$ = ast::statement_ptr(new ast::variable_decl(gd_data->state, $2, $1, nullptr)); }
+ : typespec IDENTIFIER '=' expression ';' { $$ = ast::statement_ptr(new ast::variable_decl(gd_data->state, $2, $1, $4, yylloc.first_line, yylloc.first_column)); }
+ | typespec IDENTIFIER ';' { $$ = ast::statement_ptr(new ast::variable_decl(gd_data->state, $2, $1, nullptr, yylloc.first_line, yylloc.first_column)); }
  ;
 
 
@@ -299,7 +306,7 @@ function_call
 
 function_args_opt
  : function_args
- | { }
+ | { $$ = std::vector<ast::expression_ptr>(); }
  ;
 
 function_args

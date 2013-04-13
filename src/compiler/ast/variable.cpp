@@ -11,8 +11,9 @@ using namespace llvm;
 /** Variable Declaration **/
 
 raytrace::ast::variable_decl::variable_decl(parser_state *st, const string &name,
-					    const type_spec &type, const expression_ptr &init) :
-  statement(st),
+					    const type_spec &type, const expression_ptr &init,
+					    unsigned int line_no, unsigned int column_no) :
+  statement(st, line_no, column_no),
   name(name), type(type), initializer(init)
 {
   

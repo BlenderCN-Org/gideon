@@ -21,7 +21,7 @@ namespace raytrace {
     class statement : public ast_node {
     public:
 
-      statement(parser_state *st) : ast_node(st) {}
+      statement(parser_state *st, unsigned int line_no = 0, unsigned int column_no = 0) : ast_node(st, line_no, column_no) {}
       virtual ~statement() {}
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;

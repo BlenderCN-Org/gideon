@@ -4,6 +4,10 @@
 #include <boost/lexical_cast.hpp>
   
 #define TOKEN_STRING (std::string(yytext, yyleng))
+  
+#define YY_USER_ACTION yylloc->first_line = yylloc->last_line = yylineno; \
+  yylloc->first_column = yycolumn; yylloc->last_column = yycolumn+yyleng-1; \
+  yycolumn += yyleng;
 
   void save_float(YYSTYPE *yylval, const std::string &str) {
     yylval->f = boost::lexical_cast<float>(str);
@@ -22,6 +26,7 @@
 %option reentrant noyywrap
 %option bison-bridge
 %option bison-locations
+%option yylineno
 
 %%
 
@@ -31,11 +36,14 @@
 "float" { return FLOAT_TYPE; }
 "string" { return STRING_TYPE; }
 
+"vec2" { return FLOAT2_TYPE; }
 "vec3" { return FLOAT3_TYPE; }
 "vec4" { return FLOAT4_TYPE; }
 
 "ray" { return RAY_TYPE; }
 "isect" { return INTERSECTION_TYPE; }
+
+"light" { return LIGHT_TYPE; }
 "scene" { return SCENE_PTR_TYPE; }
 
 "extern" { return EXTERN; }
@@ -54,8 +62,9 @@
 
 
 
-[ \t\n\r]      ;
-\/\/.*\n       ; //comments
+[ \t\r]      ;
+\n           ;
+\/\/.*\n     ; //comments
 
 [a-zA-Z_][a-zA-Z0-9_:]*  yylval->s = TOKEN_STRING; return IDENTIFIER;
 -?[0-9]+\.[0-9]*          save_float(yylval, TOKEN_STRING); return FLOAT_LITERAL;

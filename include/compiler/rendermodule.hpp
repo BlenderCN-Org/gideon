@@ -14,7 +14,7 @@ namespace raytrace {
 
     //Returns a reference to a vector containing all libraries that this module depends on.
     const std::vector<std::string> &get_dependencies() const { return dependencies; }
-
+    
     //Compile this render module into an LLVM module so that it may be linked into the final program.
     //The caller assumes ownership of the returned pointer.
     llvm::Module *compile();

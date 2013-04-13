@@ -62,45 +62,13 @@ namespace raytrace {
 
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
     
+    virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+    
+
   private:
 
     llvm::Type *str_type_value;
-
-  };
-
-  //Vector Types
-
-  class float4_type : public type {
-  public:
-    
-    float4_type(type_table *types);
-    virtual llvm::Type *llvm_type() const;
-
-    virtual codegen_value create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
-
-    virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-
-  private:
-
-    llvm::Type *type_value;
-
-  };
-
-  class float3_type : public type {
-  public:
-    
-    float3_type(type_table *types);
-    virtual llvm::Type *llvm_type() const;
-    
-    virtual codegen_value create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
-    
-    virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-
-  private:
-
-    llvm::Type *type_value;
 
   };
 
