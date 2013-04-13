@@ -40,8 +40,6 @@
     raytrace::ast::expression_ptr expr;
     std::vector<raytrace::ast::expression_ptr> expr_list;
     
-    raytrace::ast::lvalue_ptr lval;
-    
     raytrace::ast::statement_ptr stmt;
     std::vector<raytrace::ast::statement_ptr> stmt_list;
     
@@ -81,9 +79,13 @@ token <i> OUTPUT
 
 //Operators
 %right <i> '='
-%left <i> '+'
+
 %left <i> '<'
-%left <i> '(' ')'
+
+%left <i> '+' '-'
+%left <i> '*' '/'
+
+%left <i> '(' ')' '.'
 
 //Non-terminals
 %type <global_list> rt_file
@@ -117,11 +119,10 @@ token <i> OUTPUT
 %type <expr> expression binary_expression
 %type <expr> assignment_expression variable_ref
 %type <expr> type_constructor
+%type <expr> field_selection
 
 %type <expr> function_call
 %type <expr_list> function_args_opt function_args
-
-%type <lval> variable_lvalue
 
 %start rt_file
 
@@ -276,28 +277,29 @@ expression
  | FLOAT_LITERAL { $$ = ast::expression_ptr(new ast::literal<float>(gd_data->state, $1)); }
  | BOOL_LITERAL { $$ = ast::expression_ptr(new ast::literal<bool>(gd_data->state, $1)); }
  | STRING_LITERAL { $$ = ast::expression_ptr(new ast::literal<std::string>(gd_data->state, $1)); }
+ | variable_ref
+ | field_selection
  | assignment_expression
  | binary_expression
  | type_constructor
  | function_call
  | '(' expression ')' { $$ = $2; }
- | variable_ref
  ;
 
 assignment_expression
- : variable_lvalue '=' expression { $$ = ast::expression_ptr(new ast::assignment(gd_data->state, $1, $3)); }
+ : expression '=' expression { $$ = ast::expression_ptr(new ast::assignment(gd_data->state, $1, $3)); }
  ;
 
 type_constructor
  : typespec '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::type_constructor(gd_data->state, $1, $3)); }
  ;
 
-variable_lvalue
- : IDENTIFIER { $$ = ast::lvalue_ptr(new ast::variable_lvalue(gd_data->state, $1)); }
+variable_ref
+ : IDENTIFIER { $$ = ast::expression_ptr(new ast::variable_ref(gd_data->state, $1)); }
  ;
 
-variable_ref
- : variable_lvalue { $$ = ast::expression_ptr(new ast::variable_ref(gd_data->state, $1)); }
+field_selection
+ : expression '.' IDENTIFIER { $$ = ast::expression_ptr(new ast::field_selection(gd_data->state, $3, $1, yylloc.first_line, yylloc.first_column)); }
  ;
 
 function_call
@@ -315,8 +317,11 @@ function_args
  ;
 
 binary_expression
- : expression '+' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "+", $1, $3)); }
- | expression '<' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "<", $1, $3)); }
+ : expression '+' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "+", $1, $3, yylloc.first_line, yylloc.first_column)); }
+ | expression '-' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "-", $1, $3, yylloc.first_line, yylloc.first_column)); }
+ | expression '*' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "*", $1, $3, yylloc.first_line, yylloc.first_column)); }
+ | expression '/' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "/", $1, $3, yylloc.first_line, yylloc.first_column)); }
+ | expression '<' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "<", $1, $3, yylloc.first_line, yylloc.first_column)); }
  ;
 
 %%

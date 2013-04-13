@@ -31,6 +31,15 @@ namespace raytrace {
     virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
 				 codegen_value &lhs, codegen_value &rhs) const;
 
+    virtual codegen_value op_sub(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+
+    virtual codegen_value op_mul(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+    
+    virtual codegen_value op_div(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+
     virtual codegen_value op_less(llvm::Module *module, llvm::IRBuilder<> &builder,
 				  codegen_value &lhs, codegen_value &rhs) const;
   };
@@ -43,6 +52,15 @@ namespace raytrace {
 
     //operations
     virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+
+    virtual codegen_value op_sub(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+    
+    virtual codegen_value op_mul(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+    
+    virtual codegen_value op_div(llvm::Module *module, llvm::IRBuilder<> &builder,
 				 codegen_value &lhs, codegen_value &rhs) const;
 
     virtual codegen_value op_less(llvm::Module *module, llvm::IRBuilder<> &builder,

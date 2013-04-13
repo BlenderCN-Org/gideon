@@ -97,14 +97,12 @@ extern "C" float gde_gen_random(boost::function<float ()> *rng) {
   return (*rng)();
 };
 
-extern "C" int gde_draw_coords(int x, int y, int idx, float depth, float3 *color, float2 *uv, void *out) {
+extern "C" int gde_draw_coords(int x, int y, int idx, float3 *color, void *out) {
   float *rgba_out = reinterpret_cast<float*>(out);
-  float v = (depth < 0.0) ? 0.0 : depth;
-  //v = expf(-0.2f * depth);
 
-  rgba_out[idx] = v * color->x * uv->x;
-  rgba_out[idx+1] = v * color->y * uv->y;
-  rgba_out[idx+2] = v * color->z;
+  rgba_out[idx] = color->x;
+  rgba_out[idx+1] = color->y;
+  rgba_out[idx+2] = color->z;
   rgba_out[idx+3] = 1.0f;
   return idx + 4;
 }
@@ -173,12 +171,8 @@ extern "C" void gde_print_ray(ray *r) {
   cout << "Direction: (" << r->d.x << ", " << r->d.y << ", " << r->d.z << ")" << endl;
 }
 
-extern "C" void gde_gen_shadow_ray(float3 *P, float3 *P_lt, ray *r) {
-  float3 dLt = (*P_lt) - (*P);
-  float dist = length(dLt);
-  float3 I = normalize(dLt);
-
-  *r = {*P, I, 5.0f*epsilon, dist + 5.0f*epsilon};
+extern "C" void gde_gen_ray(float3 *O, float3 *D, float max_t, ray *r) {
+  *r = {*O, *D, 5.0f*epsilon, max_t + 5.0f*epsilon};
 }
 
 /* Code used by the Blender Python Plugin. */

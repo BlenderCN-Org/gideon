@@ -21,17 +21,18 @@ namespace raytrace {
     class expression : public ast_node {
     public:
 
-      expression(parser_state *st) : ast_node(st), result_type(st->types["void"]) {}
-      expression(parser_state *st, const type_spec &rt) : ast_node(st), result_type(rt) {}
+      expression(parser_state *st, unsigned int line_no = 0, unsigned int column_no = 0) : ast_node(st, line_no, column_no), result_type(st->types["void"]) {}
+      expression(parser_state *st, const type_spec &rt,
+		 unsigned int line_no = 0, unsigned int column_no = 0) : ast_node(st, line_no, column_no), result_type(rt) {}
       
       virtual ~expression() {}
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
-
       virtual codegen_value codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
-      virtual bool has_ptr() { return false; } //returns true if this expression has an address
       
       virtual type_spec typecheck() = 0;
       typecheck_value typecheck_safe();
+
+      virtual typed_value_container codegen_safe(llvm::Module *module, llvm::IRBuilder<> &builder);
       
     protected:
 
@@ -45,7 +46,8 @@ namespace raytrace {
     class binary_expression : public expression {
     public:
       
-      binary_expression(parser_state *st, const std::string &op, const expression_ptr &lhs, const expression_ptr &rhs);
+      binary_expression(parser_state *st, const std::string &op, const expression_ptr &lhs, const expression_ptr &rhs,
+			unsigned int line_no, unsigned int column_no);
       virtual ~binary_expression() {}
       
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);

@@ -29,6 +29,33 @@ codegen_value int_type::op_add(Module *module, IRBuilder<> &builder,
   return errors::codegen_call_args(op, lhs, rhs);
 }
 
+codegen_value int_type::op_sub(Module *module, IRBuilder<> &builder,
+			       codegen_value &lhs, codegen_value &rhs) const {
+  typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [&builder, module] (arg_val_type &val) {
+    return builder.CreateSub(val.get<0>(), val.get<1>(), "i_sub_tmp");
+  };
+  return errors::codegen_call_args(op, lhs, rhs);
+}
+
+codegen_value int_type::op_mul(Module *module, IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const {
+  typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [&builder, module] (arg_val_type &val) {
+    return builder.CreateMul(val.get<0>(), val.get<1>(), "i_mul_tmp");
+  };
+  return errors::codegen_call_args(op, lhs, rhs);
+}
+
+codegen_value int_type::op_div(Module *module, IRBuilder<> &builder,
+			       codegen_value &lhs, codegen_value &rhs) const {
+  typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [&builder, module] (arg_val_type &val) {
+    return builder.CreateSDiv(val.get<0>(), val.get<1>(), "i_div_tmp");
+  };
+  return errors::codegen_call_args(op, lhs, rhs);
+}
+
 codegen_value int_type::op_less(Module *module, IRBuilder<> &builder,
 				  codegen_value &lhs, codegen_value &rhs) const {
   typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
@@ -49,6 +76,33 @@ codegen_value float_type::op_add(Module *module, IRBuilder<> &builder,
   typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
   boost::function<codegen_value (arg_val_type &)> op = [&builder, module] (arg_val_type &val) {
     return builder.CreateFAdd(val.get<0>(), val.get<1>(), "f_add_tmp");
+  };
+  return errors::codegen_call_args(op, lhs, rhs);
+}
+
+codegen_value float_type::op_sub(Module *module, IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const {
+  typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [&builder, module] (arg_val_type &val) {
+    return builder.CreateFSub(val.get<0>(), val.get<1>(), "f_sub_tmp");
+  };
+  return errors::codegen_call_args(op, lhs, rhs);
+}
+
+codegen_value float_type::op_mul(Module *module, IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const {
+  typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [&builder, module] (arg_val_type &val) {
+    return builder.CreateFMul(val.get<0>(), val.get<1>(), "f_mul_tmp");
+  };
+  return errors::codegen_call_args(op, lhs, rhs);
+}
+
+codegen_value float_type::op_div(Module *module, IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const {
+  typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [&builder, module] (arg_val_type &val) {
+    return builder.CreateFDiv(val.get<0>(), val.get<1>(), "f_div_tmp");
   };
   return errors::codegen_call_args(op, lhs, rhs);
 }

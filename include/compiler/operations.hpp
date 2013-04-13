@@ -11,10 +11,23 @@ namespace raytrace {
   //Returns the result type of the addition operation.
   type_spec get_add_result_type(const ast::expression_ptr &lhs, const ast::expression_ptr &rhs);
 
+  type_spec get_sub_result_type(const ast::expression_ptr &lhs, const ast::expression_ptr &rhs);
+  
+
   //Performs any type-checking and conversions to generate instructions adding the two expressions.
   codegen_value generate_add(ast::expression_ptr &lhs, ast::expression_ptr &rhs,
 			     type_table &types,
 			     llvm::Module *module, llvm::IRBuilder<> &builder);
+
+  codegen_value generate_sub(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
+			     llvm::Module *module, llvm::IRBuilder<> &builder);
+
+  codegen_value generate_mul(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
+			     llvm::Module *module, llvm::IRBuilder<> &builder);
+
+  codegen_value generate_div(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
+			     llvm::Module *module, llvm::IRBuilder<> &builder);
+			     
 
   //Less-Than
 
@@ -22,6 +35,7 @@ namespace raytrace {
 				   type_table &types,
 				   llvm::Module *module, llvm::IRBuilder<> &builder);
   
+
 
   //Helpers
 

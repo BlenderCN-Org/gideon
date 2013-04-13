@@ -27,6 +27,14 @@ type_spec raytrace::get_add_result_type(const ast::expression_ptr &lhs, const as
   return lt;
 }
 
+type_spec raytrace::get_sub_result_type(const ast::expression_ptr &lhs, const ast::expression_ptr &rhs) {
+  type_spec lt = lhs->typecheck();
+  type_spec rt = rhs->typecheck();
+  if (*lt != *rt) throw invalid_operation("-", lt->name, rt->name);
+  
+  return lt;
+}
+
 codegen_value raytrace::generate_add(ast::expression_ptr &lhs, ast::expression_ptr &rhs,
 			      type_table &types,
 			      Module *module, IRBuilder<> &builder) {
@@ -41,6 +49,66 @@ codegen_value raytrace::generate_add(ast::expression_ptr &lhs, ast::expression_p
   return lt->op_add(module, builder, lval, rval);
 }
 
+codegen_value raytrace::generate_sub(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
+				     Module *module, IRBuilder<> &builder) {
+  typecheck_value lt = lhs->typecheck_safe();
+  typecheck_value rt = rhs->typecheck_safe();
+  
+  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [&lhs, &rhs, module, &builder] (arg_val_type &arg) -> codegen_value {
+    type_spec lt = arg.get<0>();
+    type_spec rt = arg.get<1>();
+    
+    if (*lt != *rt) return invalid_conversion(lt->name, rt->name);
+
+    codegen_value lval = lhs->codegen(module, builder);
+    codegen_value rval = rhs->codegen(module, builder);
+    return lt->op_sub(module, builder, lval, rval);
+  };
+
+  return errors::codegen_call_args(op, lt, rt);
+}
+
+codegen_value raytrace::generate_mul(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
+				     Module *module, IRBuilder<> &builder) {
+  typecheck_value lt = lhs->typecheck_safe();
+  typecheck_value rt = rhs->typecheck_safe();
+  
+  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [&lhs, &rhs, module, &builder] (arg_val_type &arg) -> codegen_value {
+    type_spec lt = arg.get<0>();
+    type_spec rt = arg.get<1>();
+    
+    if (*lt != *rt) return invalid_conversion(lt->name, rt->name);
+
+    codegen_value lval = lhs->codegen(module, builder);
+    codegen_value rval = rhs->codegen(module, builder);
+    return lt->op_mul(module, builder, lval, rval);
+  };
+
+  return errors::codegen_call_args(op, lt, rt);
+}
+
+codegen_value raytrace::generate_div(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
+				     Module *module, IRBuilder<> &builder) {
+  typecheck_value lt = lhs->typecheck_safe();
+  typecheck_value rt = rhs->typecheck_safe();
+  
+  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [&lhs, &rhs, module, &builder] (arg_val_type &arg) -> codegen_value {
+    type_spec lt = arg.get<0>();
+    type_spec rt = arg.get<1>();
+    
+    if (*lt != *rt) return invalid_conversion(lt->name, rt->name);
+
+    codegen_value lval = lhs->codegen(module, builder);
+    codegen_value rval = rhs->codegen(module, builder);
+    return lt->op_div(module, builder, lval, rval);
+  };
+
+  return errors::codegen_call_args(op, lt, rt);
+}
+
 codegen_value raytrace::generate_less_than(ast::expression_ptr &lhs, ast::expression_ptr &rhs,
 				    type_table &types,
 				    Module *module, IRBuilder<> &builder) {
@@ -52,23 +120,6 @@ codegen_value raytrace::generate_less_than(ast::expression_ptr &lhs, ast::expres
   codegen_value lval = lhs->codegen(module, builder);
   codegen_value rval = rhs->codegen(module, builder);
   return lt->op_less(module, builder, lval, rval);
-
-  /*typedef raytrace::errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
-
-  codegen_value lval = lhs->codegen(module, builder);
-  codegen_value rval = rhs->codegen(module, builder);
-
-  boost::function<codegen_value (arg_val_type &val)> op;
-
-  if (*lt == *types["float"]) {
-    op = [&builder] (arg_val_type &val) -> codegen_value { return builder.CreateFCmpOLT(val.get<0>(), val.get<1>(), "f_le_tmp"); };
-  }
-  else if (*lt == *types["int"]) {
-    op = [&builder] (arg_val_type &val) -> codegen_value { return builder.CreateICmpSLT(val.get<0>(), val.get<1>(), "i_le_tmp"); };
-  }
-  else return invalid_operation("<", lt->name, rt->name);
-
-  return errors::codegen_call_args(op, lval, rval);*/
 }
 
 codegen_value raytrace::llvm_builtin_binop(const string &func_name, Type *type, Value *lhs, Value *rhs,

@@ -23,3 +23,4 @@ extern "C" float gde_ray_max_dist(ray *r) { return r->max_t; }
 //Vector Ops
 extern "C" float gde_dot_v3(float3 *a, float3 *b) { return dot(*a, *b); }
 extern "C" void gde_normalize_v3(float3 *in, float3 *out) { *out = normalize(*in); }
+extern "C" float gde_length_v3(float3 *v) { return length(*v); }

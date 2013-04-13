@@ -78,8 +78,8 @@ raytrace::codegen_value raytrace::ast::global_variable_decl::codegen(llvm::Modul
 
 /** Variable Reference **/
 
-raytrace::ast::variable_ref::variable_ref(parser_state *st, const lvalue_ptr &lval) :
-  expression(st), lval_ref(lval)
+raytrace::ast::variable_ref::variable_ref(parser_state *st, const string &name) :
+  expression(st), name(name)
 {
   
 }
@@ -91,27 +91,11 @@ codegen_value raytrace::ast::variable_ref::codegen(Module *module, IRBuilder<> &
   
   raytrace::errors::value_container_operation<codegen_value> create_load(op);
   
-  codegen_value addr = lval_ref->codegen(module, builder);
+  codegen_value addr = lookup_var();
   return errors::codegen_call(addr, op);
 }
 
-codegen_value raytrace::ast::variable_ref::codegen_ptr(Module *module, IRBuilder<> &builder) {
-  return lval_ref->codegen(module, builder);
-}
-
-raytrace::type_spec raytrace::ast::variable_ref::typecheck() {
-  return lval_ref->typecheck();
-}
-
-/** Variable L-Value **/
-
-raytrace::ast::variable_lvalue::variable_lvalue(parser_state *st, const string &name) :
-  lvalue(st, st->types["void"]), name(name)
-{
-  
-}
-
-codegen_value raytrace::ast::variable_lvalue::codegen(Module *module, IRBuilder<> &builder) {
+codegen_value ast::variable_ref::lookup_var() {
   try {
     variable_symbol_table::entry_type &entry = state->variables.get(name);
     return entry.value;
@@ -119,13 +103,17 @@ codegen_value raytrace::ast::variable_lvalue::codegen(Module *module, IRBuilder<
   catch (compile_error &e) { return e; }
 }
 
-raytrace::type_spec raytrace::ast::variable_lvalue::typecheck() {
+codegen_value raytrace::ast::variable_ref::codegen_ptr(Module *module, IRBuilder<> &builder) {
+  return lookup_var();
+}
+
+raytrace::type_spec raytrace::ast::variable_ref::typecheck() {
   return state->variables.get(name).type;
 }
 
 /** Assignment **/
 
-raytrace::ast::assignment::assignment(parser_state *st, const lvalue_ptr &lhs, const expression_ptr &rhs) :
+raytrace::ast::assignment::assignment(parser_state *st, const expression_ptr &lhs, const expression_ptr &rhs) :
   expression(st), lhs(lhs), rhs(rhs)
 {
   
@@ -144,7 +132,7 @@ codegen_value raytrace::ast::assignment::codegen(Module *module, IRBuilder<> &bu
   };
 
   typecheck_value t = typecheck_safe();  
-  codegen_value ptr = lhs->codegen(module, builder);
+  codegen_value ptr = lhs->codegen_ptr(module, builder);
   codegen_value value = rhs->codegen(module, builder);
   
   return errors::codegen_call_args(op, value, ptr, t);
@@ -189,4 +177,53 @@ codegen_value raytrace::ast::type_constructor::get_argval(int i, Module *module,
 
 typecheck_value ast::type_constructor::get_argtype(int i) {
   return args[i]->typecheck_safe();
+}
+
+/** Field Selection **/
+
+ast::field_selection::field_selection(parser_state *st, const string &field, const expression_ptr &expr,
+					    unsigned int line_no, unsigned int column_no) :
+  expression(st), field(field), expr(expr)
+{
+
+}
+
+codegen_value ast::field_selection::codegen(Module *module, IRBuilder<> &builder) {
+  typecheck_value type = expr->typecheck_safe();
+  codegen_value value = expr->codegen(module, builder);
+
+  typedef errors::argument_value_join<typecheck_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> access = [this, module, &builder] (arg_val_type &arg) -> codegen_value {
+    type_spec ts = arg.get<0>();
+    Value *val = arg.get<1>();
+
+    return ts->access_field(field, val, module, builder);
+  };
+
+  return errors::codegen_call_args(access, type, value);
+}
+
+codegen_value ast::field_selection::codegen_ptr(Module *module, IRBuilder<> &builder) {
+  typecheck_value type = expr->typecheck_safe();
+  codegen_value ptr = expr->codegen_ptr(module, builder);
+
+  typedef errors::argument_value_join<typecheck_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> access = [this, module, &builder] (arg_val_type &arg) -> codegen_value {
+    type_spec ts = arg.get<0>();
+    Value *ptr = arg.get<1>();
+
+    return ts->access_field_ptr(field, ptr, module, builder);
+  };
+  
+  return errors::codegen_call_args(access, type, ptr);
+}
+
+type_spec ast::field_selection::typecheck() {
+  typecheck_value type = expr->typecheck_safe();
+  boost::function<typecheck_value (type_spec &)> op = [this] (type_spec &ts) -> typecheck_value {
+    return ts->field_type(field);
+  };
+  type = errors::codegen_call(type, op);
+
+  return errors::extract_left<typecheck_value>(type);
 }

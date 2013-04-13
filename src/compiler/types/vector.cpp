@@ -5,133 +5,154 @@ using namespace raytrace;
 using namespace llvm;
 using namespace std;
 
-//Float 4
+/* Vector Helper Functions */
 
-float4_type::float4_type(type_table *types) :
-  type(types, "vec4", "v4", true),
-  type_value(StructType::create(getGlobalContext(),
-				ArrayRef<Type*>(vector<Type*>(4, Type::getFloatTy(getGlobalContext()))),
-				"vec4", true))
-{
-  
-}
-
-Type *float4_type::llvm_type() const {
-  return type_value;
-}
-
-codegen_value float4_type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args) const {
-  boost::function<codegen_value (vector<typed_value> &)> op = [this, module, &builder] (vector<typed_value> &args) -> codegen_value {
-    if (args.size() != 4) return arg_count_mismatch(4, args.size());
-    type_spec f = types->at("float");
-    for (unsigned int i = 0; i < 4; i++) {
-      if (f != args[i].get<1>()) {
+codegen_value make_llvm_vec_N(IRBuilder<> &builder, const string &vname, unsigned int N,
+			      Type *vec_type, type_spec elem_type, typed_value_vector &args) {
+  boost::function<codegen_value (vector<typed_value> &)> op = [vec_type, elem_type, &vname, N, &builder] (vector<typed_value> &args) -> codegen_value {
+    //check argument count
+    if (args.size() != N) {
+      stringstream err_ss;
+      err_ss << vname << " constructor expects " << N << "arguments, received " << args.size();
+      return compile_error(err_ss.str());
+    }
+    
+    //check argument types
+    for (unsigned int i = 0; i < N; ++i) {
+      if (elem_type != args[i].get<1>()) {
 	stringstream ss;
-	ss << "Error in vec4 constructor argument " << i << ": Expected '" << f->name << "' found '" << args[i].get<1>()->name << "'.";
+	ss << "Error in " << vname << " constructor argument " << i << ": Expected '" << elem_type->name << "' found '" << args[i].get<1>()->name << "'.";
 	return compile_error(ss.str());
       }
     }
 
-    return make_llvm_float4(module, builder, *types,
-			    args[0].get<0>(), args[1].get<0>(), args[2].get<0>(), args[3].get<0>());
+    //build the vector
+    string val_name = string("new_") + vname;
+    Value *v = builder.CreateInsertValue(UndefValue::get(vec_type),
+					 args[0].get<0>(), ArrayRef<unsigned int>(0), val_name);
+    for (unsigned int i = 1; i < N; ++i) {
+      v = builder.CreateInsertValue(v, args[i].get<0>(), ArrayRef<unsigned int>(i));
+    }
+
+    return v;
   };
+
   errors::value_container_operation<typed_value_vector, codegen_value> constructor(op);
   return boost::apply_visitor(constructor, args);
 }
 
-codegen_value float4_type::op_add(Module *module, IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const {
+/* floatN_type Implementation */
+
+string floatN_type::type_name(unsigned int N) {
+  stringstream ss;
+  ss << "vec" << N;
+  return ss.str();
+}
+
+string floatN_type::type_code(unsigned int N) {
+  stringstream ss;
+  ss << "v" << N;
+  return ss.str();
+}
+
+floatN_type::floatN_type(type_table *types, unsigned int N) :
+  type(types, type_name(N), type_code(N), true),
+  N(N),
+  type_value(StructType::create(getGlobalContext(),
+				ArrayRef<Type*>(vector<Type*>(N, Type::getFloatTy(getGlobalContext()))),
+				type_name(N), true))
+{
+
+}
+
+Type *floatN_type::llvm_type() const { return type_value; }
+
+bool floatN_type::get_element_idx(char c, /* out */ unsigned int &idx) const {
+  switch (c) {
+  case 'x':
+    idx = 0;
+    break;
+  case 'y':
+    idx = 1;
+    break;
+  case 'z':
+    idx = 2;
+    break;
+  case 'w':
+    idx = 3;
+    break;
+  default:
+    return false;
+  };
+
+  return (idx < N);
+}
+
+compile_error floatN_type::invalid_field(const string &field) const {
+  stringstream ss;
+  ss << type_name(N) << " has no field named '" << field << "'";
+  return compile_error(ss.str());
+}
+
+typecheck_value floatN_type::field_type(const string &field) const {
+  //check each character to make sure it's a valid element
+  unsigned int idx;
+  for (string::size_type i = 0; i < field.size(); ++i) {
+    if (!get_element_idx(field[i], idx)) return invalid_field(field);
+  }
+
+  //for the moment, no swizzling
+  if (field.size() != 1) return invalid_field(field);
+  return types->at("float");
+}
+
+codegen_value floatN_type::access_field(const string &field, Value *value,
+					Module *, IRBuilder<> &builder) const {
+  unsigned int idx = 0;
+  
+  if (field.size() != 1) return invalid_field(field);
+  if (!get_element_idx(field[0], idx)) return invalid_field(field);
+
+  return builder.CreateExtractValue(value, ArrayRef<unsigned int>(idx), "vec_elem");
+}
+
+codegen_value floatN_type::access_field_ptr(const string &field, Value *value_ptr,
+					    Module *module, IRBuilder<> &builder) const { 
+  unsigned int idx = 0;
+  
+  if (field.size() != 1) return invalid_field(field);
+  if (!get_element_idx(field[0], idx)) return invalid_field(field);
+  
+  return builder.CreateStructGEP(value_ptr, idx, "vec_elem");
+}
+
+codegen_value floatN_type::create(Module *, llvm::IRBuilder<> &builder, typed_value_vector &args) const {
+  return make_llvm_vec_N(builder, type_name(N), N, type_value, types->at("float"), args);
+}
+
+codegen_value floatN_type::op_add(Module *module, IRBuilder<> &builder,
+				  codegen_value &lhs, codegen_value &rhs) const {
+  stringstream op_ss;
+  op_ss << "gd_builtin_add_v" << N << "_v" << N;
+  string op_func = op_ss.str();
+  
   typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> op = [this, &builder, module] (arg_val_type &val) {
-    return llvm_builtin_binop("rtl_add_v4v4", llvm_type(),
+  boost::function<codegen_value (arg_val_type &)> op = [this, &op_func, &builder, module] (arg_val_type &val) {
+    return llvm_builtin_binop(op_func, llvm_type(),
 			      val.get<0>(), val.get<1>(), module, builder);
   };
   return errors::codegen_call_args(op, lhs, rhs);
 }
 
-//Float 3
-
-float3_type::float3_type(type_table *types) :
-  type(types, "vec3", "v3", true),
-  type_value(StructType::create(getGlobalContext(),
-				ArrayRef<Type*>(vector<Type*>(3, Type::getFloatTy(getGlobalContext()))),
-				"vec3", true))
-{
+codegen_value floatN_type::op_sub(Module *module, IRBuilder<> &builder,
+				  codegen_value &lhs, codegen_value &rhs) const {
+  stringstream op_ss;
+  op_ss << "gd_builtin_sub_v" << N << "_v" << N;
+  string op_func = op_ss.str();
   
-}
-
-Type *float3_type::llvm_type() const {
-  return type_value;
-}
-
-codegen_value float3_type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args) const {
-  boost::function<codegen_value (vector<typed_value> &)> op = [this, module, &builder] (vector<typed_value> &args) -> codegen_value {
-    if (args.size() != 3) return arg_count_mismatch(3, args.size());
-    type_spec f = types->at("float");
-    for (unsigned int i = 0; i < 3; i++) {
-      if (f != args[i].get<1>()) {
-	stringstream ss;
-	ss << "Error in vec4 constructor argument " << i << ": Expected '" << f->name << "' found '" << args[i].get<1>()->name << "'.";
-	return compile_error(ss.str());
-      }
-    }
-
-    return make_llvm_float3(module, builder, *types,
-			    args[0].get<0>(), args[1].get<0>(), args[2].get<0>());
-  };
-  errors::value_container_operation<typed_value_vector, codegen_value> constructor(op);
-  return boost::apply_visitor(constructor, args);
-}
-
-codegen_value float3_type::op_add(Module *module, IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const {
   typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> op = [this, &builder, module] (arg_val_type &val) {
-    return llvm_builtin_binop("rtl_add_v3v3", llvm_type(),
-			      val.get<0>(), val.get<1>(), module, builder);
-  };
-  return errors::codegen_call_args(op, lhs, rhs);
-}
-
-//Float 2
-
-float2_type::float2_type(type_table *types) :
-  type(types, "vec2", "v2", true),
-  type_value(StructType::create(getGlobalContext(),
-				ArrayRef<Type*>(vector<Type*>(2, Type::getFloatTy(getGlobalContext()))),
-				"vec2", true))
-{
-  
-}
-
-Type *float2_type::llvm_type() const {
-  return type_value;
-}
-
-codegen_value float2_type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args) const {
-  boost::function<codegen_value (vector<typed_value> &)> op = [this, module, &builder] (vector<typed_value> &args) -> codegen_value {
-    if (args.size() != 2) return arg_count_mismatch(2, args.size());
-    type_spec f = types->at("float");
-    for (unsigned int i = 0; i < 2; i++) {
-      if (f != args[i].get<1>()) {
-	stringstream ss;
-	ss << "Error in vec4 constructor argument " << i << ": Expected '" << f->name << "' found '" << args[i].get<1>()->name << "'.";
-	return compile_error(ss.str());
-      }
-    }
-
-    return make_llvm_float2(module, builder, *types,
-			    args[0].get<0>(), args[1].get<0>());
-  };
-  errors::value_container_operation<typed_value_vector, codegen_value> constructor(op);
-  return boost::apply_visitor(constructor, args);
-}
-
-codegen_value float2_type::op_add(Module *module, IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const {
-  typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> op = [this, &builder, module] (arg_val_type &val) {
-    return llvm_builtin_binop("rtl_add_v2v2", llvm_type(),
+  boost::function<codegen_value (arg_val_type &)> op = [this, &op_func, &builder, module] (arg_val_type &val) {
+    return llvm_builtin_binop(op_func, llvm_type(),
 			      val.get<0>(), val.get<1>(), module, builder);
   };
   return errors::codegen_call_args(op, lhs, rhs);

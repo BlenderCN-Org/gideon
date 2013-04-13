@@ -65,13 +65,32 @@ namespace raytrace {
 
     virtual llvm::Type *llvm_type() const = 0;
 
+    //field access
+    virtual typecheck_value field_type(const std::string &field) const;
+    virtual codegen_value access_field(const std::string &field, llvm::Value *value,
+				       llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual codegen_value access_field_ptr(const std::string &field, llvm::Value *value_ptr,
+					   llvm::Module *module, llvm::IRBuilder<> &builder) const;
+
     //operations
     virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
 				 codegen_value &lhs, codegen_value &rhs) const;
 
+    virtual codegen_value op_sub(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+
+    virtual codegen_value op_mul(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+    
+    virtual codegen_value op_div(llvm::Module *module, llvm::IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const;
+    
+    
     virtual codegen_value op_less(llvm::Module *module, llvm::IRBuilder<> &builder,
 				  codegen_value &lhs, codegen_value &rhs) const;
     
+    
+
   protected:
 
     type_table *types;
@@ -82,22 +101,6 @@ namespace raytrace {
     compile_error arg_count_mismatch(unsigned int expected, unsigned int found) const;
     
   };
-
-  
-  /* Type constructors */
-
-  llvm::Value *make_llvm_float2(llvm::Module *module, llvm::IRBuilder<> &builder,
-				type_table &types,
-				llvm::Value *x, llvm::Value *y);
-
-  llvm::Value *make_llvm_float3(llvm::Module *module, llvm::IRBuilder<> &builder,
-				type_table &types,
-				llvm::Value *x, llvm::Value *y, llvm::Value *z);
-  
-  llvm::Value *make_llvm_float4(llvm::Module *module, llvm::IRBuilder<> &builder,
-				type_table &types,
-				llvm::Value *x, llvm::Value *y, llvm::Value *z, llvm::Value *w);
-  
 
 };
 

@@ -12,17 +12,6 @@
 namespace raytrace {
   
   namespace ast {
-
-    /* Base class for expressions returning values that can be the target of an assignment. */
-    class lvalue : public expression {
-    public:
-      
-      lvalue(parser_state *st, const type_spec &type) : expression(st, type) {}
-      virtual ~lvalue() {}
-
-    };
-
-    typedef std::shared_ptr<lvalue> lvalue_ptr;
     
     /* Declares a new variable. */
     class variable_decl : public statement {
@@ -61,46 +50,29 @@ namespace raytrace {
 
     };
 
-    /* A lvalue variable reference. */
-    class variable_lvalue : public lvalue {
+    /* A reference to a variable. */
+    class variable_ref : public expression {
     public:
 
-      variable_lvalue(parser_state *st, const std::string &name);
-      virtual ~variable_lvalue() {}
+      variable_ref(parser_state *st, const std::string &name);
+      virtual ~variable_ref() {}
       
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual type_spec typecheck();
       
     private:
       
       std::string name;
-      
-    };
+      codegen_value lookup_var();
 
-    /* A reference to a variable or field. */
-    class variable_ref : public expression {
-    public:
-
-      variable_ref(parser_state *st, const lvalue_ptr &lval);
-      virtual ~variable_ref() {}
-      
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
-      virtual codegen_value codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
-      virtual bool has_ptr() { return true; }
-      
-      virtual type_spec typecheck();
-      
-    private:
-      
-      lvalue_ptr lval_ref;
-      
     };
 
     /* Assigns an expression to an lvalue. */
     class assignment : public expression {
     public:
 
-      assignment(parser_state *st, const lvalue_ptr &lhs, const expression_ptr &rhs);
+      assignment(parser_state *st, const expression_ptr &lhs, const expression_ptr &rhs);
       virtual ~assignment() {}
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
@@ -108,8 +80,7 @@ namespace raytrace {
       
     private:
 
-      lvalue_ptr lhs;
-      expression_ptr rhs;
+      expression_ptr lhs, rhs;
       
     };
 
@@ -131,6 +102,27 @@ namespace raytrace {
       codegen_value get_argval(int i, llvm::Module *module, llvm::IRBuilder<> &builder);
       typecheck_value get_argtype(int i);
     };
+
+    /* Access the field of a vector or struct (as the result of an expression). */
+    class field_selection : public expression {
+    public:
+
+      field_selection(parser_state *st, const std::string &field, const expression_ptr &expr,
+		      unsigned int line_no, unsigned int column_no);
+      virtual ~field_selection() {}
+
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
+      
+      virtual type_spec typecheck();
+      
+    private:
+
+      std::string field;
+      expression_ptr expr;
+      
+    };
+
   };
 
 };

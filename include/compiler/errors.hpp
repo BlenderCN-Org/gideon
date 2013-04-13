@@ -97,16 +97,23 @@ namespace raytrace {
     };
 
     /* Extracts a value from a codegen_value or throws and exception in case of error. */
-    class return_or_throw : public boost::static_visitor<llvm::Value*> {
+    template<typename T>
+    class return_or_throw : public boost::static_visitor<T> {
     public:
 
-      llvm::Value *operator()(llvm::Value *v) const { return v; }
-      llvm::Value *operator()(std::runtime_error &e) const { throw e; return nullptr; }
+      T operator()(T &v) const { return v; }
+      T operator()(compile_error &e) const { throw e; }
       
     };
     
     llvm::Value *codegen_value_extract(codegen_value &val);
     codegen_void codegen_ignore_value(codegen_value &val);
+
+    template<typename ContainerType>
+    typename value_helper<ContainerType>::value_type extract_left(ContainerType &c) {
+      typedef typename value_helper<ContainerType>::value_type left_type;
+      return boost::apply_visitor(return_or_throw<left_type>(), c);
+    }
     
     template<typename ErrorType>
     ErrorType merge_errors(const ErrorType &e0, const ErrorType &e1);

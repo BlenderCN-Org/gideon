@@ -6,7 +6,7 @@ using namespace llvm;
 using namespace std;
 
 Value *errors::codegen_value_extract(codegen_value &val) {
-  return boost::apply_visitor(errors::return_or_throw(), val);
+  return boost::apply_visitor(errors::return_or_throw<Value*>(), val);
 }
 
 codegen_void errors::codegen_ignore_value(codegen_value &val) {

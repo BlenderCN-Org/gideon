@@ -3,7 +3,7 @@ scene __gd_output;
 scene __gd_rng;
 
 extern void print(int x, int y) : gde_print_coords;
-extern int my_draw(int x, int y, int idx, float depth, output vec3 color, output vec2 uv, scene out) : gde_draw_coords;
+extern int my_draw(int x, int y, int idx, output vec3 color, scene out) : gde_draw_coords;
 
 extern void __print_string(output string s) : gde_print_string;
 void print_string(string s) { __print_string(s); }
@@ -71,14 +71,13 @@ vec3 light:eval_radiance(light lt, vec3 P, vec3 I) {
 extern void __vec4_to_vec3(output vec4 v4, output vec3 v3) : gde_vec4_to_vec3;
 vec3 vec4_to_vec3(vec4 v) { vec3 v3; __vec4_to_vec3(v, v3); return v3; }
 
-extern void __vec3_comp_mul(output vec3 lhs, output vec3 rhs, output vec3 result) : gde_vec3_comp_mul;
-vec3 comp_mul(vec3 lhs, vec3 rhs) { vec3 rt; __vec3_comp_mul(lhs, rhs, rt); return rt; }
+vec3 comp_mul(vec3 lhs, vec3 rhs) { return vec3(lhs.x*rhs.x, lhs.y*rhs.y, lhs.z*lhs.z); }
 
-extern void __vec3_scale(output vec3 v, float k, output vec3 result) : gde_vec3_scale;
-vec3 scale(vec3 v, float k) { vec3 r; __vec3_scale(v, k, r); return r; }
+vec3 scale(vec3 v, float k) { return vec3(k*v.x, k*v.y, k*v.z); }
 
-extern void __gen_shadow_ray(output vec3 P, output vec3 P_lt, output ray r) : gde_gen_shadow_ray;
-ray gen_shadow_ray(vec3 P, vec3 P_lt) { ray r; __gen_shadow_ray(P, P_lt, r); return r; }
+extern void __gen_ray(output vec3 O, output vec3 D, float max_t,
+		      output ray r) : gde_gen_ray;
+ray gen_ray(vec3 O, vec3 D, float max_t) { ray r; __gen_ray(O, D, max_t, r); return r; }
 
 //Standard Library Functions
 extern float __ray_max_dist(output ray r) : gde_ray_max_dist;
@@ -104,9 +103,20 @@ float dot(vec3 a, vec3 b) { return __dot_v3(a, b); }
 extern void __normalize_v3(output vec3 v, output vec3 n) : gde_normalize_v3;
 vec3 normalize(vec3 v) { vec3 r; __normalize_v3(v, r); return r; }
 
+extern float __length_v3(output vec3 v) : gde_length_v3;
+float length(vec3 v) { return __length_v3(v); }
+
 //Draw Functions
-int draw(int x, int y, int idx, float depth, vec3 color, vec2 uv) {
-  return my_draw(x, y, idx, depth, color, uv, __gd_output);
+int draw(int x, int y, int idx, vec3 color) {
+  return my_draw(x, y, idx, color, __gd_output);
+}
+
+ray gen_shadow_ray(vec3 P, vec3 P_lt) {
+  vec3 dir = P_lt - P;
+  float dist_lt = length(dir);
+  dir = normalize(dir);
+
+  return gen_ray(P, dir, dist_lt);
 }
 
 //Entry Point
@@ -117,7 +127,7 @@ void main(int x_size, int y_size) {
   
   int num_lights = scene:num_lights();
   int num_samples = 8;
-  float inv_num_samples = 0.125;
+  float inv_num_samples = 1.0 / 8.0;
 
   for (int i = 0; i < y_size; i = i + 1) {
     for (int j = 0; j < x_size; j = j + 1) {
@@ -133,7 +143,7 @@ void main(int x_size, int y_size) {
 
 	  for (int sample_id = 0; sample_id < num_samples; sample_id = sample_id + 1) {
 	    vec4 P_lt4 = light:sample_position(lt, P, random(), random());
-	    vec3 P_lt = vec4_to_vec3(P_lt4);
+	    vec3 P_lt = vec3(P_lt4.x, P_lt4.y, P_lt4.z);
 
 	    vec3 I;
 	    vec3 nI;
@@ -155,10 +165,10 @@ void main(int x_size, int y_size) {
 
       vec2 uv_coords = vec2(1.0, 1.0);
       vec3 color = vec3(1.0, 1.0, 1.0);
-      bool has_color = isect:attribute(ray_hit, "attribute:my_colors", color);
-      has_color = isect:attribute(ray_hit, "uv:UVMap", uv_coords);
+      if (isect:attribute(ray_hit, "attribute:my_colors", color)) L = comp_mul(L, color);
+      if (isect:attribute(ray_hit, "uv:UVMap", uv_coords)) L = comp_mul(L, vec3(uv_coords.x, uv_coords.y, 1.0));
       
-      idx = draw(j, i, idx, 1.0, L, uv_coords);
+      idx = draw(j, i, idx, L);
     }
   }
 }
