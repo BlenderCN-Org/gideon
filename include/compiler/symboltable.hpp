@@ -32,7 +32,7 @@ namespace raytrace {
     typedef typename Scope::entry_type entry_type;
     typedef typename Scope::key_type key_type;
 
-    scoped_symbol_table() : table(1) { }
+    scoped_symbol_table() { scope_push(""); }
 
     //Searches for the given key, throwing an exception if it does not exist.
     entry_type &get(const key_type &name) {
@@ -66,16 +66,20 @@ namespace raytrace {
 
     void set(const key_type &key, const entry_type &entry) { table.back().set(key, entry); }
     
-    void scope_push() { table.push_back(scope_type()); }
+    void scope_push(const std::string &scope_name = "") { table.push_back(scope_type(push_name(scope_name))); }
+    
     codegen_void scope_pop(llvm::Module *module, llvm::IRBuilder<> &builder) {
       codegen_void rt = table.back().destroy(module, builder);
       table.pop_back();
-
+      pop_name();
       return rt;
     }
 
+    std::string scope_name() const { return get_full_scope_name(); }
+
   private:
     std::vector<Scope> table;
+    std::vector<std::string> name_stack;
     
     void throw_not_found(const key_type &name) {
       std::stringstream err_str;
@@ -83,6 +87,28 @@ namespace raytrace {
       throw std::runtime_error(err_str.str());
     }
 
+    //Concatenates all the names of all the scopes on the stack.
+    std::string get_full_scope_name() const {
+      std::stringstream full_name_ss;
+      auto it = name_stack.begin();
+      full_name_ss << *it;
+      ++it;
+
+      while (it != name_stack.end()) {
+	full_name_ss << "_" << *it;
+	++it;
+      }
+      
+      return full_name_ss.str();
+    }
+    
+    //Adds a new name to the stack and returns the resulting full name.
+    std::string push_name(const std::string &name) {
+      name_stack.push_back(name);
+      return get_full_scope_name();
+    }
+
+    void pop_name() { name_stack.pop_back(); }
   };
   
   /* A table entry defining a particular variable. */
@@ -95,6 +121,9 @@ namespace raytrace {
   class variable_scope {
   public:
     
+    variable_scope(const std::string &) { }
+
+
     typedef variable_entry entry_type;
     typedef std::string key_type;
     typedef boost::unordered_map<std::string, variable_entry>::iterator iterator;
@@ -107,7 +136,7 @@ namespace raytrace {
     
     void set(const key_type &name, const entry_type &entry);
     codegen_void destroy(llvm::Module *module, llvm::IRBuilder<> &builder);
-
+    
     static std::string key_to_string(const key_type &key) { return key; }
 
   private:
@@ -132,7 +161,7 @@ namespace raytrace {
   };
 
   //Generates a function name based on the argument signature.
-  std::string function_generate_name(const std::string &base_name, const std::vector<function_argument> &args);
+  std::string function_generate_name(const std::string &base_name, const std::string &scope_name, const std::vector<function_argument> &args);
   
   struct function_key {
     std::string name;
@@ -155,7 +184,7 @@ namespace raytrace {
     bool operator==(const function_entry &rhs) const;
     
     //Creates a function entry from a name and types.
-    static function_entry make_entry(const std::string &name,
+    static function_entry make_entry(const std::string &name, const std::string &scope_name,
 				     const type_spec &return_type, const std::vector<function_argument> &arguments);
     function_key to_key() const;
   };
@@ -186,6 +215,8 @@ namespace raytrace {
   /* A mapping from function names to all overloaded versions. */
   class function_scope {
   public:
+
+    function_scope(const std::string &name);
 
     typedef boost::unordered_map<std::string, function_overload_set> table_type;
     
@@ -222,7 +253,8 @@ namespace raytrace {
   private:
 
     table_type table;
-    
+    std::string name;
+
   };
 
   typedef scoped_symbol_table<function_scope> function_symbol_table;

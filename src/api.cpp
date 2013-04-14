@@ -399,7 +399,7 @@ extern "C" {
     engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_output")), (void*)&rgba_out);
     engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_rng")), (void*)&rng_ptr);
 
-    void *fptr = engine->getPointerToFunction(module->getFunction("gdi_2_main_i_i"));
+    void *fptr = engine->getPointerToFunction(module->getFunction("gdi__2_main_i_i"));
     void (*render_entry)(int, int) = (void (*)(int, int))(fptr);
 
     render_entry(s->resolution.x, s->resolution.y);

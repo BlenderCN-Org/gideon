@@ -6,6 +6,9 @@ void output_func(output float y) {
 float test_access(float a, float b, float c) {
   vec3 foo = vec3(a, b, c);
   vec3 bar = vec3(c, a, b);
-  
-  return foo.x * bar.y;
+
+  {  
+    output_func(foo.x);
+    return foo.x * bar.y;
+  }
 }

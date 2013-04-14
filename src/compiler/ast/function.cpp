@@ -117,7 +117,7 @@ codegen_value raytrace::ast::prototype::codegen(Module *module, IRBuilder<> &bui
       else arg_types.push_back(arg_type);
     }
     
-    function_symbol_table::entry_type entry = function_entry::make_entry(name, return_type, args);
+    function_symbol_table::entry_type entry = function_entry::make_entry(name, state->functions.scope_name(), return_type, args);
     string name_to_use = (external ? extern_name : entry.full_name);
     
     FunctionType *ft = FunctionType::get(return_type->llvm_type(), arg_types, false);

@@ -12,7 +12,7 @@ namespace raytrace {
 
     std::vector<type_spec> return_type_stack;
     std::vector<loop_blocks> loop_stack;
-
+    
     void push_function_rt(const type_spec &t) { return_type_stack.push_back(t); }
     void pop_function_rt() { return_type_stack.pop_back(); }
     type_spec &return_type() { return return_type_stack.back(); }
@@ -21,7 +21,7 @@ namespace raytrace {
       loop_blocks loop{post, next};
       loop_stack.push_back(loop);
     }
-
+    
     void pop_loop() { loop_stack.pop_back(); }
     bool inside_loop() { return loop_stack.size() > 0; }
 

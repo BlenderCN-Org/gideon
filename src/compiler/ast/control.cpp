@@ -96,7 +96,7 @@ codegen_value raytrace::ast::for_loop_statement::codegen(Module *module, IRBuild
   //evaluate and ensure that the loop condition is a bool
   typecheck_value cond_type = cond->typecheck_safe();
   codegen_value cond_test = cond->codegen(module, builder);
-  boost::function<codegen_value (typed_value &)> bool_check = [state, &builder, loop_bb, post_bb] (typed_value &arg) -> codegen_value {
+  boost::function<codegen_value (typed_value &)> bool_check = [this, &builder, loop_bb, post_bb] (typed_value &arg) -> codegen_value {
     if (*arg.get<1>() != *state->types["bool"]) return compile_error("Condition must be a boolean expression");
 
     builder.CreateCondBr(arg.get<0>(), loop_bb, post_bb);

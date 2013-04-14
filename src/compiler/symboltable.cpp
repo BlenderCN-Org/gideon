@@ -55,9 +55,9 @@ namespace raytrace {
     return true;
   }
 
-  string function_generate_name(const string &base_name, const vector<function_argument> &args) {
+  string function_generate_name(const string &base_name, const string &scope_name, const vector<function_argument> &args) {
     stringstream ss;
-    ss << "gdi_" << args.size() << "_" << base_name;
+    ss << "gdi_" << scope_name << "_" << args.size() << "_" << base_name;
     
     for (auto it = args.begin(); it != args.end(); it++) {
       ss << "_" << it->type->type_id;
@@ -83,12 +83,12 @@ namespace raytrace {
     return key;
   }
   
-  function_entry function_entry::make_entry(const string &name,
+  function_entry function_entry::make_entry(const string &name, const string &scope_name,
 					    const type_spec &return_type, const vector<function_argument> &arguments) {
     function_entry fe;
     fe.func = NULL;
     fe.name = name;
-    fe.full_name = function_generate_name(name, arguments);
+    fe.full_name = function_generate_name(name, scope_name, arguments);
 
     fe.external = false;
     fe.return_type = return_type;
@@ -167,6 +167,12 @@ namespace raytrace {
 
   template<>
   string symbol_name<function_key>() { return "function"; }
+
+  function_scope::function_scope(const string &name) :
+    name(name)
+  {
+    
+  }
 
   function_scope::iterator &function_scope::iterator::operator++() {
     version_it++;

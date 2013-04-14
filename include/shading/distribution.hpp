@@ -4,6 +4,8 @@
 #include "math/vector.hpp"
 #include "vm/parameters.hpp"
 
+#include <boost/unordered_map.hpp>
+
 #include <string>
 #include <map>
 
@@ -77,6 +79,29 @@ namespace raytrace {
     
   };
   
+  /*
+    A program that describes how light intersects with a surface/volume.
+  */
+  class gd_distribution_function {
+  public:
+
+    typedef void (*eval_func_type)(void*,
+				   float3*,
+				   float3*, float3*, float3*, float3*,
+				   float4*);
+
+    gd_distribution_function(const std::string &name,
+			     const boost::unordered_map<std::string, size_t> &params,
+			     eval_func_type eval);
+
+  private:
+    
+    std::string name;
+    boost::unordered_map<std::string, size_t> param_offset;
+    eval_func_type eval_func;
+    
+  };
+
 };
 
 #endif
