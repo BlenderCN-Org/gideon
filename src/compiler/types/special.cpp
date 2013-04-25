@@ -68,6 +68,28 @@ codegen_void dfunc_type::destroy(Value *value, Module *module, IRBuilder<> &buil
   return nullptr;
 }
 
+codegen_value dfunc_type::op_add(Module *module, IRBuilder<> &builder,
+				 codegen_value &lhs, codegen_value &rhs) const {
+  typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> op = [this, &builder, module] (arg_val_type &val) {
+    Type *pointer_type = llvm_type()->getPointerTo();
+    vector<Type*> arg_type({pointer_type, pointer_type, pointer_type});
+    FunctionType *ty = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_type, false);
+    Function *add_f = cast<Function>(module->getOrInsertFunction("gd_builtin_dfunc_add", ty));
+    
+    Value *lhs_ptr = CreateEntryBlockAlloca(builder, llvm_type(), "dfunc_lhs");
+    builder.CreateStore(val.get<0>(), lhs_ptr, false);
+
+    Value *rhs_ptr = CreateEntryBlockAlloca(builder, llvm_type(), "dfunc_lhs");
+    builder.CreateStore(val.get<1>(), rhs_ptr, false);
+
+    Value *sum = CreateEntryBlockAlloca(builder, llvm_type(), "dfunc_add");
+    builder.CreateCall3(add_f, lhs_ptr, rhs_ptr, sum);
+    return builder.CreateLoad(sum);
+  };
+  return errors::codegen_call_args(op, lhs, rhs);
+}
+
 //Context Pointer
 
 Type *context_ptr_type::llvm_type() const {

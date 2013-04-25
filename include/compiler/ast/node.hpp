@@ -40,6 +40,9 @@ namespace raytrace {
       void push_function(const type_spec &t);
       void pop_function(llvm::Module *module, llvm::IRBuilder<> &builder);
 
+      void push_distribution_context(const std::string &name, llvm::Type *param_ptr_type, const control_state::context_loader_type &loader);
+      void pop_distribution_context(llvm::Module *module, llvm::IRBuilder<> &builder);
+
       void exit_loop_scopes(llvm::Module *module, llvm::IRBuilder<> &builder);
       void exit_to_loop_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
       void exit_function(llvm::Module *module, llvm::IRBuilder<> &builder);

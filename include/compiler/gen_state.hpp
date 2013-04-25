@@ -11,10 +11,12 @@ namespace raytrace {
       unsigned int top_scope;
     };
 
+    typedef boost::function<void (llvm::Value*, llvm::Module*, llvm::IRBuilder<>&)> context_loader_type;
+
     struct class_context {
       llvm::Value *ctx;
       llvm::Type *ctx_type;
-      boost::function<void (llvm::Value*, llvm::Module*, llvm::IRBuilder<>&)> loader;
+      context_loader_type loader;
     };
 
     std::vector<type_spec> return_type_stack;

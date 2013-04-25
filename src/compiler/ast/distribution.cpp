@@ -42,10 +42,8 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
     }
   };
   
-  //enter new scope  
-  state->control.push_context(NULL, param_type->getPointerTo(), loader);
-  state->functions.scope_push(name);
-  state->control.push_scope();
+  //enter new scope
+  push_distribution_context(name, param_type->getPointerTo(), loader);
   
   //evaluate all internal declarations
   codegen_vector content_eval;
@@ -68,21 +66,21 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
   else eval_func = compile_error("Distribution must define an 'evaluate' function.");
 
   //leave new scope
-  state->control.pop_scope();
-  codegen_void fpop = state->functions.scope_pop(module, builder);
-  state->control.pop_context();
+  pop_distribution_context(module, builder);
   
   //define an externally visible function to evaluate this distribution (vectors must be passed by pointer, not value).
   //then define an externally visible function to instantiate this distribution
   codegen_value ctor_val = errors::codegen_call(eval_func, [this, module, &builder] (Value *f_val) -> codegen_value {
       Function *eval_f = createEvaluator(cast<Function>(f_val), module, builder);
-      return createConstructor(module, builder, eval_f);
+      Function *dtor_f = createDestructor(module, builder);
+      
+      return createConstructor(module, builder, eval_f, dtor_f);
     });
   
   //final error checking, add the constructor to the function symtab
-  typedef errors::argument_value_join<codegen_vector, codegen_value, codegen_void, codegen_value>::result_value_type arg_val_type;
+  typedef errors::argument_value_join<codegen_vector, codegen_value, codegen_value>::result_value_type arg_val_type;
   boost::function<codegen_value (arg_val_type &)> op = [this, module, &builder] (arg_val_type &args) -> codegen_value {
-    Function *ctor = cast<Function>(args.get<3>());
+    Function *ctor = cast<Function>(args.get<2>());
     function_entry entry = function_entry::make_entry(name, state->functions.scope_name(),
 						      state->types["dfunc"], params);
     entry.func = ctor;
@@ -90,11 +88,11 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
     return ctor;
   };
   
-  return errors::codegen_call_args(op, content_eval, eval_func, fpop, ctor_val);
+  return errors::codegen_call_args(op, content_eval, eval_func, ctor_val);
 }
 
 Function *ast::distribution::createConstructor(Module *module, IRBuilder<> &builder,
-					       Function *eval) {
+					       Function *eval, Function *dtor) {
   string ctor_name = function_generate_name(name, state->functions.scope_name(), params);
   
   //create function accepting parameters as arguments
@@ -114,13 +112,13 @@ Function *ast::distribution::createConstructor(Module *module, IRBuilder<> &buil
   
   //initialize the object and dynamically allocate parameter memory (calling a builtin function)
   vector<Type*> alloc_arg_types({state->types["scene_ptr"]->llvm_type(), Type::getInt32Ty(getGlobalContext()),
-	eval->getType(), dfunc_ptr->getType()});
+	eval->getType(), dtor->getType(), dfunc_ptr->getType()});
   FunctionType *alloc_type = FunctionType::get(param_type->getPointerTo(), alloc_arg_types, false);
   Function *alloc_func = cast<Function>(module->getOrInsertFunction("gd_builtin_alloc_dfunc", alloc_type));
   
   int param_data_size = DataLayout(module).getTypeAllocSize(param_type);
   Constant *param_size_arg = ConstantInt::get(getGlobalContext(), APInt(8*sizeof(int), param_data_size));
-  Value *param_ptr = builder.CreateCall4(alloc_func, scene_ptr, param_size_arg, eval, dfunc_ptr);
+  Value *param_ptr = builder.CreateCall5(alloc_func, scene_ptr, param_size_arg, eval, dtor, dfunc_ptr);
 
   //set each parameter
   auto arg_it = f->arg_begin();
@@ -136,9 +134,30 @@ Function *ast::distribution::createConstructor(Module *module, IRBuilder<> &buil
   return f;
 }
 
-string ast::distribution::evaluator_name() const {
+Function *ast::distribution::createDestructor(Module *module, IRBuilder<> &builder) {
+  string dtor_name = evaluator_name("dtor");
+  
+  FunctionType *dtor_type = FunctionType::get(Type::getVoidTy(getGlobalContext()),
+					      ArrayRef<Type*>(vector<Type*>(1, param_type->getPointerTo())), false);
+  Function *dtor = Function::Create(dtor_type, Function::ExternalLinkage, dtor_name, module);
+  BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "func_entry", dtor);
+  builder.SetInsertPoint(bb);
+
+  Value *param_ptr = dtor->arg_begin();
+  for (unsigned int i = 0;  i < params.size(); ++i) {
+    Value *ptr = builder.CreateStructGEP(param_ptr, i);
+    type_spec type = params[i].type;
+    type->destroy(ptr, module, builder);
+  }
+
+  builder.CreateRetVoid();
+
+  return dtor;
+}
+
+string ast::distribution::evaluator_name(const string &n) const {
   stringstream name_ss;
-  name_ss << "gd_dist_" << state->functions.scope_name() << "_" << name;
+  name_ss << "gd_dist_" << state->functions.scope_name() << "_" << name << "_" << n;
   return name_ss.str();
 }
 
@@ -149,7 +168,7 @@ Function *ast::distribution::createEvaluator(Function *eval, Module *module, IRB
   const unsigned int num_args = 5;
   vector<Type*> arg_types({param_type->getPointerTo(), vec3_ptr, vec3_ptr, vec3_ptr, vec3_ptr, vec3_ptr, /* out */ vec4_ptr});
   FunctionType *eval_type = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_types, false);
-  Function *f = Function::Create(eval_type, Function::ExternalLinkage, evaluator_name(), module);
+  Function *f = Function::Create(eval_type, Function::ExternalLinkage, evaluator_name("eval"), module);
   
   BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "func_entry", f);
   builder.SetInsertPoint(bb);

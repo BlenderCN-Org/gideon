@@ -31,6 +31,16 @@ void ast::ast_node::pop_function(Module *module, IRBuilder<> &builder) {
   state->control.pop_function_rt();
 }
 
+void ast::ast_node::push_distribution_context(const string &name, Type *param_ptr_type, const control_state::context_loader_type &loader) {
+  state->control.push_context(NULL, param_ptr_type, loader);
+  push_scope(name);
+}
+
+void ast::ast_node::pop_distribution_context(Module *module, IRBuilder<> &builder) {
+  pop_scope(module, builder);
+  state->control.pop_context();
+}
+
 void ast::ast_node::exit_loop_scopes(Module *module, IRBuilder<> &builder) {
   assert(state->control.inside_loop());
   

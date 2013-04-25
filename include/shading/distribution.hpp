@@ -87,19 +87,26 @@ namespace raytrace {
 				     float3*, float3*, float3*, float3*,
 				     float4*);
 
-      ~leaf() { delete[] params; }
+      typedef void (*dtor_func_type)(void*);
+
+      leaf(char *p, eval_func_type eval, dtor_func_type dtor);
+      ~leaf();
       
       char *params;
       eval_func_type evaluate;
+      dtor_func_type destructor;
     };
 
     struct scale;
     struct sum;
     
-    typedef boost::variant<leaf,
-			   scale,
-			   sum> node;
-    typedef std::shared_ptr<node> node_ptr;
+    typedef std::shared_ptr<leaf> leaf_ptr;
+    typedef std::shared_ptr<scale> scale_ptr;
+    typedef std::shared_ptr<sum> sum_ptr;
+
+    typedef boost::variant<leaf_ptr,
+			   scale_ptr,
+			   sum_ptr> node_ptr;
     
     struct scale {
       float4 k;

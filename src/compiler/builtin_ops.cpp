@@ -89,19 +89,27 @@ extern "C" void gd_builtin_light_iterator_next(void *s_ptr, /* inout */ int *lig
 
 extern "C" void *gd_builtin_alloc_dfunc(void *,
 					int param_size,
-					shade_tree::leaf::eval_func_type eval, /* out */ void *out) {
+					shade_tree::leaf::eval_func_type eval,
+					shade_tree::leaf::dtor_func_type dtor,
+					/* out */ void *out) {
   char *params = new char[param_size];
-  new (out) shade_tree::node_ptr(new shade_tree::node(shade_tree::leaf{params, eval}));
+  new (out) shade_tree::node_ptr(shade_tree::leaf_ptr(new shade_tree::leaf(params, eval, dtor)));
   return params;
 }
 
 extern "C" void gd_builtin_copy_dfunc(void *in, /* out */ void *out) {
   shade_tree::node_ptr *node_in = reinterpret_cast<shade_tree::node_ptr*>(in);
-  shade_tree::node_ptr *node_out = reinterpret_cast<shade_tree::node_ptr*>(out);
-  *node_out = *node_in;
+  new (out) shade_tree::node_ptr(*node_in);
 }
 
 extern "C" void gd_builtin_destroy_dfunc(void *out) {
   shade_tree::node_ptr *node = reinterpret_cast<shade_tree::node_ptr*>(out);
   node->shade_tree::node_ptr::~node_ptr();
+}
+
+extern "C" void gd_builtin_dfunc_add(void *lhs, void *rhs, /* out */ void *out) {
+    shade_tree::node_ptr *left = reinterpret_cast<shade_tree::node_ptr*>(lhs);
+    shade_tree::node_ptr *right = reinterpret_cast<shade_tree::node_ptr*>(rhs);
+
+    new (out) shade_tree::node_ptr(shade_tree::sum_ptr(new shade_tree::sum{*left, *right}));
 }
