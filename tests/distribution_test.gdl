@@ -1,0 +1,55 @@
+
+float main(float a, float b) {
+  return (a - b);
+}
+
+int get_my_vector() {
+  return 2;
+}
+
+distribution my_bsdf(float sigma, vec3 color) {
+
+  int get_my_vector() {
+    return 0;
+  }
+
+  float dot(vec3 a, vec3 b) {
+    return a.x*b.x + a.y*b.y + a.z*b.z;
+  }
+  
+  float yet_another_function(float x) {
+    int call_me = get_my_vector();
+    return main(x, 75.0*sigma);
+  }
+  
+  vec4 evaluate(vec3 N,
+		vec3 P_in, vec3 w_in,
+		vec3 P_out, vec3 w_out) {
+    float k = sigma * dot(N, w_out);
+    return vec4(k*color.x, k*color.y, k*color.z, 1.0);
+  }
+  
+}
+
+extern void __dfunc_eval(output dfunc d,
+			 output vec3 N,
+			 output vec3 P_in, output vec3 w_in,
+			 output vec3 P_out, output vec3 w_out,
+			 output vec4 out) : gde_dfunc_eval;
+vec4 dfunc:evaluate(dfunc d, vec3 N,
+		    vec3 P_in, vec3 w_in,
+		    vec3 P_out, vec3 w_out) {
+  vec4 out;
+  __dfunc_eval(d, N, P_in, w_in, P_out, w_out, out);
+  return out;
+}
+		      
+
+vec4 my_test_function() {
+  dfunc f = my_bsdf(0.75, vec3(1.0, 1.0, 1.0));
+  dfunc f2 = f;
+  f;
+
+  vec3 zero = vec3(1.0, 1.0, 1.0);
+  return dfunc:evaluate(f, zero, zero, zero, zero, zero);
+}

@@ -1,4 +1,5 @@
 #include "compiler/gd_std.hpp"
+#include "shading/distribution.hpp"
 #include "math/vector.hpp"
 
 #include <cstring>
@@ -82,4 +83,25 @@ extern "C" void gd_builtin_light_iterator_next(void *s_ptr, /* inout */ int *lig
 					       /* out */ light **lt) {
   scene *s = reinterpret_cast<scene*>(s_ptr);
   *lt = &s->lights[(*light_id)++];
+}
+
+/* Distributions */
+
+extern "C" void *gd_builtin_alloc_dfunc(void *,
+					int param_size,
+					shade_tree::leaf::eval_func_type eval, /* out */ void *out) {
+  char *params = new char[param_size];
+  new (out) shade_tree::node_ptr(new shade_tree::node(shade_tree::leaf{params, eval}));
+  return params;
+}
+
+extern "C" void gd_builtin_copy_dfunc(void *in, /* out */ void *out) {
+  shade_tree::node_ptr *node_in = reinterpret_cast<shade_tree::node_ptr*>(in);
+  shade_tree::node_ptr *node_out = reinterpret_cast<shade_tree::node_ptr*>(out);
+  *node_out = *node_in;
+}
+
+extern "C" void gd_builtin_destroy_dfunc(void *out) {
+  shade_tree::node_ptr *node = reinterpret_cast<shade_tree::node_ptr*>(out);
+  node->shade_tree::node_ptr::~node_ptr();
 }

@@ -1,5 +1,6 @@
 #include "compiler/ast/expression.hpp"
 #include "compiler/operations.hpp"
+#include "compiler/llvm_helper.hpp"
 
 #include <iostream>
 
@@ -23,6 +24,24 @@ typed_value_container ast::expression::codegen_safe(llvm::Module *module, llvm::
   codegen_value val = codegen(module, builder);
   return errors::combine_arg_list(val, type);
 }
+
+void ast::expression::destroy_unbound(typecheck_value &type, codegen_value &val, Module *module, IRBuilder<> &builder) {
+  typedef raytrace::errors::argument_value_join<codegen_value, typecheck_value>::result_value_type arg_val_type;
+  boost::function<codegen_void (arg_val_type &)> dtor = [module, &builder] (arg_val_type &arg) -> codegen_void {
+    type_spec t = arg.get<1>();
+    Value *val = arg.get<0>();
+
+    //ensure we have a pointer to this object
+    Value *val_ptr = CreateEntryBlockAlloca(builder, t->llvm_type(), "dtor_tmp");
+    builder.CreateStore(val, val_ptr, false);
+
+    return t->destroy(val_ptr, module, builder);
+  };
+
+  errors::codegen_call_args(dtor, val, type);
+}
+
+
 
 /** Binary Expression **/
 

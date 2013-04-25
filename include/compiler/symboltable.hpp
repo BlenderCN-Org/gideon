@@ -68,11 +68,30 @@ namespace raytrace {
     
     void scope_push(const std::string &scope_name = "") { table.push_back(scope_type(push_name(scope_name))); }
     
-    codegen_void scope_pop(llvm::Module *module, llvm::IRBuilder<> &builder) {
-      codegen_void rt = table.back().destroy(module, builder);
+    codegen_void scope_pop(llvm::Module *module, llvm::IRBuilder<> &builder, bool destroy = true) {
+      codegen_void rt = nullptr;
+      if (destroy) rt = scope_destroy(module, builder);
       table.pop_back();
       pop_name();
+
       return rt;
+    }
+    
+    //Generates the destructor code for this scope, without actually popping it off the stack.
+    //Can be used to give a scope multiple exit points.
+    codegen_void scope_destroy(llvm::Module *module, llvm::IRBuilder<> &builder) {
+      return table.back().destroy(module, builder);
+    }
+
+    //Generates destructor code for the lowest N scopes.
+    codegen_void scope_destroy(unsigned int N, llvm::Module *module, llvm::IRBuilder<> &builder) {
+      unsigned int end = std::min(N, static_cast<unsigned int>(table.size()));
+      for (unsigned int i = 0; i < end; i++) {
+	Scope &scope = table[table.size() - 1 - i];
+	scope.destroy(module, builder);
+      }
+
+      return nullptr;
     }
 
     std::string scope_name() const { return get_full_scope_name(); }
@@ -115,6 +134,12 @@ namespace raytrace {
   struct variable_entry {
     llvm::Value *value;
     type_spec type;
+    
+    bool destroy_on_scope_exit;
+
+    variable_entry(llvm::Value *val, type_spec t, bool do_destroy = true) :
+      value(val), type(t), destroy_on_scope_exit(do_destroy) { }
+    variable_entry() : value(NULL), type(nullptr), destroy_on_scope_exit(false) { }
   };
 
   /* A table of variable entries. */
@@ -172,7 +197,7 @@ namespace raytrace {
   struct function_entry {
     llvm::Function *func;
     std::string name, full_name;
-    bool external;
+    bool external, member_function;
     
     type_spec return_type;
     std::vector<function_argument> arguments;

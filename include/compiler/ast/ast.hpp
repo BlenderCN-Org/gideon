@@ -7,5 +7,7 @@
 #include "compiler/ast/function.hpp"
 #include "compiler/ast/statement.hpp"
 #include "compiler/ast/control.hpp"
+#include "compiler/ast/distribution.hpp"
+#include "compiler/ast/module.hpp"
 
 #endif

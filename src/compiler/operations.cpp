@@ -35,6 +35,14 @@ type_spec raytrace::get_sub_result_type(const ast::expression_ptr &lhs, const as
   return lt;
 }
 
+void destroy_unbound_arg(ast::expression_ptr &expr, type_spec t, codegen_value &val,
+			 Module *module, IRBuilder<> &builder) {
+  if (!expr->bound()) {
+    typecheck_value safe = t;
+    ast::expression::destroy_unbound(safe, val, module, builder);
+  }
+}
+
 codegen_value raytrace::generate_add(ast::expression_ptr &lhs, ast::expression_ptr &rhs,
 			      type_table &types,
 			      Module *module, IRBuilder<> &builder) {
@@ -46,7 +54,12 @@ codegen_value raytrace::generate_add(ast::expression_ptr &lhs, ast::expression_p
   codegen_value lval = lhs->codegen(module, builder);
   codegen_value rval = rhs->codegen(module, builder);
 
-  return lt->op_add(module, builder, lval, rval);
+  codegen_value result = lt->op_add(module, builder, lval, rval);
+
+  destroy_unbound_arg(lhs, lt, lval, module, builder);
+  destroy_unbound_arg(rhs, rt, rval, module, builder);
+
+  return result;
 }
 
 codegen_value raytrace::generate_sub(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
@@ -63,7 +76,12 @@ codegen_value raytrace::generate_sub(ast::expression_ptr &lhs, ast::expression_p
 
     codegen_value lval = lhs->codegen(module, builder);
     codegen_value rval = rhs->codegen(module, builder);
-    return lt->op_sub(module, builder, lval, rval);
+
+    codegen_value result = lt->op_sub(module, builder, lval, rval);
+    destroy_unbound_arg(lhs, lt, lval, module, builder);
+    destroy_unbound_arg(rhs, rt, rval, module, builder);
+    
+    return result; 
   };
 
   return errors::codegen_call_args(op, lt, rt);
@@ -83,9 +101,14 @@ codegen_value raytrace::generate_mul(ast::expression_ptr &lhs, ast::expression_p
 
     codegen_value lval = lhs->codegen(module, builder);
     codegen_value rval = rhs->codegen(module, builder);
-    return lt->op_mul(module, builder, lval, rval);
-  };
 
+    codegen_value result = lt->op_mul(module, builder, lval, rval);
+    destroy_unbound_arg(lhs, lt, lval, module, builder);
+    destroy_unbound_arg(rhs, rt, rval, module, builder);
+    
+    return result;
+  };
+  
   return errors::codegen_call_args(op, lt, rt);
 }
 
@@ -103,7 +126,12 @@ codegen_value raytrace::generate_div(ast::expression_ptr &lhs, ast::expression_p
 
     codegen_value lval = lhs->codegen(module, builder);
     codegen_value rval = rhs->codegen(module, builder);
-    return lt->op_div(module, builder, lval, rval);
+
+    codegen_value result = lt->op_div(module, builder, lval, rval);
+    destroy_unbound_arg(lhs, lt, lval, module, builder);
+    destroy_unbound_arg(rhs, rt, rval, module, builder);
+    
+    return result;
   };
 
   return errors::codegen_call_args(op, lt, rt);
@@ -119,7 +147,12 @@ codegen_value raytrace::generate_less_than(ast::expression_ptr &lhs, ast::expres
   
   codegen_value lval = lhs->codegen(module, builder);
   codegen_value rval = rhs->codegen(module, builder);
-  return lt->op_less(module, builder, lval, rval);
+
+  codegen_value result = lt->op_less(module, builder, lval, rval);
+  destroy_unbound_arg(lhs, lt, lval, module, builder);
+  destroy_unbound_arg(rhs, rt, rval, module, builder);
+  
+  return result;
 }
 
 codegen_value raytrace::llvm_builtin_binop(const string &func_name, Type *type, Value *lhs, Value *rhs,

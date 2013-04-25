@@ -17,6 +17,10 @@ namespace raytrace {
       type_table types;
       control_state control;
     };
+
+    //Defines a full path to a variable / function name.
+    //This is used to determine what module should be searched for symbol lookups.
+    typedef std::vector<std::string> name_path;
     
     class ast_node { 
     public:
@@ -30,6 +34,16 @@ namespace raytrace {
       parser_state *state;
       unsigned int line_no, column_no;
 
+      void push_scope(const std::string &name = "");
+      void pop_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
+
+      void push_function(const type_spec &t);
+      void pop_function(llvm::Module *module, llvm::IRBuilder<> &builder);
+
+      void exit_loop_scopes(llvm::Module *module, llvm::IRBuilder<> &builder);
+      void exit_to_loop_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
+      void exit_function(llvm::Module *module, llvm::IRBuilder<> &builder);
+      
     };
 
   };

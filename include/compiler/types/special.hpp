@@ -26,7 +26,30 @@ namespace raytrace {
 
     light_type(type_table *types) : type(types, "light", "lt") { }
     virtual llvm::Type *llvm_type() const;
+  };
 
+  //An instance of a distribution object.
+  class dfunc_type : public type {
+  public:
+
+    dfunc_type(type_table *types);
+    virtual llvm::Type *llvm_type() const;
+
+    virtual codegen_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
+    virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
+
+  private:
+    
+  };
+
+  //Hidden placeholder type, used to pass a 'this' pointer in distributions and shaders.
+  class context_ptr_type : public type {
+  public:
+
+    context_ptr_type(type_table *types) : type(types, "context_ptr", "ctx") { }
+    virtual llvm::Type *llvm_type() const;
+    
   };
 
 };

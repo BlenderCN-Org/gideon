@@ -23,6 +23,7 @@ codegen_value raytrace::ast::conditional_statement::codegen(Module *module, IRBu
 			   });
   
   codegen_value cond_val = cond->codegen(module, builder);
+  
   boost::function<codegen_value (typed_value &)> op = [this, module, &builder] (typed_value &cond) -> codegen_value {
     Value *cond_val = cond.get<0>();
     Function *func = builder.GetInsertBlock()->getParent();
@@ -59,7 +60,11 @@ codegen_value raytrace::ast::conditional_statement::codegen(Module *module, IRBu
     return errors::codegen_call_args(check_branches, if_val, else_val);
   };
   
-  return errors::codegen_call_args(op, cond_val, t);
+  codegen_value result = errors::codegen_call_args(op, cond_val, t);
+  if (!cond->bound()) ast::expression::destroy_unbound(t, cond_val, module, builder);
+  state->control.set_scope_reaches_end(true);
+  
+  return result;
 }
 
 /* For Loop Statement */
@@ -75,15 +80,14 @@ raytrace::ast::for_loop_statement::for_loop_statement(parser_state *st,
 }
 
 codegen_value raytrace::ast::for_loop_statement::codegen(Module *module, IRBuilder<> &builder) {
-  state->variables.scope_push();
-  state->functions.scope_push();
-
+  push_scope();
+  
   Function *func = builder.GetInsertBlock()->getParent();
   BasicBlock *pre_bb = BasicBlock::Create(getGlobalContext(), "pre_bb", func);
   BasicBlock *loop_bb = BasicBlock::Create(getGlobalContext(), "loop_bb");
   BasicBlock *next_bb = BasicBlock::Create(getGlobalContext(), "next_bb");
   BasicBlock *post_bb = BasicBlock::Create(getGlobalContext(), "post_bb");
-
+  
   state->control.push_loop(post_bb, next_bb);
 
   //initialize the loop
@@ -115,20 +119,25 @@ codegen_value raytrace::ast::for_loop_statement::codegen(Module *module, IRBuild
   func->getBasicBlockList().push_back(next_bb);
   builder.SetInsertPoint(next_bb);
   
+  typecheck_value after_type = (after ? after->typecheck_safe() : nullptr);
   codegen_value after_val = (after ? after->codegen(module, builder) : nullptr);
   builder.CreateBr(pre_bb);
   
+  //generate post-loop code
   func->getBasicBlockList().push_back(post_bb);
   builder.SetInsertPoint(post_bb);
   
-  codegen_void fpop = state->functions.scope_pop(module, builder);
-  codegen_void vpop = state->variables.scope_pop(module, builder);
+  pop_scope(module, builder);
   state->control.pop_loop();
 
   //merge all the generated values to propagate any errors
-  typedef raytrace::errors::argument_value_join<codegen_value, codegen_value, codegen_value, codegen_value, codegen_void, codegen_void>::result_value_type arg_val_type;
+  typedef raytrace::errors::argument_value_join<codegen_value, codegen_value, codegen_value, codegen_value>::result_value_type arg_val_type;
   boost::function<codegen_value (arg_val_type &)> final_check = [] (arg_val_type &) { return nullptr; };
-  return errors::codegen_call_args(final_check, init_val, cond_test, body_val, after_val, fpop, vpop);
+  codegen_value result = errors::codegen_call_args(final_check, init_val, cond_test, body_val, after_val);
+  
+  if (!cond->bound()) ast::expression::destroy_unbound(cond_type, cond_test, module, builder);
+  if (after && !after->bound()) ast::expression::destroy_unbound(after_type, after_val, module, builder);
+  return result;
 }
 
 /** Break **/
@@ -140,7 +149,11 @@ raytrace::ast::break_statement::break_statement(parser_state *st) :
 }
 
 codegen_value raytrace::ast::break_statement::codegen(Module *module, IRBuilder<> &builder) {
+  if (builder.GetInsertBlock()->getTerminator()) return nullptr;
   if (!state->control.inside_loop()) return compile_error("Invalid use of 'break' outside any loop");
+  state->control.set_scope_reaches_end(false);
+  
+  exit_loop_scopes(module, builder);
   BasicBlock *bb = state->control.post_loop();
   return builder.CreateBr(bb);
 }
@@ -154,7 +167,11 @@ raytrace::ast::continue_statement::continue_statement(parser_state *st) :
 }
 
 codegen_value raytrace::ast::continue_statement::codegen(Module *module, IRBuilder<> &builder) {
+  if (builder.GetInsertBlock()->getTerminator()) return nullptr;
   if (!state->control.inside_loop()) return compile_error("Invalid use of 'continue' outside any loop");
+  state->control.set_scope_reaches_end(false);
+
+  exit_to_loop_scope(module, builder);
   BasicBlock *bb = state->control.next_iter();
   return builder.CreateBr(bb);
 }

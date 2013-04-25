@@ -23,24 +23,34 @@ function_key ast::func_call::get_key() const {
   return fkey;
 }
 
-codegen_value raytrace::ast::func_call::codegen(Module *module, IRBuilder<> &builder) {
+codegen_value raytrace::ast::func_call::codegen(Module *module, IRBuilder<> &builder) {  
   function_symbol_table::entry_type *entry = nullptr;
   try { entry = &state->functions.get(get_key()); }
   catch (compile_error &e) { return e; }
   
   Function *f = entry->func;
+  bool is_member_function = entry->member_function;
   
-  if (args.size() != entry->arguments.size()) {
+  size_t expected_size = entry->arguments.size();
+  if (args.size() != expected_size) {
     stringstream err_str;
-    err_str << "Expected " << entry->arguments.size() << " arguments, found " << args.size() << ".";
+    err_str << "Expected " << expected_size << " arguments, found " << args.size() << ".";
     return compile_error(err_str.str());
   }
     
   //check argument types and evaluate
   typecheck_vector arg_types;
   codegen_vector arg_eval;
-  
+
+  //add the context to the argument list
+  if (is_member_function) {
+    codegen_value ctx_val = state->control.get_context();
+    arg_eval = errors::codegen_vector_push_back(arg_eval, ctx_val);
+  }
+
   unsigned int arg_idx = 0;
+  vector< pair<typecheck_value, codegen_value> > to_destroy;
+
   for (vector<expression_ptr>::iterator arg_it = args.begin(); arg_it != args.end(); arg_it++, arg_idx++) {
     typecheck_value ats = (*arg_it)->typecheck_safe();
     ats = errors::codegen_call(ats, [entry, arg_idx] (type_spec &arg_ts) -> typecheck_value {
@@ -57,6 +67,8 @@ codegen_value raytrace::ast::func_call::codegen(Module *module, IRBuilder<> &bui
     codegen_value expr = (entry->arguments[arg_idx].output ?
 			  (*arg_it)->codegen_ptr(module, builder) : 
 			  (*arg_it)->codegen(module, builder));
+    
+    if (!(*arg_it)->bound()) to_destroy.push_back(make_pair(ats, expr));
     arg_eval = errors::codegen_vector_push_back(arg_eval, expr);
   }
   
@@ -69,7 +81,14 @@ codegen_value raytrace::ast::func_call::codegen(Module *module, IRBuilder<> &bui
     return builder.CreateCall(f, arg_vals, tmp_name.c_str());
   };
   
-  return errors::codegen_call_args(call_op, arg_eval, arg_types);
+  codegen_value result = errors::codegen_call_args(call_op, arg_eval, arg_types);
+
+  //delete any expressions used to call this function
+  for (auto it = to_destroy.begin(); it != to_destroy.end(); ++it) {
+    ast::expression::destroy_unbound(it->first, it->second, module, builder);
+  }
+
+  return result;
 }
 
 type_spec raytrace::ast::func_call::typecheck() {
@@ -83,7 +102,7 @@ raytrace::ast::prototype::prototype(parser_state *st, const string &name, const 
 				    const vector<function_argument> &args) :
   global_declaration(st),
   name(name), extern_name(name), return_type(return_type),
-  args(args), external(false)
+  args(args), external(false), member_function(false)
 {
 
 }
@@ -93,7 +112,7 @@ raytrace::ast::prototype::prototype(parser_state *st, const string &name, const 
   global_declaration(st),
   name(name), extern_name(extern_name),
   return_type(return_type), args(args),
-  external(true)
+  external(true), member_function(false)
 {
   
 }
@@ -110,7 +129,11 @@ codegen_value raytrace::ast::prototype::codegen(Module *module, IRBuilder<> &bui
     if (f_val) return cast<Function>(f_val);
     
     //no previous definition, define now
+    member_function = state->control.has_context();
     vector<Type*> arg_types;
+    
+    if (member_function) arg_types.push_back(state->control.get_context_type()); //add an extra argument if this function has an associated context
+    
     for (vector<function_argument>::iterator it = args.begin(); it != args.end(); it++) {
       Type *arg_type = it->type->llvm_type();
       if (it->output) arg_types.push_back(PointerType::getUnqual(arg_type));
@@ -123,14 +146,9 @@ codegen_value raytrace::ast::prototype::codegen(Module *module, IRBuilder<> &bui
     FunctionType *ft = FunctionType::get(return_type->llvm_type(), arg_types, false);
     Function *f = Function::Create(ft, Function::ExternalLinkage, name_to_use, module);
     
-    //set names for all the arguments (so they can be loaded into the symbol table later)
-    unsigned int arg_idx = 0;
-    for (auto arg_it = f->arg_begin(); arg_it != f->arg_end(); arg_it++, arg_idx++) {
-      arg_it->setName(args[arg_idx].name.c_str());
-    }
-    
     entry.func = f;
     entry.external = external;
+    entry.member_function = member_function;
     
     state->functions.set(entry.to_key(), entry);
     return f;
@@ -148,7 +166,7 @@ function_key ast::prototype::get_key() const {
 
 codegen_value raytrace::ast::prototype::check_for_entry() {
   function_key fkey = get_key();
-  if (!state->functions.has_key(fkey)) return nullptr; //function has not been defined
+  if (!state->functions.has_local(fkey)) return nullptr; //function has not been defined
   function_symbol_table::entry_type &entry = state->functions.get(fkey);
 
   if (entry.external && !external) {
@@ -205,29 +223,35 @@ codegen_value raytrace::ast::function::create_function(Value *& val, Module *mod
     string err = string("Redefinition of function: ") + defn->function_name();
     return compile_error(err);
   }
-
+  
+  bool is_member_function = defn->is_member_function();
   BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "func_entry", f);
   builder.SetInsertPoint(bb);
   
   //define the body, first name and load up all arguments
-  state->variables.scope_push();
-  state->functions.scope_push();
-  state->control.push_function_rt(defn->get_return_type());
+  push_function(defn->get_return_type());
 
   auto arg_it = f->arg_begin();
+  if (is_member_function) {
+    //load the context into the symbol table
+    state->control.set_context(arg_it);
+    state->control.load_context(module, builder);
+    arg_it++;
+  }
+
   for (unsigned int i = 0; i < defn->num_args(); i++, arg_it++) {
     const function_argument &arg = defn->get_arg(i);
     variable_symbol_table::entry_type arg_var;
 
     if (arg.output) {
       //output parameter, so we don't need to allocate anything
-      arg_var = {arg_it, arg.type};
+      arg_var = variable_symbol_table::entry_type(arg_it, arg.type, false);
     }
     else {
       //create a local copy of this parameter
       AllocaInst *alloca = create_argument_alloca(f, arg);
       builder.CreateStore(arg_it, alloca);
-      arg_var = {alloca, arg.type};
+      arg_var = variable_symbol_table::entry_type(alloca, arg.type, false);
     }
     
     state->variables.set(arg.name, arg_var);
@@ -235,16 +259,15 @@ codegen_value raytrace::ast::function::create_function(Value *& val, Module *mod
   
   //codegen the body and exit the function's scope
   codegen_void body_result = body.codegen(module, builder);
-  state->control.pop_function_rt();
-  codegen_void vpop_result = state->variables.scope_pop(module, builder);
-  codegen_void fpop_result = state->functions.scope_pop(module, builder);
+  pop_function(module, builder);
   
   //assuming everything worked, add a terminator and return from the function
-  typedef errors::argument_value_join<codegen_void, codegen_void, codegen_void>::result_value_type arg_val_type;
+  typedef errors::argument_value_join<codegen_void>::result_value_type arg_val_type;
   boost::function<codegen_value (arg_val_type &)> error_ret = [this, module, &builder, f] (arg_val_type &) -> codegen_value {
     //check for a terminator
     BasicBlock *func_end = builder.GetInsertBlock();
     if (!func_end->getTerminator()) {
+      f->dump();
       //no terminator - add if return type is void, error otherwise
       if (f->getReturnType()->isVoidTy()) builder.CreateRetVoid();
       else return compile_error("No return statement in a non-void function");
@@ -254,7 +277,7 @@ codegen_value raytrace::ast::function::create_function(Value *& val, Module *mod
     return f;
   };
   
-  return errors::codegen_call_args(error_ret, body_result, vpop_result, fpop_result);
+  return errors::codegen_call_args(error_ret, body_result);
 }
 
 /* Return Statement */
@@ -266,9 +289,14 @@ raytrace::ast::return_statement::return_statement(parser_state *st, const expres
 
 }
 
-codegen_value raytrace::ast::return_statement::codegen(Module *module, IRBuilder<> &builder) {    
-  if (expr == nullptr) return builder.CreateRetVoid();
+codegen_value raytrace::ast::return_statement::codegen(Module *module, IRBuilder<> &builder) {
+  if (builder.GetInsertBlock()->getTerminator()) return nullptr;
+  
+  state->control.set_scope_reaches_end(false);
+  exit_function(module, builder);
 
+  if (expr == nullptr) return builder.CreateRetVoid();
+  
   type_spec &expected_rt = state->control.return_type();  
   typecheck_value result_t = expr->typecheck_safe();
 

@@ -63,9 +63,11 @@
 %token <tspec> FLOAT_TYPE INT_TYPE BOOL_TYPE VOID_TYPE STRING_TYPE
 
 %token <tspec> RAY_TYPE INTERSECTION_TYPE
-%token <tspec> LIGHT_TYPE SCENE_PTR_TYPE
+%token <tspec> LIGHT_TYPE SCENE_PTR_TYPE DISTRIBUTION_FUNC_TYPE
 
 %token <tspec> FLOAT2_TYPE FLOAT3_TYPE FLOAT4_TYPE
+
+%token <i> DISTRIBUTION
 
 %token <i> EXTERN
 token <i> OUTPUT
@@ -95,10 +97,17 @@ token <i> OUTPUT
 %type <id_list> identifier_list
 %type <global> import_declaration
 
+%type <global> function_declaration
 %type <func> function_definition
 %type <ptype> function_prototype external_function_declaration
 %type <arg_list> function_formal_params function_formal_params_opt
 %type <arg> function_formal_param
+
+%type <global> distribution_declaration
+
+%type <arg> distribution_param
+%type <arg_list> distribution_params distribution_params_opt
+%type <global_list> distribution_content_opt
 
 %type <i> outputspec
 %type <tspec> typespec
@@ -134,7 +143,7 @@ rt_file : global_declarations_opt { *gd_data->globals = $1; } ;
 
 global_declarations_opt
  : global_declarations
- | { } //empty
+ | { $$ = std::vector<ast::global_declaration_ptr>(); } //empty
  ;
 
 global_declarations
@@ -143,11 +152,16 @@ global_declarations
  ;
 
 global_declaration
+ : function_declaration
+ | typespec IDENTIFIER ';' { $$ = ast::global_declaration_ptr(new ast::global_variable_decl(gd_data->state, $2, $1)); }
+ | import_declaration
+ | distribution_declaration
+ ;
+
+function_declaration
  : function_definition { $$ = $1; }
  | function_prototype ';' { $$ = $1; }
  | external_function_declaration { $$ = $1; }
-| typespec IDENTIFIER ';' { $$ = ast::global_declaration_ptr(new ast::global_variable_decl(gd_data->state, $2, $1)); }
- | import_declaration
  ;
 
 identifier_list
@@ -200,6 +214,7 @@ simple_typename
 
  | LIGHT_TYPE { $$ = gd_data->state->types["light"]; }
  | SCENE_PTR_TYPE { $$ = gd_data->state->types["scene_ptr"]; }
+ | DISTRIBUTION_FUNC_TYPE { $$ = gd_data->state->types["dfunc"]; }
  
  | RAY_TYPE { $$ = gd_data->state->types["ray"]; }
  | INTERSECTION_TYPE { $$ = gd_data->state->types["isect"]; }
@@ -214,6 +229,34 @@ typespec
  : simple_typename
  ;
 
+/* Distributions */
+
+distribution_param
+ : typespec IDENTIFIER { $$ = {$2, $1, false}; }
+ ;
+
+distribution_params
+ : distribution_param { $$ = std::vector<function_argument>(1, $1); }
+ | distribution_params ',' distribution_param { $$ = $1; $$.push_back($3); }
+;
+
+distribution_params_opt
+ : distribution_params
+ | { $$ = std::vector<function_argument>(); } //empty
+ ;
+
+distribution_content_opt
+ : distribution_content_opt function_declaration { $$ = $1; $$.push_back($2); }
+ | { $$ = std::vector<ast::global_declaration_ptr>(); } //empty
+ ;
+
+distribution_declaration
+ : DISTRIBUTION IDENTIFIER '(' distribution_params_opt ')' '{' distribution_content_opt '}' {
+   $$ = ast::global_declaration_ptr(new ast::distribution(gd_data->state, $2,
+							  $4, $7,
+							  yylloc.first_line, yylloc.first_column));
+ }
+;
 
 /* Statements */
 

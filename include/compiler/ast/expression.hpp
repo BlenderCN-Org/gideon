@@ -33,6 +33,9 @@ namespace raytrace {
       typecheck_value typecheck_safe();
 
       virtual typed_value_container codegen_safe(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual bool bound() const { return false; } //returns true if the result of this expression is bound to a variable
+      
+      static void destroy_unbound(typecheck_value &type, codegen_value &val, llvm::Module *module, llvm::IRBuilder<> &builder);
       
     protected:
 

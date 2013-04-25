@@ -1,4 +1,3 @@
-scene __gd_scene;
 scene __gd_output;
 scene __gd_rng;
 
@@ -96,6 +95,19 @@ ray camera:shoot_ray(int x, int y) {
   return r;
 }
 
+extern void __dfunc_eval(output dfunc d,
+			 output vec3 N,
+			 output vec3 P_in, output vec3 w_in,
+			 output vec3 P_out, output vec3 w_out,
+			 output vec4 out) : gde_dfunc_eval;
+vec4 dfunc:evaluate(dfunc d, vec3 N,
+		    vec3 P_in, vec3 w_in,
+		    vec3 P_out, vec3 w_out) {
+  vec4 out;
+  __dfunc_eval(d, N, P_in, w_in, P_out, w_out, out);
+  return out;
+}
+
 //Vector Operations
 extern float __dot_v3(output vec3 a, output vec3 b) : gde_dot_v3;
 float dot(vec3 a, vec3 b) { return __dot_v3(a, b); }
@@ -119,6 +131,18 @@ ray gen_shadow_ray(vec3 P, vec3 P_lt) {
   return gen_ray(P, dir, dist_lt);
 }
 
+distribution test_bsdf(vec3 color) {
+
+  vec4 evaluate(vec3 N,
+		vec3 P_in, vec3 w_in,
+		vec3 P_out, vec3 w_out) {
+    float fac = dot(w_out, N);
+    vec3 out = scale(color, fac);
+    return vec4(out.x, out.y, out.z, 1.0);
+  }
+
+}
+
 //Entry Point
 void main(int x_size, int y_size) {
   int idx = 0;
@@ -129,6 +153,8 @@ void main(int x_size, int y_size) {
   int num_samples = 8;
   float inv_num_samples = 1.0 / 8.0;
 
+  dfunc shade = test_bsdf(vec3(1.0, 1.0, 0.9));
+  
   for (int i = 0; i < y_size; i = i + 1) {
     for (int j = 0; j < x_size; j = j + 1) {
       ray r = camera:shoot_ray(j, i);
@@ -154,10 +180,14 @@ void main(int x_size, int y_size) {
 	    
 	    if (trace(shadow_ray, shadow_hit)) { }
 	    else {
+	      //dfunc shade = test_bsdf(vec3(1.0, 1.0, 0.9));
 	      vec3 R = light:eval_radiance(lt, P_lt, I);
-	      float fac = dot(nI, norm);
+	      //float fac = dot(nI, norm);
+	      vec4 bounce = dfunc:evaluate(shade, norm, P, vec3(0.0, 0.0, 0.0),
+					   P, nI);
+	      vec3 sample = vec3(R.x*bounce.x, R.y*bounce.y, R.z*bounce.z);
 	      
-	      L = L + scale(scale(R, fac), inv_num_samples);
+	      L = L + scale(sample, inv_num_samples);
 	    }
 	  }
 	}

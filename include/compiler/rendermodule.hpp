@@ -15,6 +15,20 @@ namespace raytrace {
     //Returns a reference to a vector containing all libraries that this module depends on.
     const std::vector<std::string> &get_dependencies() const { return dependencies; }
     
+    struct distribution_export {
+      std::string name;
+      std::string eval_func_name;
+    };
+
+    //Returns a vector containing all the distributions defined by this block of code.
+    std::vector<distribution_export> get_distributions() const;
+
+    struct function_export {
+      std::string name, full_name;
+      type_spec return_type;
+      std::vector<function_argument> arguments;
+    };
+    
     //Compile this render module into an LLVM module so that it may be linked into the final program.
     //The caller assumes ownership of the returned pointer.
     llvm::Module *compile();

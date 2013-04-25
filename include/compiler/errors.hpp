@@ -242,13 +242,13 @@ namespace raytrace {
     }
 
     /* Applies a function to the value contained in the given object. */
-    template<typename T, typename FuncType>
-    T codegen_call(T &arg, const FuncType &func) {
-      typedef boost::function<T (typename value_helper<T>::value_type &)> func_type;
+    template<typename T, typename RT = T, typename FuncType = typename boost::function<RT (typename value_helper<T>::value_type &)> >
+    RT codegen_call(T &arg, const FuncType &func) {
+      typedef boost::function<RT (typename value_helper<T>::value_type &)> func_type;
       static_assert(boost::is_convertible<FuncType, func_type>::value, "Cannot convert argument 1 to a function of the correct type.");
       
       func_type f(func);
-      return boost::apply_visitor(value_container_operation<T>(f), arg);
+      return boost::apply_visitor(value_container_operation<T, RT>(f), arg);
     }
     
     /* Wraps multiple arguments into a tuple which is given as an argument to the function. */

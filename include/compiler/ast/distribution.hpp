@@ -18,15 +18,19 @@ namespace raytrace {
       virtual ~distribution() {}
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+
+      std::string evaluator_name() const;
       
     private:
 
       std::string name;
       std::vector<function_argument> params;
       std::vector<global_declaration_ptr> internal_decl;
+      llvm::Type *param_type;
 
       llvm::StructType *getParameterType();
-
+      llvm::Function *createConstructor(llvm::Module *module, llvm::IRBuilder<> &builder, llvm::Function *eval);
+      llvm::Function *createEvaluator(llvm::Function *eval, llvm::Module *module, llvm::IRBuilder<> &builder);
     };
 
   };

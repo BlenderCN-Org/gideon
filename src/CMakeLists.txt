@@ -48,6 +48,7 @@ set(RT_SOURCE_FILES
   compiler/symboltable.cpp
   compiler/operations.cpp
   compiler/llvm_helper.cpp
+  compiler/gen_state.cpp
 
   compiler/builtin_ops.cpp  
   compiler/gd_std.cpp
@@ -57,6 +58,7 @@ set(RT_SOURCE_FILES
   compiler/types/vector.cpp
 
   compiler/ast/ast.cpp
+  compiler/ast/node.cpp
   compiler/ast/literal.cpp
   compiler/ast/expression.cpp
   compiler/ast/variable.cpp
@@ -64,6 +66,7 @@ set(RT_SOURCE_FILES
   compiler/ast/statement.cpp
   compiler/ast/control.cpp
   compiler/ast/distribution.cpp
+  compiler/ast/module.cpp
   )
 
 find_package(BISON)
@@ -86,8 +89,8 @@ include_directories(${RT_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 link_directories(${LLVM_LIB_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
-add_library(raytrace SHARED ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE})
-#add_executable(raytrace ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE} ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
+#add_library(raytrace SHARED ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE})
+add_executable(raytrace ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE} ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
 
 target_link_libraries(raytrace ${LLVM_LIBS} pthread m dl)
 

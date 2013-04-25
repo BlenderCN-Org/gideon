@@ -45,6 +45,9 @@
 
 "light" { return LIGHT_TYPE; }
 "scene" { return SCENE_PTR_TYPE; }
+"dfunc" { return DISTRIBUTION_FUNC_TYPE; }
+
+"distribution" { return DISTRIBUTION; }
 
 "extern" { return EXTERN; }
 "output" { return OUTPUT; }

@@ -64,3 +64,50 @@ raytrace::distribution_instance::distribution_instance(scene *s, int func_id) :
 {
   
 }
+
+/* Shade-Tree Evaluation */
+
+/* Helper class that evaluates a shade_tree */
+class shade_tree_evaluator : public boost::static_visitor<> {
+public:
+  
+  float3 *N;
+  float3 *P_in, *w_in;
+  float3 *P_out, *w_out;
+  /* out */ float4 *out;
+
+  shade_tree_evaluator(float3 *N,
+		       float3 *P_in, float3 *w_in,
+		       float3 *P_out, float3 *w_out, 
+		       /* out */ float4 *out) :
+    N(N), P_in(P_in), w_in(w_in), P_out(P_out), w_out(w_out), out(out)
+  {
+    
+  }
+
+  void operator()(shade_tree::leaf &node) const {
+    node.evaluate(node.params, N, P_in, w_in, P_out, w_out, out);
+  }
+
+  void operator()(shade_tree::scale &node) const {
+    boost::apply_visitor(shade_tree_evaluator(N, P_in, w_in, P_out, w_out, out), *node.node);
+    *out = node.k * (*out);
+  }
+
+  void operator()(shade_tree::sum &node) const {
+    float4 lhs, rhs;
+    boost::apply_visitor(shade_tree_evaluator(N, P_in, w_in, P_out, w_out, &lhs), *node.lhs);
+    boost::apply_visitor(shade_tree_evaluator(N, P_in, w_in, P_out, w_out, &rhs), *node.rhs);
+    
+    *out = lhs + rhs;
+  }
+
+};
+
+void shade_tree::evaluate(node_ptr &node,
+			  float3 *N,
+			  float3 *P_in, float3 *w_in,
+			  float3 *P_out, float3 *w_out,
+			  /* out */ float4 *out) {
+  boost::apply_visitor(shade_tree_evaluator(N, P_in, w_in, P_out, w_out, out), *node);
+}

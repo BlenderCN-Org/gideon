@@ -28,22 +28,36 @@ raytrace::codegen_value ast::variable_decl::codegen(Module *module, IRBuilder<> 
   
   codegen_value init_value = nullptr;
   typecheck_value init_type = type;
+  bool make_copy = false;
+
   if (initializer) {
     init_value = initializer->codegen(module, builder);
     init_type = initializer->typecheck_safe();
+    make_copy = initializer->bound();
   }
   else init_value = type->initialize(module, builder);
   
-  boost::function<codegen_value (typed_value &)> op = [this, &builder] (typed_value &args) -> codegen_value {
-    if (args.get<1>() != type) return compile_error("Initializer of invalid type");
+  boost::function<codegen_value (typed_value &)> op = [this, make_copy, module, &builder] (typed_value &args) -> codegen_value {
+    type_spec val_type = args.get<1>();
+    if (val_type != type) {
+      stringstream err_ss;
+      err_ss << "Line " << line_no << ":" << column_no << " - Initializer of invalid type";
+      return compile_error(err_ss.str());
+    }
 
     Value *val = args.get<0>();
+    if (make_copy) {
+      //initializer is already bound to another variable, make a copy
+      val = val_type->copy(val, module, builder);
+    }
+
     Value *ptr = NULL;
     ptr = CreateEntryBlockAlloca(builder, type->llvm_type(), name);
     if (val) builder.CreateStore(val, ptr, false);
     
-    variable_symbol_table::entry_type entry { ptr, type };
-    state->variables.set(name, entry);    
+    variable_symbol_table::entry_type entry(ptr, type);
+    state->variables.set(name, entry);
+
     return ptr;
   };
   
@@ -70,7 +84,7 @@ raytrace::codegen_value raytrace::ast::global_variable_decl::codegen(llvm::Modul
   GlobalVariable *gv = new GlobalVariable(type->llvm_type(), NULL, GlobalValue::ExternalLinkage, NULL, name);
   module->getGlobalList().push_back(gv);
 
-  variable_symbol_table::entry_type entry { gv, type };
+  variable_symbol_table::entry_type entry(gv, type);
   state->variables.set(name, entry);
   return gv;
 }
@@ -121,12 +135,20 @@ raytrace::ast::assignment::assignment(parser_state *st, const expression_ptr &lh
 
 codegen_value raytrace::ast::assignment::codegen(Module *module, IRBuilder<> &builder) {
   typedef raytrace::errors::argument_value_join<codegen_value, codegen_value, typecheck_value>::result_value_type arg_val_type;  
-  boost::function<codegen_value (arg_val_type &)> op = [module, &builder] (arg_val_type &args) -> codegen_value {
+  boost::function<codegen_value (arg_val_type &)> op = [this, module, &builder] (arg_val_type &args) -> codegen_value {
     try {
       type_spec t = args.get<2>();
-      Value *copied = t->copy(args.get<0>(), module, builder);
-      builder.CreateStore(copied, args.get<1>(), false);
-      return copied;
+      
+      Value *new_val = args.get<0>();
+
+      //if the rhs is already bound to a variable, make a copy
+      if (rhs->bound()) new_val = t->copy(new_val, module, builder);
+
+      //now destroy the old value
+      t->destroy(args.get<1>(), module, builder);
+      
+      builder.CreateStore(new_val, args.get<1>(), false);
+      return new_val;
     }
     catch (compile_error &e) { return e; }
   };
@@ -161,14 +183,23 @@ raytrace::ast::type_constructor::type_constructor(parser_state *st, const type_s
 
 codegen_value raytrace::ast::type_constructor::codegen(Module *module, IRBuilder<> &builder) {
   typed_value_vector arg_values;
+  vector< pair<typecheck_value, codegen_value> > to_destroy;
+  
   for (unsigned int i = 0; i < args.size(); i++) {
     typecheck_value t = get_argtype(i);
     codegen_value v = get_argval(i, module, builder);
     typed_value_container val = errors::combine_arg_list(v, t);
     arg_values = errors::codegen_vector_push_back(arg_values, val);
+    if (!args[i]->bound()) to_destroy.push_back(make_pair(t, v));
   }
 
-  return type->create(module, builder, arg_values);
+  codegen_value result = type->create(module, builder, arg_values);
+
+  for (auto it = to_destroy.begin(); it != to_destroy.end(); ++it) {
+    expression::destroy_unbound(it->first, it->second, module, builder);
+  }
+
+  return result;
 }
 
 codegen_value raytrace::ast::type_constructor::get_argval(int i, Module *module, IRBuilder<> &builder) {
@@ -182,7 +213,7 @@ typecheck_value ast::type_constructor::get_argtype(int i) {
 /** Field Selection **/
 
 ast::field_selection::field_selection(parser_state *st, const string &field, const expression_ptr &expr,
-					    unsigned int line_no, unsigned int column_no) :
+				      unsigned int line_no, unsigned int column_no) :
   expression(st), field(field), expr(expr)
 {
 

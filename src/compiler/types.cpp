@@ -33,6 +33,9 @@ void raytrace::initialize_types(type_table &tt) {
   tt["ray"] = type_ptr(new ray_type(&tt));
   tt["isect"] = type_ptr(new intersection_type(&tt));
   tt["light"] = type_ptr(new light_type(&tt));
+
+  tt["dfunc"] = type_ptr(new dfunc_type(&tt));
+  tt["context_ptr"] = type_ptr(new context_ptr_type(&tt));
 }
 
 /** Type Base Class **/

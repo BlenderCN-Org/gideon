@@ -1,0 +1,64 @@
+void test_args_not_destroyed(string s) {
+
+}
+
+void test_arg_refs_are_not_destroyed(output string s) {
+  
+}
+
+void test_new_vars_are_destroyed() {
+  string foo = "foo";
+}
+
+void test_no_assignment_gets_destroyed(string s) {
+  s + s;
+}
+
+void test_intermediate_gets_destroyed(string s) {
+  string x = s + (s + s);
+}
+
+void test_inititalizer_copies_bound(string s) {
+  string y = "foo";
+  string x = y;
+}
+
+void test_assignment_copies_bound(string s) {
+  string x = "foo";
+  x = "hello"; //no need for copy
+  x = s; //do copy
+}
+
+string dummy_func(string s, string b);
+void test_function_call_works() {
+  string x = "hello";
+  x = dummy_func(x + x, x);
+}
+
+string test_string_return(string s) {
+  return s; //do not destroy, copy is okay
+}
+
+int str_to_int(string s);
+void test_break() {
+  for (int i = str_to_int(s); i < str_to_int("foo"); i = i + 1) {
+    string s = "hello";
+    if (2 < i) break; //should invoke the string destructor
+
+    if (7 < i) continue;
+    {break;} break;
+  }
+}
+
+string test_scoped_return() {
+  string s = "foo";
+  {
+    string x = s;
+    if (true) return s;
+    
+    string y = "wassup";
+    return y;
+  }
+
+  return s;
+}

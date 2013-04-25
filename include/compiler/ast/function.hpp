@@ -61,18 +61,20 @@ namespace raytrace {
       const type_spec &get_return_type() { return return_type; }
 
       bool is_external() { return external; }
-      
+      bool is_member_function() { return member_function; } //this will only be known after codegen
+            
     private:
 
       std::string name, extern_name;
       type_spec return_type;
       std::vector<function_argument> args;
-      bool external;
-      
-      function_key get_key() const;
+      bool external, member_function;
       
       //checks to see if this function has been previously defined (and if so, do the prototypes match).
       codegen_value check_for_entry();
+
+      function_key get_key() const;
+      
     };
 
     typedef std::shared_ptr<prototype> prototype_ptr;

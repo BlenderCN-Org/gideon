@@ -60,6 +60,7 @@ namespace raytrace {
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual codegen_value codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual type_spec typecheck();
+      virtual bool bound() const { return true; }
       
     private:
       
@@ -77,7 +78,8 @@ namespace raytrace {
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual type_spec typecheck();
-      
+      virtual bool bound() const { return true; }
+
     private:
 
       expression_ptr lhs, rhs;
@@ -115,6 +117,7 @@ namespace raytrace {
       virtual codegen_value codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
       
       virtual type_spec typecheck();
+      virtual bool bound() const { return true; }
       
     private:
 

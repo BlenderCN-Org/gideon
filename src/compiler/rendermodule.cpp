@@ -40,6 +40,9 @@ void render_module::parse_source() {
 
   yy_delete_buffer(state, scanner);
   yylex_destroy(scanner);
+
+  //add a global scene pointer declaration
+  top.insert(top.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(&parser, "__gd_scene", parser.types["scene_ptr"])));
 }
 
 void render_module::load_exports() {
@@ -60,9 +63,9 @@ Module *render_module::compile() {
     return nullptr;
   };
   raytrace::errors::error_container_operation<codegen_void, codegen_void> report(report_errors);
-
+  
   codegen_void result = nullptr;
-
+  
   for (auto ast_it = top.begin(); ast_it != top.end(); ast_it++) {
     codegen_value gen_val = (*ast_it)->codegen(module, builder);
     codegen_void val = raytrace::errors::codegen_ignore_value(gen_val);
@@ -100,3 +103,7 @@ void render_module::optimize(Module *module) {
   for (auto it = funcs.begin(); it != funcs.end(); it++) fpm.run(*it);
   
 }
+
+//vector<distribution_export> render_module::get_distributions() const {
+//  return vector<distribution_export>();
+//}

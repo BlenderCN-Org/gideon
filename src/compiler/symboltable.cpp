@@ -14,7 +14,10 @@ namespace raytrace {
   
   template<>
   codegen_void destroy_entry<variable_entry>(variable_entry &entry, Module *module, IRBuilder<> &builder) {
-    return entry.type->destroy(entry.value, module, builder);
+    if (entry.destroy_on_scope_exit)
+      return entry.type->destroy(entry.value, module, builder);
+
+    return nullptr;
   }
 
   variable_scope::iterator variable_scope::find(const key_type &name) { return table.find(name); }
@@ -31,9 +34,7 @@ namespace raytrace {
 
   codegen_void variable_scope::destroy(Module *module, IRBuilder<> &builder) {
     TerminatorInst *term = builder.GetInsertBlock()->getTerminator();
-    IRBuilder<>::InsertPoint saved = builder.saveIP();
-
-    if (term) builder.SetInsertPoint(term);
+    if (term) return nullptr; //we've already exited this block, don't add anymore code
 
     codegen_void rt = nullptr;
 
@@ -41,8 +42,7 @@ namespace raytrace {
       codegen_void d = destroy_entry<entry_type>(it->second, module, builder);
       rt = errors::merge_void_values(rt, d);
     }
-
-    if (term) builder.restoreIP(saved);
+    
     return rt;
   }
 
@@ -91,6 +91,7 @@ namespace raytrace {
     fe.full_name = function_generate_name(name, scope_name, arguments);
 
     fe.external = false;
+    fe.member_function = false;
     fe.return_type = return_type;
     fe.arguments = arguments;
     return fe;

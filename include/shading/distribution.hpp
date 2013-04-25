@@ -5,6 +5,7 @@
 #include "vm/parameters.hpp"
 
 #include <boost/unordered_map.hpp>
+#include <boost/variant.hpp>
 
 #include <string>
 #include <map>
@@ -79,29 +80,42 @@ namespace raytrace {
     
   };
   
-  /*
-    A program that describes how light intersects with a surface/volume.
-  */
-  class gd_distribution_function {
-  public:
+  namespace shade_tree {
+    struct leaf {
+      typedef void (*eval_func_type)(const void*,
+				     float3*,
+				     float3*, float3*, float3*, float3*,
+				     float4*);
 
-    typedef void (*eval_func_type)(void*,
-				   float3*,
-				   float3*, float3*, float3*, float3*,
-				   float4*);
+      ~leaf() { delete[] params; }
+      
+      char *params;
+      eval_func_type evaluate;
+    };
 
-    gd_distribution_function(const std::string &name,
-			     const boost::unordered_map<std::string, size_t> &params,
-			     eval_func_type eval);
-
-  private:
+    struct scale;
+    struct sum;
     
-    std::string name;
-    boost::unordered_map<std::string, size_t> param_offset;
-    eval_func_type eval_func;
+    typedef boost::variant<leaf,
+			   scale,
+			   sum> node;
+    typedef std::shared_ptr<node> node_ptr;
     
+    struct scale {
+      float4 k;
+      node_ptr node;
+    };
+    
+    struct sum {
+      node_ptr lhs, rhs;
+    };
+
+    void evaluate(node_ptr &node,
+		  float3 *N,
+		  float3 *P_in, float3 *w_in,
+		  float3 *P_out, float3 *w_out,
+		  /* out */ float4 *out);
   };
-
 };
 
 #endif
