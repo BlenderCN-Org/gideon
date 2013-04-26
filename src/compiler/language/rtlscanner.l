@@ -44,6 +44,9 @@
 
 \/\/.*\n     ; //comments
 
+\"(\\.|[^\\"])*\" { save_string(yylval, TOKEN_STRING); return STRING_LITERAL; }
+\"(\\.|[^\\"])*\" { /* dummy rule */ }
+  
 "void" { return VOID_TYPE; }
 "bool" { return BOOL_TYPE; }
 "int" { return INT_TYPE; }
@@ -85,8 +88,6 @@
 [a-zA-Z_][a-zA-Z0-9_:]*  yylval->s = TOKEN_STRING; return IDENTIFIER;
 -?[0-9]+\.[0-9]*          save_float(yylval, TOKEN_STRING); return FLOAT_LITERAL;
 [0-9]+                  save_int(yylval, TOKEN_STRING); return INTEGER_LITERAL;
-\"(\\.|[^\"])*\"                    save_string(yylval, TOKEN_STRING); return STRING_LITERAL;
-
 
 .                       { return yytext[0]; }
 
