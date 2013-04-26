@@ -62,3 +62,8 @@ string test_scoped_return() {
 
   return s;
 }
+
+/* C-Style Comment Yay! */
+void string_literals() {
+  string s = "test_\"str\"ing0" + "test_string1";
+}
