@@ -9,154 +9,142 @@ using namespace raytrace;
 using namespace std;
 using namespace llvm;
 
-static compile_error invalid_conversion(const string &t0, const string &t1) {
-  string error = string("Invalid conversion from '") + t0 + string("' to '") + t1 + string("'");
-  return runtime_error(error);
-}
+/** Binary Operation Table **/
 
-static compile_error invalid_operation(const string &op, const string &t0, const string &t1) {
-  string error = string("Invalid operation '") + op + string("' on types '") + t0 + string("' and '") + t1 + string("'");
-  return runtime_error(error);
-}
+binop_table::op_candidate_vector binop_table::find_operation(const string &op, const type_spec &lhs, const type_spec &rhs) const {
+  op_candidate_vector candidates;
+  op_type args = make_pair(lhs, rhs);
 
-type_spec raytrace::get_add_result_type(const ast::expression_ptr &lhs, const ast::expression_ptr &rhs) {
-  type_spec lt = lhs->typecheck();
-  type_spec rt = rhs->typecheck();
-  if (*lt != *rt) throw invalid_operation("+", lt->name, rt->name);
-  
-  return lt;
-}
-
-type_spec raytrace::get_sub_result_type(const ast::expression_ptr &lhs, const ast::expression_ptr &rhs) {
-  type_spec lt = lhs->typecheck();
-  type_spec rt = rhs->typecheck();
-  if (*lt != *rt) throw invalid_operation("-", lt->name, rt->name);
-  
-  return lt;
-}
-
-void destroy_unbound_arg(ast::expression_ptr &expr, type_spec t, codegen_value &val,
-			 Module *module, IRBuilder<> &builder) {
-  if (!expr->bound()) {
-    typecheck_value safe = t;
-    ast::expression::destroy_unbound(safe, val, module, builder);
+  auto table_it = operations.find(op);
+  if (table_it != operations.end()) {
+    auto op_it = table_it->second.find(args);
+    if (op_it != table_it->second.end()) candidates.push_back(*op_it);
   }
+
+  return candidates;
 }
 
-codegen_value raytrace::generate_add(ast::expression_ptr &lhs, ast::expression_ptr &rhs,
-			      type_table &types,
-			      Module *module, IRBuilder<> &builder) {
-  type_spec lt = lhs->typecheck();
-  type_spec rt = rhs->typecheck();
+binop_table::op_result_value binop_table::find_best_operation(const std::string &op, const type_spec &lhs, const type_spec &rhs) const {
+  auto table_it = operations.find(op);
+  if (table_it == operations.end()) return compile_error(string("Unsupported operation: ") + op);
   
-  if (*lt != *rt) return invalid_conversion(lt->name, rt->name);
-  
-  codegen_value lval = lhs->codegen(module, builder);
-  codegen_value rval = rhs->codegen(module, builder);
+  const op_codegen_table &candidates = table_it->second;
 
-  codegen_value result = lt->op_add(module, builder, lval, rval);
+  int max_score = std::numeric_limits<int>::max();
+  int best_score = max_score;
+  op_candidate_vector best_list;
 
-  destroy_unbound_arg(lhs, lt, lval, module, builder);
-  destroy_unbound_arg(rhs, rt, rval, module, builder);
+  for (auto it = candidates.begin(); it != candidates.end(); ++it) {
+    int score = candidate_score(it->first, lhs, rhs);
+    if (score >= max_score) continue;
+    
+    if (score < best_score) {
+      best_score = score;
+      best_list.clear();
+    }
+    
+    if (score == best_score) best_list.push_back(*it);
+  }
 
-  return result;
+  if (best_list.size() == 0) return compile_error("Invalid operation for those types"); //no matches
+  if (best_list.size() > 1) return compile_error("Binary operation is ambiguous"); //ambiguous
+  return best_list[0];
 }
 
-codegen_value raytrace::generate_sub(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
-				     Module *module, IRBuilder<> &builder) {
-  typecheck_value lt = lhs->typecheck_safe();
-  typecheck_value rt = rhs->typecheck_safe();
-  
-  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> op = [&lhs, &rhs, module, &builder] (arg_val_type &arg) -> codegen_value {
-    type_spec lt = arg.get<0>();
-    type_spec rt = arg.get<1>();
-    
-    if (*lt != *rt) return invalid_conversion(lt->name, rt->name);
+void binop_table::add_operation(const string &op, const type_spec &lhs, const type_spec &rhs,
+				const type_spec &result_type, const op_codegen &codegen) {
+  op_type args = make_pair(lhs, rhs);
+  op_info info{result_type, codegen};
 
-    codegen_value lval = lhs->codegen(module, builder);
-    codegen_value rval = rhs->codegen(module, builder);
+  op_codegen_table &table = operations[op];
+  table[args] = info;
+}
 
-    codegen_value result = lt->op_sub(module, builder, lval, rval);
-    destroy_unbound_arg(lhs, lt, lval, module, builder);
-    destroy_unbound_arg(rhs, rt, rval, module, builder);
-    
-    return result; 
+int binop_table::candidate_score(const op_type &types,
+				 const type_spec &lhs, const type_spec &rhs) const {
+  int l_cost, r_cost;
+  if (!lhs->can_cast_to(*types.first, l_cost)) return l_cost;
+  if (!rhs->can_cast_to(*types.second, r_cost)) return r_cost;
+
+  return l_cost + r_cost;
+}
+
+void binop_table::initialize_standard_ops(binop_table &table, type_table &types) {
+  table.add_operation("+", types["int"], types["int"], types["int"], llvm_add_i_i());
+  table.add_operation("<", types["int"], types["int"], types["bool"], llvm_lt_i_i());
+
+  table.add_operation("+", types["float"], types["float"], types["float"], llvm_add_f_f());
+
+  table.add_operation("+", types["vec2"], types["vec2"], types["vec2"], llvm_add_vec_vec(2, types));
+  table.add_operation("+", types["vec3"], types["vec3"], types["vec3"], llvm_add_vec_vec(3, types));
+  table.add_operation("+", types["vec4"], types["vec4"], types["vec4"], llvm_add_vec_vec(4, types));
+
+  table.add_operation("+", types["string"], types["string"], types["string"],
+  		      llvm_add_str_str(types["string"]->llvm_type()));
+}
+
+/* LLVM Code Generation Functions */
+
+binop_table::op_codegen raytrace::llvm_add_i_i() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    return builder.CreateAdd(lhs, rhs, "i_add_tmp");
   };
-
-  return errors::codegen_call_args(op, lt, rt);
 }
 
-codegen_value raytrace::generate_mul(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
-				     Module *module, IRBuilder<> &builder) {
-  typecheck_value lt = lhs->typecheck_safe();
-  typecheck_value rt = rhs->typecheck_safe();
-  
-  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> op = [&lhs, &rhs, module, &builder] (arg_val_type &arg) -> codegen_value {
-    type_spec lt = arg.get<0>();
-    type_spec rt = arg.get<1>();
-    
-    if (*lt != *rt) return invalid_conversion(lt->name, rt->name);
-
-    codegen_value lval = lhs->codegen(module, builder);
-    codegen_value rval = rhs->codegen(module, builder);
-
-    codegen_value result = lt->op_mul(module, builder, lval, rval);
-    destroy_unbound_arg(lhs, lt, lval, module, builder);
-    destroy_unbound_arg(rhs, rt, rval, module, builder);
-    
-    return result;
+binop_table::op_codegen raytrace::llvm_lt_i_i() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    return builder.CreateICmpSLT(lhs, rhs, "i_lt_tmp");
   };
-  
-  return errors::codegen_call_args(op, lt, rt);
 }
 
-codegen_value raytrace::generate_div(ast::expression_ptr &lhs, ast::expression_ptr &rhs, type_table &types,
-				     Module *module, IRBuilder<> &builder) {
-  typecheck_value lt = lhs->typecheck_safe();
-  typecheck_value rt = rhs->typecheck_safe();
-  
-  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> op = [&lhs, &rhs, module, &builder] (arg_val_type &arg) -> codegen_value {
-    type_spec lt = arg.get<0>();
-    type_spec rt = arg.get<1>();
-    
-    if (*lt != *rt) return invalid_conversion(lt->name, rt->name);
-
-    codegen_value lval = lhs->codegen(module, builder);
-    codegen_value rval = rhs->codegen(module, builder);
-
-    codegen_value result = lt->op_div(module, builder, lval, rval);
-    destroy_unbound_arg(lhs, lt, lval, module, builder);
-    destroy_unbound_arg(rhs, rt, rval, module, builder);
-    
-    return result;
+binop_table::op_codegen raytrace::llvm_add_f_f() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    return builder.CreateFAdd(lhs, rhs, "f_add_tmp");
   };
-
-  return errors::codegen_call_args(op, lt, rt);
 }
 
-codegen_value raytrace::generate_less_than(ast::expression_ptr &lhs, ast::expression_ptr &rhs,
-				    type_table &types,
+binop_table::op_codegen raytrace::llvm_add_vec_vec(unsigned int N, type_table &types) {
+  stringstream tname;
+  tname << "vec" << N;
+  Type *llvm_type = types[tname.str()]->llvm_type();
+
+  return [N, llvm_type] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    stringstream op_ss;
+    op_ss << "gd_builtin_sub_v" << N << "_v" << N;
+    string op_func = op_ss.str();
+
+    return llvm_builtin_binop(op_func, llvm_type, lhs, rhs, module, builder);
+    
+    return builder.CreateFAdd(lhs, rhs, "f_add_tmp");
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_add_str_str(Type *str_type) {
+  return [str_type] (Value *lhs, Value *rhs,
+		     Module *module, IRBuilder<> &builder) -> Value* {
+    Value *l_data = builder.CreateExtractValue(lhs, ArrayRef<unsigned int>(1), "s0_data");
+    Value *r_data = builder.CreateExtractValue(rhs, ArrayRef<unsigned int>(1), "s1_data");
+    
+    Type *char_ptr = Type::getInt8PtrTy(getGlobalContext());
+    vector<Type*> arg_ty{char_ptr, char_ptr};
+    FunctionType *ft = FunctionType::get(char_ptr, ArrayRef<Type*>(arg_ty), false);
+    Function *adder = cast<Function>(module->getOrInsertFunction("gd_builtin_concat_string", ft));
+    
+    Value *new_data = builder.CreateCall(adder, vector<Value*>{l_data, r_data});
+    Value *new_str = builder.CreateInsertValue(UndefValue::get(str_type),
+					       ConstantInt::get(getGlobalContext(), APInt(1, false, true)), ArrayRef<unsigned int>(0), "str_concat_tmp");
+    return builder.CreateInsertValue(new_str, new_data, ArrayRef<unsigned int>(1));
+  };
+}
+
+/* Helpers */
+
+Value *raytrace::llvm_builtin_binop(const string &func_name, Type *type, Value *lhs, Value *rhs,
 				    Module *module, IRBuilder<> &builder) {
-  type_spec lt = lhs->typecheck();
-  type_spec rt = rhs->typecheck();
-  
-  if (*lt != *rt) return invalid_conversion(lt->name, rt->name);
-  
-  codegen_value lval = lhs->codegen(module, builder);
-  codegen_value rval = rhs->codegen(module, builder);
-
-  codegen_value result = lt->op_less(module, builder, lval, rval);
-  destroy_unbound_arg(lhs, lt, lval, module, builder);
-  destroy_unbound_arg(rhs, rt, rval, module, builder);
-  
-  return result;
-}
-
-codegen_value raytrace::llvm_builtin_binop(const string &func_name, Type *type, Value *lhs, Value *rhs,
-					   Module *module, IRBuilder<> &builder) {
   Type *ptr_ty = PointerType::getUnqual(type);
   vector<Type*> arg_ty{ptr_ty, ptr_ty, ptr_ty};
   FunctionType *ft = FunctionType::get(Type::getVoidTy(getGlobalContext()),

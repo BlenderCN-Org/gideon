@@ -16,6 +16,10 @@ using namespace raytrace;
 using namespace std;
 using namespace llvm;
 
+size_t raytrace::hash_value(const type_spec &ts) {
+  return boost::hash<type*>()(ts.get());
+}
+
 void raytrace::initialize_types(type_table &tt) {
   typedef shared_ptr<type> type_ptr;
   

@@ -62,6 +62,7 @@ namespace raytrace {
       std::string op;
       expression_ptr lhs, rhs;
       
+      binop_table::op_result_value get_op();
     };
   
   };

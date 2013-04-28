@@ -52,28 +52,34 @@ raytrace::ast::binary_expression::binary_expression(parser_state *st, const stri
   
 }
 
+binop_table::op_result_value ast::binary_expression::get_op() {
+  typecheck_value lt = lhs->typecheck_safe();
+  typecheck_value rt = rhs->typecheck_safe();
+
+  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type arg_val_type;
+  boost::function<binop_table::op_result_value (arg_val_type &)> find_op = [this] (arg_val_type &types) -> binop_table::op_result_value {
+    return state->binary_operations.find_best_operation(op, types.get<0>(), types.get<1>());
+  };
+
+  return errors::codegen_call_args(find_op, lt, rt);
+}
+
 raytrace::type_spec raytrace::ast::binary_expression::typecheck() {
-  try {
-    if (op == "+" || op == "*") return get_add_result_type(lhs, rhs);
-    if (op == "-" || op == "/") return get_sub_result_type(lhs, rhs);
-    if (op == "<") return state->types["bool"];
-  }
-  catch (compile_error &e) {
-    stringstream tagged;
-    tagged << "Error on line " << line_no << ":" << column_no << " - " << e.what();
-    throw compile_error(tagged.str());
-  }
+  binop_table::op_result_value op_to_use = get_op();
+  binop_table::op_result op_val = boost::apply_visitor(errors::return_or_throw<binop_table::op_result>(), op_to_use);
+  return op_val.second.result_type;
 }
 
 codegen_value raytrace::ast::binary_expression::codegen(Module *module, IRBuilder<> &builder) {
-  try {
-    if (op == "+") return generate_add(lhs, rhs, state->types, module, builder);
-    if (op == "-") return generate_sub(lhs, rhs, state->types, module, builder);
-    if (op == "*") return generate_mul(lhs, rhs, state->types, module, builder);
-    if (op == "/") return generate_div(lhs, rhs, state->types, module, builder);
-    if (op == "<") return generate_less_than(lhs, rhs, state->types, module, builder);
-    return compile_error("Unsupported binary operation");
-  }
-  catch (compile_error &e) { return e; }
+  binop_table::op_result_value op_to_use = get_op();
+  codegen_value l_val = lhs->codegen(module, builder);
+  codegen_value r_val = rhs->codegen(module, builder);
+  
+  typedef errors::argument_value_join<binop_table::op_result_value, codegen_value, codegen_value>::result_value_type arg_val_type;
+  boost::function<codegen_value (arg_val_type &)> exec_op = [module, &builder] (arg_val_type &arg) -> codegen_value {
+    binop_table::op_codegen &op_func = arg.get<0>().second.codegen;
+    return op_func(arg.get<1>(), arg.get<2>(), module, builder);
+  };
+  return errors::codegen_call_args(exec_op, op_to_use, l_val, r_val);
 }
 

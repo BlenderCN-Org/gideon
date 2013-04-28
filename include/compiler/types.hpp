@@ -16,6 +16,8 @@ namespace raytrace {
   /* Describes an instance of a type. */
   class type;
   typedef std::shared_ptr<type> type_spec;
+  std::size_t hash_value(const type_spec &ts);
+
   typedef codegen<type_spec, compile_error>::value typecheck_value;
   typedef codegen<type_spec, compile_error>::vector typecheck_vector;
 
@@ -26,8 +28,6 @@ namespace raytrace {
   /* A table of types. */
   typedef boost::unordered_map< std::string, std::shared_ptr<type> > type_table;
   void initialize_types(type_table &tt);
-
-
   
   /* Describes a type in the Gideon Render Language. */
   class type {
@@ -52,8 +52,8 @@ namespace raytrace {
       cost = std::numeric_limits<int>::max();
       return false;
     };
-    virtual llvm::Value* gen_cast(const type &other, llvm::Value *value,
-				  llvm::Module *module, llvm::IRBuilder<> &builder) const { throw std::runtime_error("Invalid cast"); }
+    virtual codegen_value gen_cast(const type &other, llvm::Value *value,
+				   llvm::Module *module, llvm::IRBuilder<> &builder) const { return compile_error("Invalid cast"); }
 
     //destruction/copy
     virtual codegen_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const { return nullptr; }

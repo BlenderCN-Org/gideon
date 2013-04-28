@@ -4,6 +4,7 @@
 #include "compiler/errors.hpp"
 #include "compiler/symboltable.hpp"
 #include "compiler/gen_state.hpp"
+#include "compiler/operations.hpp"
 
 namespace raytrace {
 
@@ -15,6 +16,7 @@ namespace raytrace {
       function_symbol_table functions;
       
       type_table types;
+      binop_table binary_operations;
       control_state control;
     };
 

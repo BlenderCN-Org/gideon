@@ -22,6 +22,8 @@ render_module::render_module(const string &name, const string &source_code) :
   name(name), source(source_code)
 {
   initialize_types(parser.types);
+  binop_table::initialize_standard_ops(parser.binary_operations,
+				       parser.types);
   parse_source();
   load_exports();
 }

@@ -8,7 +8,6 @@ void ast::ast_node::push_scope(const string &name) {
   state->variables.scope_push(name);
   state->functions.scope_push(name);
   state->control.push_scope();
-  cout << "Scope Depth: " << state->control.scope_depth() << endl;
 }
 
 void ast::ast_node::pop_scope(Module *module, IRBuilder<> &builder) {
@@ -17,7 +16,6 @@ void ast::ast_node::pop_scope(Module *module, IRBuilder<> &builder) {
   state->control.pop_scope();
   state->functions.scope_pop(module, builder, reaches_end);
   state->variables.scope_pop(module, builder, reaches_end);
-  cout << "Scope Depth: " << state->control.scope_depth() << endl;
 }
 
 void ast::ast_node::push_function(const type_spec &t) {
@@ -47,8 +45,6 @@ void ast::ast_node::exit_loop_scopes(Module *module, IRBuilder<> &builder) {
   unsigned int end_scope = state->control.loop_top_scope();
   if (state->control.scope_depth() > end_scope) {
     unsigned int N = state->control.scope_depth() - (end_scope - 1);
-    cout << "N: " << N << endl;
-
     state->variables.scope_destroy(N, module, builder);
     state->functions.scope_destroy(N, module, builder);
   }
@@ -60,8 +56,6 @@ void ast::ast_node::exit_to_loop_scope(Module *module, IRBuilder<> &builder) {
   unsigned int end_scope = state->control.loop_top_scope();
   if (state->control.scope_depth() > end_scope) {
     unsigned int N = state->control.scope_depth() - end_scope;
-    cout << "N: " << N << endl;
-    
     state->variables.scope_destroy(N, module, builder);
     state->functions.scope_destroy(N, module, builder);
   }
@@ -71,8 +65,6 @@ void ast::ast_node::exit_function(Module *module, IRBuilder<> &builder) {
   unsigned int end_scope = state->control.function_start_depth();
   if (state->control.scope_depth() > end_scope) {
     unsigned int N = state->control.scope_depth() - end_scope;
-    cout << "N: " << N << endl;
-    
     state->variables.scope_destroy(N, module, builder);
     state->functions.scope_destroy(N, module, builder);
   }
