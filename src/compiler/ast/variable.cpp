@@ -19,25 +19,27 @@ raytrace::ast::variable_decl::variable_decl(parser_state *st, const string &name
   
 }
 
-raytrace::codegen_value ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
-  if (state->variables.has_local(name)) {
+typed_value_container ast::variable_decl::initialize_from_type(Module *module, IRBuilder<> &builder) {
+  return type->initialize(module, builder);
+}
+
+codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
+  if (variables().has_local(name)) {
     stringstream err;
     err << "Redeclaration of variable '" << name << "'.";
     return compile_error(err.str());
   }
   
-  codegen_value init_value = nullptr;
-  typecheck_value init_type = type;
+  typed_value_container init_value = typed_value(nullptr, type);
   bool make_copy = false;
 
   if (initializer) {
     init_value = initializer->codegen(module, builder);
-    init_type = initializer->typecheck_safe();
     make_copy = initializer->bound();
   }
-  else init_value = type->initialize(module, builder);
+  else init_value = initialize_from_type(module, builder);
   
-  boost::function<codegen_value (typed_value &)> op = [this, make_copy, module, &builder] (typed_value &args) -> codegen_value {
+  boost::function<codegen_void (typed_value &)> op = [this, make_copy, module, &builder] (typed_value &args) -> codegen_void {
     type_spec val_type = args.get<1>();
     if (val_type != type) {
       stringstream err_ss;
@@ -45,7 +47,7 @@ raytrace::codegen_value ast::variable_decl::codegen(Module *module, IRBuilder<> 
       return compile_error(err_ss.str());
     }
 
-    Value *val = args.get<0>();
+    Value *val = args.get<0>().extract_value();
     if (make_copy) {
       //initializer is already bound to another variable, make a copy
       val = val_type->copy(val, module, builder);
@@ -56,12 +58,12 @@ raytrace::codegen_value ast::variable_decl::codegen(Module *module, IRBuilder<> 
     if (val) builder.CreateStore(val, ptr, false);
     
     variable_symbol_table::entry_type entry(ptr, type);
-    state->variables.set(name, entry);
+    variables().set(name, entry);
 
-    return ptr;
+    return nullptr;
   };
   
-  return errors::codegen_call_args(op, init_value, init_type);
+  return errors::codegen_call<typed_value_container, codegen_void>(init_value, op);
 }
 
 /** Global Variable Declaration **/
@@ -75,18 +77,28 @@ raytrace::ast::global_variable_decl::global_variable_decl(parser_state *st,
 }
 
 raytrace::codegen_value raytrace::ast::global_variable_decl::codegen(llvm::Module *module, llvm::IRBuilder <> &builder) {
-  if (state->variables.has_local(name)) {
+  variable_scope &global_scope = global_variables();
+  variable_scope::iterator it = global_scope.find(name);
+  
+  if (it != global_scope.end()) {
     stringstream err;
     err << "Redeclaration of variable '" << name << "'.";
     return compile_error(err.str());
   }
   
-  GlobalVariable *gv = new GlobalVariable(type->llvm_type(), NULL, GlobalValue::ExternalLinkage, NULL, name);
+  GlobalVariable *gv = new GlobalVariable(type->llvm_type(), NULL, GlobalValue::ExternalLinkage, NULL, full_name());
   module->getGlobalList().push_back(gv);
 
   variable_symbol_table::entry_type entry(gv, type);
-  state->variables.set(name, entry);
+  global_scope.set(name, entry);
+  
   return gv;
+}
+
+string ast::global_variable_decl::full_name() {
+  stringstream ss;
+  ss << state->modules.scope_name() << "." << name;
+  return ss.str();
 }
 
 
@@ -98,31 +110,38 @@ raytrace::ast::variable_ref::variable_ref(parser_state *st, const string &name) 
   
 }
 
-codegen_value raytrace::ast::variable_ref::codegen(Module *module, IRBuilder<> &builder) {
-  boost::function<codegen_value (Value *&)> op = [&builder] (Value *& val) -> codegen_value {
-    return builder.CreateLoad(val, "var_ref");
+typecheck_value ast::variable_ref::typecheck() {
+  return variable_type_lookup(name);
+}
+
+typed_value_container ast::variable_ref::codegen(Module *module, IRBuilder<> &builder) {
+  boost::function<typed_value_container (typed_value &)> op = [&builder] (typed_value &val) -> typed_value_container {
+    if (val.get<0>().type() == value::LLVM_VALUE) {
+      return typed_value(builder.CreateLoad(val.get<0>().extract_value(), "var_ref"), val.get<1>());
+    }
+    
+    //no need to generate a load, return directly
+    return val;
   };
-  
-  raytrace::errors::value_container_operation<codegen_value> create_load(op);
-  
-  codegen_value addr = lookup_var();
+    
+  typed_value_container addr = lookup_typed_var();
   return errors::codegen_call(addr, op);
 }
 
-codegen_value ast::variable_ref::lookup_var() {
-  try {
-    variable_symbol_table::entry_type &entry = state->variables.get(name);
-    return entry.value;
-  }
-  catch (compile_error &e) { return e; }
+typed_value_container ast::variable_ref::lookup_typed_var() {
+  return variable_lookup(name);
 }
 
-codegen_value raytrace::ast::variable_ref::codegen_ptr(Module *module, IRBuilder<> &builder) {
-  return lookup_var();
+typed_value_container ast::variable_ref::codegen_ptr(Module *module, IRBuilder<> &builder) {
+  return lookup_typed_var();
 }
 
-raytrace::type_spec raytrace::ast::variable_ref::typecheck() {
-  return state->variables.get(name).type;
+code_value ast::variable_ref::codegen_module() {
+  typed_value_container var = lookup_typed_var();
+  return errors::codegen_call<typed_value_container, code_value>(var, [] (typed_value &v) -> code_value {
+      if (v.get<0>().type() == value::MODULE_VALUE) return v.get<0>();
+      return compile_error("Name does not refer to a module.");
+    });
 }
 
 /** Assignment **/
@@ -133,44 +152,39 @@ raytrace::ast::assignment::assignment(parser_state *st, const expression_ptr &lh
   
 }
 
-codegen_value raytrace::ast::assignment::codegen(Module *module, IRBuilder<> &builder) {
-  typedef raytrace::errors::argument_value_join<codegen_value, codegen_value, typecheck_value>::result_value_type arg_val_type;  
-  boost::function<codegen_value (arg_val_type &)> op = [this, module, &builder] (arg_val_type &args) -> codegen_value {
-    try {
-      type_spec t = args.get<2>();
-      
-      Value *new_val = args.get<0>();
-
-      //if the rhs is already bound to a variable, make a copy
-      if (rhs->bound()) new_val = t->copy(new_val, module, builder);
-
-      //now destroy the old value
-      t->destroy(args.get<1>(), module, builder);
-      
-      builder.CreateStore(new_val, args.get<1>(), false);
-      return new_val;
-    }
-    catch (compile_error &e) { return e; }
-  };
-
-  typecheck_value t = typecheck_safe();  
-  codegen_value ptr = lhs->codegen_ptr(module, builder);
-  codegen_value value = rhs->codegen(module, builder);
-  
-  return errors::codegen_call_args(op, value, ptr, t);
+typecheck_value ast::assignment::typecheck() {
+  return lhs->typecheck();
 }
 
-raytrace::type_spec ast::assignment::typecheck() {
-  type_spec lt = lhs->typecheck();
-  type_spec rt = rhs->typecheck();
-  
-  if (lt != rt) {
-    stringstream err;
-    err << "Cannot assign value of type '" << rt->name << "' to variable of type '" << lt->name << "'.";
-    throw compile_error(err.str());
-  }
+typed_value_container ast::assignment::codegen(Module *module, IRBuilder<> &builder) {
+  typed_value_container ptr = lhs->codegen_ptr(module, builder);
+  typed_value_container value = rhs->codegen(module, builder);
 
-  return lt;
+  typedef raytrace::errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type arg_val_type;  
+  boost::function<typed_value_container (arg_val_type &)> op = [this, module, &builder] (arg_val_type &args) -> typed_value_container {
+    type_spec lt = args.get<0>().get<1>();
+    type_spec rt = args.get<1>().get<1>();
+    int cost;
+    if (!rt->can_cast_to(*lt, cost)) {
+      stringstream err;
+      err << "Cannot convert value of type '" << rt->name << "' to variable of type '" << lt->name << "' in assignment.";
+      return compile_error(err.str());
+    }
+    
+    Value *new_val = args.get<1>().get<0>().extract_value();
+    
+    //if the rhs is already bound to a variable, make a copy
+    if (rhs->bound()) new_val = rt->copy(new_val, module, builder);
+
+    //now destroy the old value
+    Value *ptr = args.get<0>().get<0>().extract_value();
+    lt->destroy(ptr, module, builder);
+      
+    builder.CreateStore(new_val, ptr, false);
+    return typed_value(new_val, lt);
+  };
+  
+  return errors::codegen_call_args(op, ptr, value);
 }
 
 /** Type Constructors **/
@@ -181,33 +195,27 @@ raytrace::ast::type_constructor::type_constructor(parser_state *st, const type_s
 
 }
 
-codegen_value raytrace::ast::type_constructor::codegen(Module *module, IRBuilder<> &builder) {
+typed_value_container ast::type_constructor::codegen(Module *module, IRBuilder<> &builder) {
   typed_value_vector arg_values;
-  vector< pair<typecheck_value, codegen_value> > to_destroy;
+  vector< typed_value_container > to_destroy;
   
   for (unsigned int i = 0; i < args.size(); i++) {
-    typecheck_value t = get_argtype(i);
-    codegen_value v = get_argval(i, module, builder);
-    typed_value_container val = errors::combine_arg_list(v, t);
+    typed_value_container val = get_arg(i, module, builder);
     arg_values = errors::codegen_vector_push_back(arg_values, val);
-    if (!args[i]->bound()) to_destroy.push_back(make_pair(t, v));
+    if (!args[i]->bound()) to_destroy.push_back(val);
   }
 
-  codegen_value result = type->create(module, builder, arg_values);
+  typed_value_container result = type->create(module, builder, arg_values);
 
   for (auto it = to_destroy.begin(); it != to_destroy.end(); ++it) {
-    expression::destroy_unbound(it->first, it->second, module, builder);
+    expression::destroy_unbound(*it, module, builder);
   }
-
+  
   return result;
 }
 
-codegen_value raytrace::ast::type_constructor::get_argval(int i, Module *module, IRBuilder<> &builder) {
+typed_value_container ast::type_constructor::get_arg(int i, Module *module, IRBuilder<> &builder) {
   return args[i]->codegen(module, builder);
-}
-
-typecheck_value ast::type_constructor::get_argtype(int i) {
-  return args[i]->typecheck_safe();
 }
 
 /** Field Selection **/
@@ -219,42 +227,116 @@ ast::field_selection::field_selection(parser_state *st, const string &field, con
 
 }
 
-codegen_value ast::field_selection::codegen(Module *module, IRBuilder<> &builder) {
-  typecheck_value type = expr->typecheck_safe();
-  codegen_value value = expr->codegen(module, builder);
+typecheck_value ast::field_selection::typecheck() {
+  typecheck_value expr_type = expr->typecheck();
 
-  typedef errors::argument_value_join<typecheck_value, codegen_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> access = [this, module, &builder] (arg_val_type &arg) -> codegen_value {
-    type_spec ts = arg.get<0>();
-    Value *val = arg.get<1>();
+  return errors::codegen_call(expr_type, [this] (type_spec &t) -> typecheck_value {
+      if (*t != *state->types["module"]) { return t->field_type(field); }
 
-    return ts->access_field(field, val, module, builder);
-  };
-
-  return errors::codegen_call_args(access, type, value);
+      code_value module_val = expr->codegen_module();
+      return typecheck_module_member(module_val);
+    });
 }
 
-codegen_value ast::field_selection::codegen_ptr(Module *module, IRBuilder<> &builder) {
-  typecheck_value type = expr->typecheck_safe();
-  codegen_value ptr = expr->codegen_ptr(module, builder);
+typecheck_value ast::field_selection::typecheck_module_member(code_value &module_val) {
+  return errors::codegen_call<code_value, typecheck_value>(module_val, [this] (value &v) -> typecheck_value {
+      module_ptr module = v.extract_module();
+      
+      //search module variables
+      auto var_it = module->variables.find(field);
+      if (var_it != module->variables.end()) return var_it->second.type;
 
-  typedef errors::argument_value_join<typecheck_value, codegen_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> access = [this, module, &builder] (arg_val_type &arg) -> codegen_value {
-    type_spec ts = arg.get<0>();
-    Value *ptr = arg.get<1>();
+      //search sub-module names
+      auto mod_it = module->modules.find(field);
+      if (mod_it != module->modules.end()) return state->types["module"];
 
-    return ts->access_field_ptr(field, ptr, module, builder);
-  };
+      stringstream err_ss;
+      err_ss << "Unable to find name '" << field << "' in the given module.";
+      return compile_error(err_ss.str());
+    });
+}
+
+typed_value ast::field_selection::load_global(Value *ptr, type_spec &type,
+					      Module *, IRBuilder<> &builder) {
+  return typed_value(builder.CreateLoad(ptr, "var_ref"), type);
+}
+
+typed_value_container ast::field_selection::codegen(Module *module, IRBuilder<> &builder) {
+  typed_value_container value = expr->codegen(module, builder);
   
-  return errors::codegen_call_args(access, type, ptr);
+  boost::function<typed_value_container (typed_value &)> access = [this, module, &builder] (typed_value &arg) -> typed_value_container {
+    type_spec ts = arg.get<1>();
+    if (*ts != *state->types["module"]) {
+      Value *val = arg.get<0>().extract_value();;
+      return ts->access_field(field, val, module, builder);
+    }
+
+    //perform module member lookup
+    module_ptr mod = arg.get<0>().extract_module();
+
+    //search module variables
+    auto var_it = mod->variables.find(field);
+    if (var_it != mod->variables.end()) return load_global(var_it->second.value, var_it->second.type,
+							   module, builder);
+
+    //search sub-modules
+    auto mod_it = mod->modules.find(field);
+    if (mod_it != mod->modules.end()) return typed_value(mod_it->second, state->types["module"]);
+
+    stringstream err_ss;
+    err_ss << "Unable to find name '" << field << "' in the given module.";
+    return compile_error(err_ss.str());
+  };
+
+  typed_value_container result = errors::codegen_call(value, access);
+  if (!expr->bound()) ast::expression::destroy_unbound(value, module, builder);
+  return result;
 }
 
-type_spec ast::field_selection::typecheck() {
-  typecheck_value type = expr->typecheck_safe();
-  boost::function<typecheck_value (type_spec &)> op = [this] (type_spec &ts) -> typecheck_value {
-    return ts->field_type(field);
-  };
-  type = errors::codegen_call(type, op);
+typed_value_container ast::field_selection::codegen_ptr(Module *module, IRBuilder<> &builder) {
+  typed_value_container ptr = expr->codegen_ptr(module, builder);
+  
+  boost::function<typed_value_container (typed_value &)> access = [this, module, &builder] (typed_value &arg) -> typed_value_container {
+    type_spec ts = arg.get<1>();
+    if (*ts != *state->types["module"]) {
+      Value *val = arg.get<0>().extract_value();
+      return ts->access_field_ptr(field, val, module, builder);
+    }
 
-  return errors::extract_left<typecheck_value>(type);
+    //perform module member lookup
+    module_ptr mod = arg.get<0>().extract_module();
+
+    //search module variables
+    auto var_it = mod->variables.find(field);
+    if (var_it != mod->variables.end()) return typed_value(var_it->second.value, var_it->second.type);
+
+    //search sub-modules
+    auto mod_it = mod->modules.find(field);
+    if (mod_it != mod->modules.end()) return typed_value(mod_it->second, state->types["module"]);
+
+    stringstream err_ss;
+    err_ss << "Unable to find name '" << field << "' in the given module.";
+    return compile_error(err_ss.str());
+  };
+
+  return errors::codegen_call(ptr, access);
+}
+
+code_value ast::field_selection::codegen_module() {
+  code_value expr_mod = expr->codegen_module();
+  return errors::codegen_call(expr_mod, [this] (value &mod) -> code_value {
+      module_ptr m = mod.extract_module();
+      
+      //search module variables
+      auto var_it = m->variables.find(field);
+      if (var_it != m->variables.end()) return compile_error("Expression cannot be converted to a module");
+      
+      //search sub-modules
+      auto mod_it = m->modules.find(field);
+      if (mod_it != m->modules.end()) return mod_it->second;
+      
+      stringstream err_ss;
+      err_ss << "Unable to find module named '" << field << "' in the given module.";
+      return compile_error(err_ss.str());
+    });
 }

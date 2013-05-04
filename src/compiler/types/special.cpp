@@ -41,7 +41,7 @@ Type *dfunc_type::llvm_type() const {
   return ArrayType::get(byte_type, sizeof(shade_tree::node_ptr));
 }
 
-codegen_value dfunc_type::initialize(Module *, IRBuilder<> &) const {
+typed_value_container dfunc_type::initialize(Module *, IRBuilder<> &) const {
   return compile_error("No default initialization for distributions.");
 }
 

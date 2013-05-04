@@ -24,7 +24,7 @@ namespace raytrace {
       statement(parser_state *st, unsigned int line_no = 0, unsigned int column_no = 0) : ast_node(st, line_no, column_no) {}
       virtual ~statement() {}
 
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
+      virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
       virtual bool is_terminator() { return false; }
     };
 
@@ -37,7 +37,7 @@ namespace raytrace {
       expression_statement(parser_state *st, const expression_ptr &expr);
       virtual ~expression_statement() {}
 
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       
     private:
       
@@ -65,7 +65,7 @@ namespace raytrace {
       scoped_statement(parser_state *st, const statement_list &stmt_list);
       virtual ~scoped_statement() { }
 
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
     private:
       

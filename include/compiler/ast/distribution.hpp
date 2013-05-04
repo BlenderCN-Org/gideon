@@ -19,7 +19,7 @@ namespace raytrace {
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
-      std::string evaluator_name(const std::string &n) const;
+      std::string evaluator_name(const std::string &n);
       
     private:
 

@@ -4,7 +4,7 @@
 #include "compiler/ast/ast.hpp"
 
 namespace raytrace {
-
+  
   /* Defines set of functions that can be linked into a renderer program. */
   class render_module {
   public:
@@ -22,7 +22,7 @@ namespace raytrace {
 
     //Returns a vector containing all the distributions defined by this block of code.
     std::vector<distribution_export> get_distributions() const;
-
+    
     struct function_export {
       std::string name, full_name;
       type_spec return_type;
@@ -51,7 +51,7 @@ namespace raytrace {
     void optimize(llvm::Module *module);
 
   };
-
+  
 };
 
 #endif

@@ -8,92 +8,171 @@ using namespace llvm;
 
 /* Function Call */
 
-raytrace::ast::func_call::func_call(parser_state *st, const string &fname,
+raytrace::ast::func_call::func_call(parser_state *st,
+				    const expression_ptr &path_expr, const string &fname,
 				    const vector<expression_ptr> &args) :
   expression(st, st->types["void"]),
-  fname(fname), args(args)
+  path_expr(path_expr), fname(fname), args(args)
 {
   
 }
 
-function_key ast::func_call::get_key() const {
-  function_key fkey;
-  fkey.name = fname;
-  for (auto it = args.begin(); it != args.end(); it++) fkey.arguments.push_back((*it)->typecheck());
-  return fkey;
-}
-
-codegen_value raytrace::ast::func_call::codegen(Module *module, IRBuilder<> &builder) {  
-  function_symbol_table::entry_type *entry = nullptr;
-  try { entry = &state->functions.get(get_key()); }
-  catch (compile_error &e) { return e; }
-  
-  Function *f = entry->func;
-  bool is_member_function = entry->member_function;
-  
-  size_t expected_size = entry->arguments.size();
-  if (args.size() != expected_size) {
-    stringstream err_str;
-    err_str << "Expected " << expected_size << " arguments, found " << args.size() << ".";
-    return compile_error(err_str.str());
-  }
-    
-  //check argument types and evaluate
+ast::func_call::entry_or_error ast::func_call::lookup_function() {
+  //determine the type of each argument
   typecheck_vector arg_types;
-  codegen_vector arg_eval;
-
-  //add the context to the argument list
-  if (is_member_function) {
-    codegen_value ctx_val = state->control.get_context();
-    arg_eval = errors::codegen_vector_push_back(arg_eval, ctx_val);
-  }
-
-  unsigned int arg_idx = 0;
-  vector< pair<typecheck_value, codegen_value> > to_destroy;
-
-  for (vector<expression_ptr>::iterator arg_it = args.begin(); arg_it != args.end(); arg_it++, arg_idx++) {
-    typecheck_value ats = (*arg_it)->typecheck_safe();
-    ats = errors::codegen_call(ats, [entry, arg_idx] (type_spec &arg_ts) -> typecheck_value {
-	if (*arg_ts != *entry->arguments[arg_idx].type) {
-	  stringstream err_str;
-	  err_str << "Error in " << arg_idx << "-th argument: Expected type '" << entry->arguments[arg_idx].type->name << "' but found type '" << arg_ts->name << "'.";
-	  return compile_error(err_str.str());
-	}
-	
-	return arg_ts;
-      });
-    arg_types = errors::codegen_vector_push_back(arg_types, ats);
-    
-    codegen_value expr = (entry->arguments[arg_idx].output ?
-			  (*arg_it)->codegen_ptr(module, builder) : 
-			  (*arg_it)->codegen(module, builder));
-    
-    if (!(*arg_it)->bound()) to_destroy.push_back(make_pair(ats, expr));
-    arg_eval = errors::codegen_vector_push_back(arg_eval, expr);
+  for (vector<expression_ptr>::iterator arg_it = args.begin(); arg_it != args.end(); ++arg_it) {
+    typecheck_value type = (*arg_it)->typecheck();
+    arg_types = errors::codegen_vector_push_back(arg_types, type);
   }
   
-  typedef errors::argument_value_join<codegen_vector, typecheck_vector>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> call_op = [this, &builder, f] (arg_val_type &args) -> codegen_value {
-    vector<Value*> &arg_vals = args.get<0>();
-    if (f->getReturnType()->isVoidTy()) return builder.CreateCall(f, arg_vals);
+  //lookup the function
+  boost::function<entry_or_error (vector<type_spec> &)> lookup = [this] (vector<type_spec> &args) -> entry_or_error {
+    function_key fkey;
+    fkey.name = fname;
+    for (auto it = args.begin(); it != args.end(); ++it) fkey.arguments.push_back(*it);
     
-    string tmp_name = fname + string("_call");
-    return builder.CreateCall(f, arg_vals, tmp_name.c_str());
+    if (path_expr == nullptr) {
+      try { return &functions().get(fkey); }
+      catch (compile_error &e) {  } //ignore and look up the module stack
+
+      for (auto mod_it = state->modules.scope_begin(); mod_it != state->modules.scope_end(); ++mod_it) {
+	function_scope &fscope = mod_it->get_module()->functions;
+	auto func_it = fscope.find(fkey);
+	if (func_it != fscope.end()) return &(*func_it);
+      }
+
+      stringstream err_ss;
+      err_ss << "Undeclared function '" << fname << "'";
+      return compile_error(err_ss.str());
+    }
+    else {
+      code_value module_path = path_expr->codegen_module();
+      return errors::codegen_call<code_value, entry_or_error>(module_path, [&fkey] (value &val) -> entry_or_error {
+	  module_ptr m = val.extract_module();
+	  function_scope &fscope = m->functions;
+	  auto func_it = fscope.find(fkey);
+	  if (func_it != fscope.end()) return &(*func_it);
+
+	  stringstream err_ss;
+	  err_ss << "Could not find function named '" << fkey.name << "' in specified module.";
+	  return compile_error(err_ss.str());
+	});
+    }
   };
   
-  codegen_value result = errors::codegen_call_args(call_op, arg_eval, arg_types);
+  return errors::codegen_call<typecheck_vector, entry_or_error>(arg_types, lookup);
+  
+}
+
+typecheck_value ast::func_call::typecheck() {
+  entry_or_error entry = lookup_function();
+  return errors::codegen_call<entry_or_error, typecheck_value>(entry, [] (function_symbol_table::entry_type *&func) -> typecheck_value {
+      return func->return_type;
+    });
+}
+
+typed_value_vector ast::func_call::codegen_all_args(entry_or_error &entry,
+						    Module *module, IRBuilder<> &builder,
+						    /* out */ vector<typed_value_container> &to_destroy) {
+  boost::function<typed_value_vector (function_symbol_table::entry_type *&)> eval =
+    [this, module, &builder, &to_destroy] (function_symbol_table::entry_type *&entry) -> typed_value_vector {
+    
+    typed_value_vector arg_eval;
+    unsigned int arg_idx = 0;
+    
+    for (vector<expression_ptr>::iterator arg_it = args.begin(); arg_it != args.end(); ++arg_it, ++arg_idx) {
+      typed_value_container arg = (entry->arguments[arg_idx].output ? 
+				   (*arg_it)->codegen_ptr(module, builder) :
+				   (*arg_it)->codegen(module, builder));
+      if (!(*arg_it)->bound()) to_destroy.push_back(arg);
+      arg_eval = errors::codegen_vector_push_back(arg_eval, arg);
+    };
+  
+    //add the context to the front argument list
+    if (entry->member_function) {
+      typed_value_container ctx_val = typed_value(state->control.get_context(), state->types["context_ptr"]);
+
+      typedef errors::argument_value_join<typed_value_vector, typed_value_container>::result_value_type add_ctx_arg_type;
+      boost::function<typed_value_vector (add_ctx_arg_type&)> add_ctx_func = [&arg_eval] (add_ctx_arg_type &arg) -> typed_value_vector {
+	vector<typed_value> &result = arg.get<0>();
+	result.insert(result.begin(), arg.get<1>());
+	return result;
+      };
+
+      arg_eval = errors::codegen_call_args(add_ctx_func, arg_eval, ctx_val);
+    }
+    
+    return arg_eval;
+  };
+
+  return errors::codegen_call<entry_or_error, typed_value_vector>(entry, eval);
+}
+
+typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &builder) {  
+  //lookup the function
+  entry_or_error func = lookup_function();
+
+  //evaluate all arguments
+  vector<typed_value_container> to_destroy;
+  typed_value_vector arg_eval = codegen_all_args(func, module, builder, to_destroy);
+
+  typedef errors::argument_value_join<entry_or_error, typed_value_vector>::result_value_type arg_val_type;
+  boost::function<typed_value_container (arg_val_type &)> call_func = [this, module, &builder] (arg_val_type &call_args) -> typed_value_container {
+    function_symbol_table::entry_type *entry = call_args.get<0>();
+    vector<typed_value> &args = call_args.get<1>();
+
+    Function *f = entry->func;
+    bool is_member_function = entry->member_function;
+  
+    size_t expected_size = entry->arguments.size();
+    size_t found_args = args.size();
+    if (is_member_function) found_args--;
+
+    if (found_args != expected_size) {
+      stringstream err_str;
+      err_str << "Expected " << expected_size << " arguments, found " << found_args << ".";
+      return compile_error(err_str.str());
+    }
+
+    vector<Value*> arg_vals;
+    unsigned int arg_idx = 0;
+
+    auto arg_it = args.begin();
+    if (is_member_function) {
+      arg_vals.push_back(args[0].get<0>().extract_value());
+      ++arg_it;
+    }
+    
+    while (arg_it != args.end()) {
+      typed_value &arg = (*arg_it);
+      type_spec arg_ts = arg.get<1>();
+
+      if (*arg_ts != *entry->arguments[arg_idx].type) {
+	stringstream err_str;
+	err_str << "Error in " << arg_idx << "-th argument: Expected type '" << entry->arguments[arg_idx].type->name << "' but found type '" << arg_ts->name << "'.";
+	return compile_error(err_str.str());
+      }
+
+      arg_vals.push_back(arg.get<0>().extract_value());
+
+      ++arg_it;
+      ++arg_idx;
+    }
+    
+    if (f->getReturnType()->isVoidTy()) return typed_value(builder.CreateCall(f, arg_vals), entry->return_type);
+    
+    string tmp_name = fname + string("_call");
+    return typed_value(builder.CreateCall(f, arg_vals, tmp_name.c_str()), entry->return_type);
+  };
+  
+  typed_value_container result = errors::codegen_call_args(call_func, func, arg_eval);
 
   //delete any expressions used to call this function
   for (auto it = to_destroy.begin(); it != to_destroy.end(); ++it) {
-    ast::expression::destroy_unbound(it->first, it->second, module, builder);
+    ast::expression::destroy_unbound(*it, module, builder);
   }
-
+  
   return result;
-}
-
-type_spec raytrace::ast::func_call::typecheck() {
-  function_symbol_table::entry_type &entry = state->functions.get(get_key());
-  return entry.return_type;
 }
 
 /* Function Prototype */
@@ -140,7 +219,7 @@ codegen_value raytrace::ast::prototype::codegen(Module *module, IRBuilder<> &bui
       else arg_types.push_back(arg_type);
     }
     
-    function_symbol_table::entry_type entry = function_entry::make_entry(name, state->functions.scope_name(), return_type, args);
+    function_symbol_table::entry_type entry = function_entry::make_entry(name, function_scope_name(), return_type, args);
     string name_to_use = (external ? extern_name : entry.full_name);
     
     FunctionType *ft = FunctionType::get(return_type->llvm_type(), arg_types, false);
@@ -150,7 +229,7 @@ codegen_value raytrace::ast::prototype::codegen(Module *module, IRBuilder<> &bui
     entry.external = external;
     entry.member_function = member_function;
     
-    state->functions.set(entry.to_key(), entry);
+    function_table().set(entry.to_key(), entry);
     return f;
   };
 
@@ -166,8 +245,13 @@ function_key ast::prototype::get_key() const {
 
 codegen_value raytrace::ast::prototype::check_for_entry() {
   function_key fkey = get_key();
-  if (!state->functions.has_local(fkey)) return nullptr; //function has not been defined
-  function_symbol_table::entry_type &entry = state->functions.get(fkey);
+  auto func_it = function_table().find(fkey);
+
+  //if (!functions().has_local(fkey)) return nullptr; //function has not been defined
+  //function_symbol_table::entry_type &entry = functions().get(fkey);
+
+  if (func_it == function_table().end()) return nullptr; //function has not been defined
+  function_symbol_table::entry_type &entry = *func_it;
 
   if (entry.external && !external) {
     stringstream err_str;
@@ -254,7 +338,7 @@ codegen_value raytrace::ast::function::create_function(Value *& val, Module *mod
       arg_var = variable_symbol_table::entry_type(alloca, arg.type, false);
     }
     
-    state->variables.set(arg.name, arg_var);
+    variables().set(arg.name, arg_var);
   }
   
   //codegen the body and exit the function's scope
@@ -289,37 +373,34 @@ raytrace::ast::return_statement::return_statement(parser_state *st, const expres
 
 }
 
-codegen_value raytrace::ast::return_statement::codegen(Module *module, IRBuilder<> &builder) {
+codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<> &builder) {
   if (builder.GetInsertBlock()->getTerminator()) return nullptr;
   
   state->control.set_scope_reaches_end(false);
   exit_function(module, builder);
 
-  if (expr == nullptr) return builder.CreateRetVoid();
+  if (expr == nullptr) {
+    builder.CreateRetVoid();
+    return nullptr;
+  }
   
+  typed_value_container rt_val = expr->codegen(module, builder);
   type_spec &expected_rt = state->control.return_type();  
-  typecheck_value result_t = expr->typecheck_safe();
-
+  
   //make sure the expression type matches this function's return type
-  boost::function<typecheck_value (type_spec &)> check = [&expected_rt] (type_spec &result) -> typecheck_value {
-    if (expected_rt != result) {
+  boost::function<codegen_void (typed_value &)> check = [&expected_rt, module, &builder] (typed_value &result) -> codegen_void {
+    type_spec t = result.get<1>();
+    if (expected_rt != t) {
       stringstream err_str;
-      err_str << "Invalid return type '" << result->name << "', expected '" << expected_rt->name << "'";
+      err_str << "Invalid return type '" << result.get<1>()->name << "', expected '" << expected_rt->name << "'";
       return compile_error(err_str.str());
     }
     
-    return result;
+    //some values have destructors, so make a copy to ensure that we don't have invalid data (for most types this won't make a difference).
+    Value *copy = t->copy(result.get<0>().extract_value(), module, builder);
+    builder.CreateRet(copy);
+    return nullptr;
   };
   
-  //some values have destructors, so make a copy to ensure that we don't have invalid data (for most types this won't make a difference).
-  typedef raytrace::errors::argument_value_join<codegen_value, typecheck_value>::result_value_type arg_val_type;  
-  boost::function<codegen_value (arg_val_type &)> op = [module, &builder] (arg_val_type &val) -> codegen_value {
-    type_spec t = val.get<1>();
-    Value *copy = t->copy(val.get<0>(), module, builder);
-    return builder.CreateRet(copy);
-  };
-
-  typecheck_value expr_check = errors::codegen_call(result_t, check);  
-  codegen_value rt_val = expr->codegen(module, builder);
-  return errors::codegen_call_args(op, rt_val, expr_check);
+  return errors::codegen_call<typed_value_container, codegen_void>(rt_val, check);
 }

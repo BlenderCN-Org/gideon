@@ -1,0 +1,9 @@
+float my_global_x;
+
+float bar(float y) { return y + 2.0; }
+
+float foo(float x) {
+  float y = 3.5;
+  scene my_scene = __gd_scene;
+  return x + y + bar(my_global_x);
+}

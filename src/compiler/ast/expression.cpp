@@ -10,26 +10,20 @@ using namespace llvm;
 
 /** Expression Base **/
 
-codegen_value raytrace::ast::expression::codegen_ptr(Module *module, IRBuilder<> &builder) {
+typed_value_container ast::expression::codegen_ptr(Module *module, IRBuilder<> &builder) {
   return compile_error("Cannot convert expression to lvalue");
 }
 
-typecheck_value ast::expression::typecheck_safe() {
-  try { return typecheck(); }
-  catch (compile_error &e) { return e; }
+code_value ast::expression::codegen_module() {
+  return compile_error("Cannot convert expression to module");
 }
 
-typed_value_container ast::expression::codegen_safe(llvm::Module *module, llvm::IRBuilder<> &builder) {
-  typecheck_value type = typecheck_safe();
-  codegen_value val = codegen(module, builder);
-  return errors::combine_arg_list(val, type);
-}
+void ast::expression::destroy_unbound(typed_value_container &val, Module *module, IRBuilder<> &builder) {
+  boost::function<codegen_void (typed_value &)> dtor = [module, &builder] (typed_value &arg) -> codegen_void {
+    if (arg.get<0>().type() != value::LLVM_VALUE) return nullptr;
 
-void ast::expression::destroy_unbound(typecheck_value &type, codegen_value &val, Module *module, IRBuilder<> &builder) {
-  typedef raytrace::errors::argument_value_join<codegen_value, typecheck_value>::result_value_type arg_val_type;
-  boost::function<codegen_void (arg_val_type &)> dtor = [module, &builder] (arg_val_type &arg) -> codegen_void {
-    type_spec t = arg.get<1>();
-    Value *val = arg.get<0>();
+    type_spec t = arg.get<1>();    
+    Value *val = arg.get<0>().extract_value();
 
     //ensure we have a pointer to this object
     Value *val_ptr = CreateEntryBlockAlloca(builder, t->llvm_type(), "dtor_tmp");
@@ -38,7 +32,7 @@ void ast::expression::destroy_unbound(typecheck_value &type, codegen_value &val,
     return t->destroy(val_ptr, module, builder);
   };
 
-  errors::codegen_call_args(dtor, val, type);
+  errors::codegen_call<typed_value_container, codegen_void>(val, dtor);
 }
 
 
@@ -52,34 +46,46 @@ raytrace::ast::binary_expression::binary_expression(parser_state *st, const stri
   
 }
 
-binop_table::op_result_value ast::binary_expression::get_op() {
-  typecheck_value lt = lhs->typecheck_safe();
-  typecheck_value rt = rhs->typecheck_safe();
+typecheck_value ast::binary_expression::typecheck() {
+  typecheck_value ltype = lhs->typecheck();
+  typecheck_value rtype = rhs->typecheck();
 
-  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type arg_val_type;
-  boost::function<binop_table::op_result_value (arg_val_type &)> find_op = [this] (arg_val_type &types) -> binop_table::op_result_value {
-    return state->binary_operations.find_best_operation(op, types.get<0>(), types.get<1>());
+  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type typecheck_pair;
+  boost::function<binop_table::op_result_value (typecheck_pair&)> lookup = [this] (typecheck_pair &args) -> binop_table::op_result_value {
+    return state->binary_operations.find_best_operation(op, args.get<0>(), args.get<1>());
   };
 
-  return errors::codegen_call_args(find_op, lt, rt);
-}
-
-raytrace::type_spec raytrace::ast::binary_expression::typecheck() {
-  binop_table::op_result_value op_to_use = get_op();
-  binop_table::op_result op_val = boost::apply_visitor(errors::return_or_throw<binop_table::op_result>(), op_to_use);
-  return op_val.second.result_type;
-}
-
-codegen_value raytrace::ast::binary_expression::codegen(Module *module, IRBuilder<> &builder) {
-  binop_table::op_result_value op_to_use = get_op();
-  codegen_value l_val = lhs->codegen(module, builder);
-  codegen_value r_val = rhs->codegen(module, builder);
+  binop_table::op_result_value op_func = errors::codegen_call_args(lookup, ltype, rtype);
   
-  typedef errors::argument_value_join<binop_table::op_result_value, codegen_value, codegen_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> exec_op = [module, &builder] (arg_val_type &arg) -> codegen_value {
-    binop_table::op_codegen &op_func = arg.get<0>().second.codegen;
-    return op_func(arg.get<1>(), arg.get<2>(), module, builder);
-  };
-  return errors::codegen_call_args(exec_op, op_to_use, l_val, r_val);
+  return errors::codegen_call<binop_table::op_result_value, typecheck_value>(op_func,
+									     [] (binop_table::op_result &op_func) -> typecheck_value {
+									       return op_func.second.result_type;
+									     });
 }
 
+typed_value_container ast::binary_expression::execute_op(binop_table::op_result_value &op_func,
+							 Module *module, IRBuilder<> &builder,
+							 Value* lhs_val, Value *rhs_val) {
+  boost::function<typed_value_container (binop_table::op_result&)> exec_op = [module, &builder, lhs_val, rhs_val] 
+    (binop_table::op_result &op_func) -> typed_value_container {
+    type_spec rt = op_func.second.result_type;
+    Value *result = op_func.second.codegen(lhs_val, rhs_val, module, builder);
+    return typed_value(result, rt);
+  };
+
+  return errors::codegen_call<binop_table::op_result_value, typed_value_container>(op_func, exec_op);
+}
+
+typed_value_container ast::binary_expression::codegen(Module *module, IRBuilder<> &builder) {
+  typed_value_container lhs_val = lhs->codegen(module, builder);
+  typed_value_container rhs_val = rhs->codegen(module, builder);
+  
+  typedef errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type binary_op_args;
+  boost::function<typed_value_container (binary_op_args &)> exec_op = [this, module, &builder] (binary_op_args &args) -> typed_value_container {
+    binop_table::op_result_value op_func = state->binary_operations.find_best_operation(op,
+											args.get<0>().get<1>(), args.get<1>().get<1>());
+    return execute_op(op_func, module, builder,
+		      args.get<0>().get<0>().extract_value(), args.get<1>().get<0>().extract_value());
+  };
+  return errors::codegen_call_args(exec_op, lhs_val, rhs_val);
+}

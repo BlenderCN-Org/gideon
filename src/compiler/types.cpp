@@ -40,11 +40,13 @@ void raytrace::initialize_types(type_table &tt) {
 
   tt["dfunc"] = type_ptr(new dfunc_type(&tt));
   tt["context_ptr"] = type_ptr(new context_ptr_type(&tt));
+  
+  tt["module"] = type_ptr(new module_type(&tt));
 }
 
 /** Type Base Class **/
 
-codegen_value type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args) const {
+typed_value_container type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args) const {
   stringstream ss;
   ss << "Type '" << name << "' has no constructor.";
   return compile_error(ss.str());
@@ -56,15 +58,15 @@ typecheck_value type::field_type(const string &field) const {
   return compile_error(ss.str());
 }
 
-codegen_value type::access_field(const string &field, Value *value,
-				 Module *, IRBuilder<> &) const {
+typed_value_container type::access_field(const string &field, Value *value,
+					 Module *, IRBuilder<> &) const {
   stringstream ss;
   ss << "Type '" << name << "' has no field named '" << field << "'.";
   return compile_error(ss.str());
 }
 
-codegen_value type::access_field_ptr(const string &field, Value *value_ptr,
-				     Module *, IRBuilder<> &) const {
+typed_value_container type::access_field_ptr(const string &field, Value *value_ptr,
+					     Module *, IRBuilder<> &) const {
   stringstream ss;
   ss << "Type '" << name << "' has no assignable field named '" << field << "'.";
   return compile_error(ss.str());

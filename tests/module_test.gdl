@@ -1,0 +1,51 @@
+module foo {
+
+  int my_func(float x) {
+    return 0;
+  }
+
+  module another_module {
+   
+    module yam {
+
+      vec2 my_other_global;
+ 
+    }
+
+    void hidden_func(float x) { return; }
+    
+  }
+
+  int my_other_global;
+  
+  distribution my_bsdf() {
+    vec4 evaluate(vec3 N, vec3 P_in, vec3 w_in,
+		  vec3 P_out, vec3 w_out) {
+      return vec4(N.x, N.y, N.z, 1.0);
+    }
+  }
+
+  module shaders {
+    distribution my_bsdf(float x) {
+      vec4 evaluate(vec3 N, vec3 P_in, vec3 w_in,
+		    vec3 P_out, vec3 w_out) {
+	return vec4(x, N.y, N.z, 1.0);
+      }
+    }
+  }
+
+  float my_global;
+
+  module bar {
+    float hello() { return 3.5 + my_global; }
+    int world() {
+      dfunc d = my_bsdf();
+      dfunc d2 = shaders.my_bsdf(7.69);
+      
+      another_module.yam.my_other_global.x = 4.5;
+      return my_func(another_module.yam.my_other_global.y);
+    }
+  }
+  
+  void test2() { another_module.hidden_func(my_global); }
+}

@@ -69,6 +69,8 @@
 
 %token <i> DISTRIBUTION
 
+%token<i> MODULE
+
 %token <i> EXTERN
 token <i> OUTPUT
 
@@ -96,6 +98,7 @@ token <i> OUTPUT
 
 %type <id_list> identifier_list
 %type <global> import_declaration
+%type <global> module_declaration
 
 %type <global> function_declaration
 %type <func> function_definition
@@ -155,6 +158,7 @@ global_declaration
  : function_declaration
  | typespec IDENTIFIER ';' { $$ = ast::global_declaration_ptr(new ast::global_variable_decl(gd_data->state, $2, $1)); }
  | import_declaration
+ | module_declaration
  | distribution_declaration
  ;
 
@@ -171,6 +175,11 @@ identifier_list
 
 import_declaration
  : IMPORT identifier_list ';' { $$ = nullptr; gd_data->dependencies->insert(gd_data->dependencies->end(), $2.begin(), $2.end()); }
+ ;
+
+module_declaration
+ : MODULE IDENTIFIER '{' global_declarations_opt '}' { $$ = ast::global_declaration_ptr(new ast::module(gd_data->state,
+													$2, $4, yylloc.first_line, yylloc.first_column)); }
  ;
 
 /** Functions **/
@@ -346,7 +355,8 @@ field_selection
  ;
 
 function_call
- : IDENTIFIER '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::func_call(gd_data->state, $1, $3)); }
+ : IDENTIFIER '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::func_call(gd_data->state, nullptr, $1, $3)); }
+ | expression '.' IDENTIFIER '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::func_call(gd_data->state, $1, $3, $5)); }
  ;
 
 function_args_opt

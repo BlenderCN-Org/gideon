@@ -49,6 +49,8 @@ set(RT_SOURCE_FILES
   compiler/operations.cpp
   compiler/llvm_helper.cpp
   compiler/gen_state.cpp
+  compiler/lookup.cpp
+  compiler/value.cpp
 
   compiler/builtin_ops.cpp  
   compiler/gd_std.cpp

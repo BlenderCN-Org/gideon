@@ -57,10 +57,10 @@ namespace raytrace {
 
   string function_generate_name(const string &base_name, const string &scope_name, const vector<function_argument> &args) {
     stringstream ss;
-    ss << "gdi_" << scope_name << "_" << args.size() << "_" << base_name;
+    ss << "gdi." << scope_name << "." << args.size() << "." << base_name;
     
     for (auto it = args.begin(); it != args.end(); it++) {
-      ss << "_" << it->type->type_id;
+      ss << "." << it->type->type_id;
     }
     
     return ss.str();

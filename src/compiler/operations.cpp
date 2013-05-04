@@ -74,13 +74,23 @@ void binop_table::initialize_standard_ops(binop_table &table, type_table &types)
   table.add_operation("<", types["int"], types["int"], types["bool"], llvm_lt_i_i());
 
   table.add_operation("+", types["float"], types["float"], types["float"], llvm_add_f_f());
+  table.add_operation("-", types["float"], types["float"], types["float"], llvm_sub_f_f());
+  table.add_operation("*", types["float"], types["float"], types["float"], llvm_mul_f_f());
+  table.add_operation("/", types["float"], types["float"], types["float"], llvm_div_f_f());
 
   table.add_operation("+", types["vec2"], types["vec2"], types["vec2"], llvm_add_vec_vec(2, types));
   table.add_operation("+", types["vec3"], types["vec3"], types["vec3"], llvm_add_vec_vec(3, types));
   table.add_operation("+", types["vec4"], types["vec4"], types["vec4"], llvm_add_vec_vec(4, types));
 
+  table.add_operation("-", types["vec2"], types["vec2"], types["vec2"], llvm_sub_vec_vec(2, types));
+  table.add_operation("-", types["vec3"], types["vec3"], types["vec3"], llvm_sub_vec_vec(3, types));
+  table.add_operation("-", types["vec4"], types["vec4"], types["vec4"], llvm_sub_vec_vec(4, types));
+
   table.add_operation("+", types["string"], types["string"], types["string"],
   		      llvm_add_str_str(types["string"]->llvm_type()));
+
+  table.add_operation("+", types["dfunc"], types["dfunc"], types["dfunc"],
+		      llvm_add_dfunc_dfunc(types["dfunc"]->llvm_type()));
 }
 
 /* LLVM Code Generation Functions */
@@ -106,7 +116,45 @@ binop_table::op_codegen raytrace::llvm_add_f_f() {
   };
 }
 
+binop_table::op_codegen raytrace::llvm_sub_f_f() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    return builder.CreateFSub(lhs, rhs, "f_sub_tmp");
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_mul_f_f() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    return builder.CreateFMul(lhs, rhs, "f_mul_tmp");
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_div_f_f() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    return builder.CreateFDiv(lhs, rhs, "f_div_tmp");
+  };
+}
+
 binop_table::op_codegen raytrace::llvm_add_vec_vec(unsigned int N, type_table &types) {
+  stringstream tname;
+  tname << "vec" << N;
+  Type *llvm_type = types[tname.str()]->llvm_type();
+
+  return [N, llvm_type] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    stringstream op_ss;
+    op_ss << "gd_builtin_add_v" << N << "_v" << N;
+    string op_func = op_ss.str();
+
+    return llvm_builtin_binop(op_func, llvm_type, lhs, rhs, module, builder);
+    
+    return builder.CreateFAdd(lhs, rhs, "vec_add_tmp");
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_sub_vec_vec(unsigned int N, type_table &types) {
   stringstream tname;
   tname << "vec" << N;
   Type *llvm_type = types[tname.str()]->llvm_type();
@@ -119,7 +167,7 @@ binop_table::op_codegen raytrace::llvm_add_vec_vec(unsigned int N, type_table &t
 
     return llvm_builtin_binop(op_func, llvm_type, lhs, rhs, module, builder);
     
-    return builder.CreateFAdd(lhs, rhs, "f_add_tmp");
+    return builder.CreateFAdd(lhs, rhs, "vec_sub_tmp");
   };
 }
 
@@ -138,6 +186,26 @@ binop_table::op_codegen raytrace::llvm_add_str_str(Type *str_type) {
     Value *new_str = builder.CreateInsertValue(UndefValue::get(str_type),
 					       ConstantInt::get(getGlobalContext(), APInt(1, false, true)), ArrayRef<unsigned int>(0), "str_concat_tmp");
     return builder.CreateInsertValue(new_str, new_data, ArrayRef<unsigned int>(1));
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_add_dfunc_dfunc(Type *dfunc_type) {
+  return [dfunc_type] (Value *lhs, Value *rhs,
+		       Module *module, IRBuilder<> &builder) -> Value* {
+    Type *pointer_type = dfunc_type->getPointerTo();
+    vector<Type*> arg_type({pointer_type, pointer_type, pointer_type});
+    FunctionType *ty = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_type, false);
+    Function *add_f = cast<Function>(module->getOrInsertFunction("gd_builtin_dfunc_add", ty));
+    
+    Value *lhs_ptr = CreateEntryBlockAlloca(builder, dfunc_type, "dfunc_lhs");
+    builder.CreateStore(lhs, lhs_ptr, false);
+
+    Value *rhs_ptr = CreateEntryBlockAlloca(builder, dfunc_type, "dfunc_lhs");
+    builder.CreateStore(rhs, rhs_ptr, false);
+
+    Value *sum = CreateEntryBlockAlloca(builder, dfunc_type, "dfunc_add");
+    builder.CreateCall3(add_f, lhs_ptr, rhs_ptr, sum);
+    return builder.CreateLoad(sum);
   };
 }
 

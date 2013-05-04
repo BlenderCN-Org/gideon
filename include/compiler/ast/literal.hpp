@@ -17,8 +17,10 @@ namespace raytrace {
       
       literal(parser_state *st, const T& v) : expression(st, get_literal_type<T>(st)), value(v) {}
       virtual ~literal() { }
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
-      virtual type_spec typecheck() { return { get_literal_type<T>(state) }; }
+      
+      virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual typecheck_value typecheck() { return { get_literal_type<T>(state) }; }
+      
       
     private:
       

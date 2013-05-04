@@ -23,7 +23,7 @@ namespace raytrace {
 			    const statement_ptr &if_branch, const statement_ptr &else_branch);
       virtual ~conditional_statement() {}
 
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
     private:
 
@@ -44,7 +44,7 @@ namespace raytrace {
 
       virtual ~for_loop_statement() {}
 
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
     private:
 
@@ -60,7 +60,7 @@ namespace raytrace {
       break_statement(parser_state *st);
       virtual ~break_statement() {}
 
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual bool is_terminator() { return true; }
 
     };
@@ -72,7 +72,7 @@ namespace raytrace {
       continue_statement(parser_state *st);
       virtual ~continue_statement() {}
 
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual bool is_terminator() { return true; }
       
     };

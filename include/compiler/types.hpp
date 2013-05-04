@@ -10,6 +10,7 @@
 #include <boost/unordered_map.hpp>
 
 #include "compiler/errors.hpp"
+#include "compiler/value.hpp"
 
 namespace raytrace {
   
@@ -21,10 +22,15 @@ namespace raytrace {
   typedef codegen<type_spec, compile_error>::value typecheck_value;
   typedef codegen<type_spec, compile_error>::vector typecheck_vector;
 
-  typedef errors::argument_value_join<codegen_value, typecheck_value>::result_value_type typed_value;
-  typedef errors::argument_value_join<codegen_value, typecheck_value>::result_type typed_value_container;
-  typedef codegen<typed_value, compile_error>::vector typed_value_vector;
+  //typedef errors::argument_value_join<codegen_value, typecheck_value>::result_value_type typed_value;
+  //typedef errors::argument_value_join<codegen_value, typecheck_value>::result_type typed_value_container;
+  //typedef codegen<typed_value, compile_error>::vector typed_value_vector;
 
+  typedef codegen<value, compile_error>::value code_value;
+  typedef errors::argument_value_join<code_value, typecheck_value>::result_value_type typed_value;
+  typedef errors::argument_value_join<code_value, typecheck_value>::result_type typed_value_container;
+  typedef codegen<typed_value, compile_error>::vector typed_value_vector;
+  
   /* A table of types. */
   typedef boost::unordered_map< std::string, std::shared_ptr<type> > type_table;
   void initialize_types(type_table &tt);
@@ -56,21 +62,24 @@ namespace raytrace {
 				   llvm::Module *module, llvm::IRBuilder<> &builder) const { return compile_error("Invalid cast"); }
 
     //destruction/copy
-    virtual codegen_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const { return nullptr; }
+    virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const {
+      return typed_value(static_cast<llvm::Value*>(nullptr), types->at(name));
+    }
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return nullptr; }
     
     virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return value; }
     
-    virtual codegen_value create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
+    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
 
     virtual llvm::Type *llvm_type() const = 0;
 
     //field access
     virtual typecheck_value field_type(const std::string &field) const;
-    virtual codegen_value access_field(const std::string &field, llvm::Value *value,
-				       llvm::Module *module, llvm::IRBuilder<> &builder) const;
-    virtual codegen_value access_field_ptr(const std::string &field, llvm::Value *value_ptr,
-					   llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual typed_value_container access_field(const std::string &field, llvm::Value *value,
+					       llvm::Module *module, llvm::IRBuilder<> &builder) const;
+
+    virtual typed_value_container access_field_ptr(const std::string &field, llvm::Value *value_ptr,
+						   llvm::Module *module, llvm::IRBuilder<> &builder) const;
 
     //operations
     virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,

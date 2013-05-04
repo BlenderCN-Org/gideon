@@ -65,6 +65,7 @@
 "dfunc" { return DISTRIBUTION_FUNC_TYPE; }
 
 "distribution" { return DISTRIBUTION; }
+"module" { return MODULE; }
 
 "extern" { return EXTERN; }
 "output" { return OUTPUT; }

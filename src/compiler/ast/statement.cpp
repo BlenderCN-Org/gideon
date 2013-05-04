@@ -13,21 +13,23 @@ raytrace::ast::expression_statement::expression_statement(parser_state *st, cons
 
 }
 
-codegen_value raytrace::ast::expression_statement::codegen(Module *module, IRBuilder<> &builder) {
-  typed_value_container result = expr->codegen_safe(module, builder);
+codegen_void raytrace::ast::expression_statement::codegen(Module *module, IRBuilder<> &builder) {
+  typed_value_container result = expr->codegen(module, builder);
   
-  boost::function<codegen_value (typed_value &val)> op = [this, module, &builder] (typed_value &val) -> codegen_value {
+  boost::function<codegen_void (typed_value &val)> op = [this, module, &builder] (typed_value &val) -> codegen_void {
     type_spec t = val.get<1>();
     if (!expr->bound() && (!t->llvm_type()->isVoidTy())) {
       //nobody captured this expression, destroy it
-      Value *ptr = CreateEntryBlockAlloca(builder, t->llvm_type(), "uncaptured_tmp");
-      builder.CreateStore(val.get<0>(), ptr, false);
-      t->destroy(ptr, module, builder);
+      if (val.get<0>().type() == value::LLVM_VALUE) {
+	Value *ptr = CreateEntryBlockAlloca(builder, t->llvm_type(), "uncaptured_tmp");
+	builder.CreateStore(val.get<0>().extract_value(), ptr, false);
+	t->destroy(ptr, module, builder);
+      }
     }
     return nullptr;
   };
 
-  return errors::codegen_call<typed_value_container, codegen_value>(result, op);
+  return errors::codegen_call<typed_value_container, codegen_void>(result, op);
 }
 
 /* Statement List */
@@ -60,15 +62,14 @@ raytrace::ast::scoped_statement::scoped_statement(parser_state *st, const statem
   
 }
 
-codegen_value raytrace::ast::scoped_statement::codegen(Module *module, IRBuilder<> &builder) {
+codegen_void raytrace::ast::scoped_statement::codegen(Module *module, IRBuilder<> &builder) {
   push_scope();
 
   typedef errors::argument_value_join<codegen_void>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> add_null_value = [] (arg_val_type &) -> codegen_value { return nullptr; };
+  boost::function<codegen_void (arg_val_type &)> add_null_value = [] (arg_val_type &) -> codegen_void { return nullptr; };
 
   codegen_void rt = statements.codegen(module, builder);
   
   pop_scope(module, builder);
-  codegen_value result = errors::codegen_call_args(add_null_value, rt);
-  return result;
+  return errors::codegen_call_args(add_null_value, rt);
 }

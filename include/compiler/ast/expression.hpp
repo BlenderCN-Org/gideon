@@ -26,17 +26,18 @@ namespace raytrace {
 		 unsigned int line_no = 0, unsigned int column_no = 0) : ast_node(st, line_no, column_no), result_type(rt) {}
       
       virtual ~expression() {}
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
-      virtual codegen_value codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
-      
-      virtual type_spec typecheck() = 0;
-      typecheck_value typecheck_safe();
 
-      virtual typed_value_container codegen_safe(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual typecheck_value typecheck() = 0;
+
+      virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
+      virtual typed_value_container codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
+
       virtual bool bound() const { return false; } //returns true if the result of this expression is bound to a variable
+      static void destroy_unbound(typed_value_container &val, llvm::Module *module, llvm::IRBuilder<> &builder);
       
-      static void destroy_unbound(typecheck_value &type, codegen_value &val, llvm::Module *module, llvm::IRBuilder<> &builder);
-      
+      //special function for use in type checking, where we may need the module's name, but can't call codegen() directly.
+      virtual code_value codegen_module();
+
     protected:
 
       type_spec result_type;
@@ -53,16 +54,17 @@ namespace raytrace {
 			unsigned int line_no, unsigned int column_no);
       virtual ~binary_expression() {}
       
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual typecheck_value typecheck();
 
-      virtual type_spec typecheck();
-      
     private:
       
       std::string op;
       expression_ptr lhs, rhs;
       
-      binop_table::op_result_value get_op();
+      typed_value_container execute_op(binop_table::op_result_value &op_func,
+				       llvm::Module *module, llvm::IRBuilder<> &builder,
+				       llvm::Value* lhs_val, llvm::Value *rhs_val);
     };
   
   };

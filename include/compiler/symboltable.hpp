@@ -31,8 +31,9 @@ namespace raytrace {
     typedef Scope scope_type;
     typedef typename Scope::entry_type entry_type;
     typedef typename Scope::key_type key_type;
+    typedef typename std::vector<Scope>::reverse_iterator scope_iterator;
 
-    scoped_symbol_table() { scope_push(""); }
+    //scoped_symbol_table() { scope_push(""); }
 
     //Searches for the given key, throwing an exception if it does not exist.
     entry_type &get(const key_type &name) {
@@ -96,6 +97,13 @@ namespace raytrace {
 
     std::string scope_name() const { return get_full_scope_name(); }
 
+    Scope &scope() { return table.back(); }
+    unsigned int depth() { return table.size(); }
+
+    //Methods for manually iterating through the nested scopes.
+    scope_iterator scope_begin() { return table.rbegin(); }
+    scope_iterator scope_end() { return table.rend(); }
+
   private:
     std::vector<Scope> table;
     std::vector<std::string> name_stack;
@@ -114,7 +122,7 @@ namespace raytrace {
       ++it;
 
       while (it != name_stack.end()) {
-	full_name_ss << "_" << *it;
+	full_name_ss << "." << *it;
 	++it;
       }
       

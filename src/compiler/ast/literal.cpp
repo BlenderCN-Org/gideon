@@ -21,23 +21,26 @@ namespace raytrace {
 
 
     template<>
-    codegen_value literal<float>::codegen(Module *, IRBuilder<> &) { return ConstantFP::get(getGlobalContext(), APFloat(value)); }
+    typed_value_container literal<float>::codegen(Module *, IRBuilder<> &) { return typed_value(ConstantFP::get(getGlobalContext(), APFloat(value)),
+												     get_literal_type<float>(state));; }
     
     template<>
-    codegen_value literal<int>::codegen(Module *, IRBuilder<> &) { return ConstantInt::get(getGlobalContext(), APInt(8*sizeof(int), value, true)); }
+    typed_value_container literal<int>::codegen(Module *, IRBuilder<> &) { return typed_value(ConstantInt::get(getGlobalContext(), APInt(8*sizeof(int), value, true)),
+												   get_literal_type<int>(state)); }
 
     template<>
-    codegen_value literal<bool>::codegen(Module *, IRBuilder<> &) { return ConstantInt::get(getGlobalContext(), APInt(1, value, true)); }
+    typed_value_container literal<bool>::codegen(Module *, IRBuilder<> &) { return typed_value(ConstantInt::get(getGlobalContext(), APInt(1, value, true)),
+												    get_literal_type<bool>(state)); }
 
     template<>
-    codegen_value literal<string>::codegen(Module *, IRBuilder<> &builder) {
+    typed_value_container literal<string>::codegen(Module *, IRBuilder<> &builder) {
       Value *is_const = ConstantInt::get(getGlobalContext(), APInt(1, true, true));
       Value *str_ptr = builder.CreateGlobalStringPtr(value, "str_data");
       
       Value *str = builder.CreateInsertValue(UndefValue::get(state->types["string"]->llvm_type()),
 					     is_const, ArrayRef<unsigned int>(0), "new_str");
       str = builder.CreateInsertValue(str, str_ptr, ArrayRef<unsigned int>(1));
-      return str;
+      return typed_value(str, state->types["string"]);
     }
     
   };

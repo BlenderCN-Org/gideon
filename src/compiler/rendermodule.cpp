@@ -68,11 +68,15 @@ Module *render_module::compile() {
   
   codegen_void result = nullptr;
   
+  parser.modules.scope_push();
+  
   for (auto ast_it = top.begin(); ast_it != top.end(); ast_it++) {
     codegen_value gen_val = (*ast_it)->codegen(module, builder);
     codegen_void val = raytrace::errors::codegen_ignore_value(gen_val);
     result = errors::merge_void_values(result, val);
   }
+
+  parser.modules.scope_pop(module, builder, false);
   
   boost::apply_visitor(report, result);
 

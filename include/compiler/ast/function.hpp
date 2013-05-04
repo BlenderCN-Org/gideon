@@ -17,20 +17,25 @@ namespace raytrace {
     class func_call : public expression {
     public:
 
-      func_call(parser_state *st, const std::string &fname,
+      func_call(parser_state *st,
+		const expression_ptr &path_expr, const std::string &fname,
 		const std::vector<expression_ptr> &args);
       virtual ~func_call() {}
-      
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
-      virtual type_spec typecheck();
 
+      virtual typecheck_value typecheck();
+      virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      
     private:
 
+      expression_ptr path_expr;
       std::string fname;
       std::vector<expression_ptr> args;
 
-      function_key get_key() const;
-      
+      typedef raytrace::codegen<function_symbol_table::entry_type*, compile_error>::value entry_or_error;
+      typed_value_vector codegen_all_args(entry_or_error &entry,
+					  llvm::Module *module, llvm::IRBuilder<> &builder,
+					  /* out */ std::vector<typed_value_container> &to_destroy);
+      entry_or_error lookup_function();
     };
 
     /* 
@@ -107,7 +112,7 @@ namespace raytrace {
       return_statement(parser_state *st, const expression_ptr &expr);
       virtual ~return_statement() {}
 
-      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual bool is_terminator() { return true; }
 
     private:

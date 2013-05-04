@@ -35,7 +35,7 @@ namespace raytrace {
     dfunc_type(type_table *types);
     virtual llvm::Type *llvm_type() const;
 
-    virtual codegen_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
     virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
 
@@ -53,6 +53,15 @@ namespace raytrace {
     context_ptr_type(type_table *types) : type(types, "context_ptr", "ctx") { }
     virtual llvm::Type *llvm_type() const;
     
+  };
+
+  //Another hidden type, used to represent a module.
+  class module_type : public type {
+  public:
+    
+    module_type(type_table *types) : type(types, "module", "mod") { }
+    virtual llvm::Type *llvm_type() const { assert("Module type has no corresponding LLVM type."); }
+
   };
 
 };
