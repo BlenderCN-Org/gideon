@@ -16,11 +16,11 @@ codegen_value ast::module::codegen(Module *module, IRBuilder<> &builder) {
     content_eval = errors::codegen_vector_push_back(content_eval, eval);
   }
   
-  pop_module(name, module, builder);
+  codegen_void save_module = pop_module(name, module, builder);
   
-  typedef errors::argument_value_join<codegen_vector>::result_value_type arg_val_type;
+  typedef errors::argument_value_join<codegen_vector, codegen_void>::result_value_type arg_val_type;
   boost::function<codegen_value (arg_val_type &)> op = [] (arg_val_type &) -> codegen_void { return nullptr; };
-  return errors::codegen_call_args(op, content_eval);
+  return errors::codegen_call_args(op, content_eval, save_module);
 }
 
 /* Import Declaration */

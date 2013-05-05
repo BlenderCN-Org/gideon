@@ -33,16 +33,25 @@ void ast::ast_node::push_module(const string &name) {
   state->modules.scope_push(name);
 }
  
-void ast::ast_node::pop_module(const string &name, Module *module, IRBuilder<> &builder) {
+codegen_void ast::ast_node::pop_module(const string &name, Module *module, IRBuilder<> &builder) {
+  codegen_void result = nullptr;
+
   //save this module
   auto scope_it = state->modules.scope_begin();
   auto parent_scope = scope_it + 1;
   if (parent_scope != state->modules.scope_end()) {
     module_ptr &module = scope_it->get_module();
-    parent_scope->get_module()->modules[name] = module;
+    auto mod_it = parent_scope->get_module()->modules.find(name);
+    if (mod_it != parent_scope->get_module()->modules.end()) {
+      stringstream err_ss;
+      err_ss << "Redeclaration of module '" << name << "'";
+      result = compile_error(err_ss.str());
+    }
+    else parent_scope->get_module()->modules[name] = module;
   }
 
   state->modules.scope_pop(module, builder, false);
+  return result;
 }
 
 void ast::ast_node::push_distribution_context(const string &name, Type *param_ptr_type, const control_state::context_loader_type &loader) {
