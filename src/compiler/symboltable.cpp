@@ -202,7 +202,7 @@ namespace raytrace {
     iterator it;
     it.name_it = start;
     it.end = table.end();
-    it.version_it = start->second.begin();
+    if (start != it.end) it.version_it = start->second.begin();
     
     return it;
   }

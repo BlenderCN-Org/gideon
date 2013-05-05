@@ -96,7 +96,6 @@ token <i> OUTPUT
 %type <global_list> global_declarations_opt global_declarations
 %type <global> global_declaration
 
-%type <id_list> identifier_list
 %type <global> import_declaration
 %type <global> module_declaration
 
@@ -168,13 +167,9 @@ function_declaration
  | external_function_declaration { $$ = $1; }
  ;
 
-identifier_list
- : IDENTIFIER { $$ = std::vector<std::string>(1, $1); }
- | identifier_list ',' IDENTIFIER { $$ = $1; $$.push_back($3); }
- ;
-
 import_declaration
- : IMPORT identifier_list ';' { $$ = nullptr; gd_data->dependencies->insert(gd_data->dependencies->end(), $2.begin(), $2.end()); }
+ : IMPORT expression ';' { $$ = ast::global_declaration_ptr(new ast::import_declaration(gd_data->state, $2,
+											yylloc.first_line, yylloc.first_column)); }
  ;
 
 module_declaration

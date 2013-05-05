@@ -21,12 +21,31 @@ namespace raytrace {
       virtual ~module() { }
 
       //Evaluates all global declarations contained within this module.
-      codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       
     private:
 
       std::string name;
       std::vector<global_declaration_ptr> content;
+
+    };
+
+    /* Imports another module's symbols into the current module. */
+    class expression;
+    class import_declaration : public global_declaration {
+    public:
+
+      typedef std::shared_ptr<expression> expression_ptr;
+
+      import_declaration(parser_state *st, const expression_ptr &module_path,
+			 unsigned int line_no, unsigned int column_no);
+      virtual ~import_declaration() { }
+
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+
+    private:
+
+      expression_ptr module_path;
 
     };
 

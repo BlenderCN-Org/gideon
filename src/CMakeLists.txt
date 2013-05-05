@@ -69,6 +69,7 @@ set(RT_SOURCE_FILES
   compiler/ast/control.cpp
   compiler/ast/distribution.cpp
   compiler/ast/module.cpp
+  compiler/ast/alias.cpp
   )
 
 find_package(BISON)

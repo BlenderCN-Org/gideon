@@ -9,5 +9,6 @@
 #include "compiler/ast/control.hpp"
 #include "compiler/ast/distribution.hpp"
 #include "compiler/ast/module.hpp"
+#include "compiler/ast/alias.hpp"
 
 #endif

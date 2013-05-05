@@ -13,7 +13,9 @@ module foo {
     }
 
     void hidden_func(float x) { return; }
-    
+
+    bool super_awesome_variable;
+    void call_me_maybe() { string s = "hi"; }
   }
 
   int my_other_global;
@@ -37,15 +39,36 @@ module foo {
   float my_global;
 
   module bar {
+    import another_module;
+    import another_module.yam;
+
     float hello() { return 3.5 + my_global; }
     int world() {
       dfunc d = my_bsdf();
       dfunc d2 = shaders.my_bsdf(7.69);
       
-      another_module.yam.my_other_global.x = 4.5;
+      another_module.yam.my_other_global.x = 4.5 + my_other_global.y;
       return my_func(another_module.yam.my_other_global.y);
+    }
+
+    bool get_boolean() {      
+      //i can also call functions
+      call_me_maybe();
+      another_module.call_me_maybe();
+      
+      return super_awesome_variable;
     }
   }
   
   void test2() { another_module.hidden_func(my_global); }
+}
+
+module bar {
+
+  import foo;
+
+  float main() {
+    return another_module.yam.my_other_global.y;
+  }
+
 }

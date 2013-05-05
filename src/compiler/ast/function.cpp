@@ -247,9 +247,6 @@ codegen_value raytrace::ast::prototype::check_for_entry() {
   function_key fkey = get_key();
   auto func_it = function_table().find(fkey);
 
-  //if (!functions().has_local(fkey)) return nullptr; //function has not been defined
-  //function_symbol_table::entry_type &entry = functions().get(fkey);
-
   if (func_it == function_table().end()) return nullptr; //function has not been defined
   function_symbol_table::entry_type &entry = *func_it;
 
