@@ -85,6 +85,15 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
 						      state->types["dfunc"], params);
     entry.func = ctor;
     function_table().set(entry.to_key(), entry);
+
+    //also export the constructor
+    exports::function_export exp;
+    exp.name = entry.name;
+    exp.full_name = entry.full_name;
+    exp.return_type = entry.return_type;
+    exp.arguments = entry.arguments;
+    state->exports.add_function(exp);
+
     return ctor;
   };
   

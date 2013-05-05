@@ -30,6 +30,8 @@ namespace raytrace {
   typedef errors::argument_value_join<code_value, typecheck_value>::result_value_type typed_value;
   typedef errors::argument_value_join<code_value, typecheck_value>::result_type typed_value_container;
   typedef codegen<typed_value, compile_error>::vector typed_value_vector;
+
+  typedef codegen<std::nullptr_t, compile_error>::vector void_vector;
   
   /* A table of types. */
   typedef boost::unordered_map< std::string, std::shared_ptr<type> > type_table;

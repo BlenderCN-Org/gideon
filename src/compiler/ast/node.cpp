@@ -31,27 +31,35 @@ void ast::ast_node::pop_function(Module *module, IRBuilder<> &builder) {
 
 void ast::ast_node::push_module(const string &name) {
   state->modules.scope_push(name);
+  state->exports.push_module(name);
 }
  
 codegen_void ast::ast_node::pop_module(const string &name, Module *module, IRBuilder<> &builder) {
-  codegen_void result = nullptr;
+  void_vector result;
 
   //save this module
   auto scope_it = state->modules.scope_begin();
   auto parent_scope = scope_it + 1;
   if (parent_scope != state->modules.scope_end()) {
+    codegen_void saved = nullptr;
     module_ptr &module = scope_it->get_module();
     auto mod_it = parent_scope->get_module()->modules.find(name);
     if (mod_it != parent_scope->get_module()->modules.end()) {
       stringstream err_ss;
       err_ss << "Redeclaration of module '" << name << "'";
-      result = compile_error(err_ss.str());
+      saved = compile_error(err_ss.str());
     }
     else parent_scope->get_module()->modules[name] = module;
+
+    result = errors::codegen_vector_push_back(result, saved);
   }
 
+  state->exports.pop_module();
   state->modules.scope_pop(module, builder, false);
-  return result;
+
+  return errors::codegen_call<void_vector, codegen_void>(result, [] (vector<std::nullptr_t> &arg) -> codegen_void {
+      return nullptr;
+    });
 }
 
 void ast::ast_node::push_distribution_context(const string &name, Type *param_ptr_type, const control_state::context_loader_type &loader) {

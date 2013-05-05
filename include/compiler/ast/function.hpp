@@ -57,7 +57,7 @@ namespace raytrace {
       virtual ~prototype() {}
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
-
+      
       const std::string &function_name() { return name; }
       void set_external(const std::string &extern_name);
       
@@ -92,7 +92,7 @@ namespace raytrace {
       virtual ~function() {}
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
-
+      
     private:
 
       prototype_ptr defn;

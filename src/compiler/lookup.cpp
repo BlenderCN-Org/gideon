@@ -23,102 +23,120 @@ namespace raytrace {
 
 };
 
-/** Lookup Functions **/
+/* Export Table */
 
-typed_value_container value_select_field(Value *value, type_spec &type,
-					 name_path::const_iterator path_start, name_path::const_iterator path_end,
-					 bool get_reference,
-					 Module *module, IRBuilder<> &builder) {
-  if (path_start == path_end) return typed_value(value, type);
-
-  typed_value_container field = (get_reference ?
-				 type->access_field_ptr(*path_start, value, module, builder) :
-				 type->access_field(*path_start, value, module, builder));
-  return errors::codegen_call(field, [&path_start, &path_end, get_reference, module, &builder] (typed_value &val) -> typed_value_container {
-      return value_select_field(val.get<0>().extract_value(), val.get<1>(), path_start+1, path_end, get_reference, module, builder);
-    });
+bool exports::variable_export::operator==(const variable_export &lhs) const {
+  return name == lhs.name;
 }
 
-typed_value_container raytrace::variable_lookup(module_symbol_table &top,
-					       variable_symbol_table &variables,
-					       const name_path &path,
-					       Module *module, IRBuilder<> &builder) {
-  const string &name = path.front();
-
-  //lookup the name in the variable table
-  try {
-    //if found, treat as field selection
-    variable_symbol_table::entry_type &var = variables.get(name);
-    return value_select_field(var.value, var.type, path.begin() + 1, path.end(), false, module, builder);
-  }
-  catch (compile_error &e) {
-    //ignore and move on
-  }
-
-  //check each module going up the stack
-  for (auto module_it = top.scope_begin(); module_it != top.scope_end(); ++module_it) {
-    module_object &curr_module = *module_it->get_module();
-
-    //check any global variables
-    auto var_it = curr_module.variables.find(name);
-    if (var_it != curr_module.variables.end()) {
-      //found global variable with correct name
-      variable_symbol_table::entry_type &var = var_it->second;
-      return value_select_field(var.value, var.type, path.begin() + 1, path.end(), false, module, builder);
-    }
-
-    //check any module names
-  }
-
-  stringstream err_ss;
-  err_ss << "Could not find variable or module named '" << name << "'";
-  return compile_error(err_ss.str());
+size_t exports::hash_value(const variable_export &v) {
+  boost::hash<std::string> hasher;
+  return hasher(v.name);
 }
 
+string exports::function_export::get_hash_string() const {
+  stringstream ss;
+  ss << name << "." << return_type->type_id;
+  for (auto it = arguments.begin(); it != arguments.end(); ++it) {
+    ss << "." << it->type->type_id;
+  }
 
-typecheck_value value_select_field_type(type_spec &type,
-					name_path::const_iterator path_start, name_path::const_iterator path_end) {
-  if (path_start == path_end) return type;
+  return ss.str();
+}
 
-  typecheck_value field_type = type->field_type(*path_start);
+bool exports::function_export::operator==(const function_export &lhs) const {
+  return get_hash_string() == lhs.get_hash_string();
+}
+
+size_t exports::hash_value(const function_export &f) {
+  boost::hash<std::string> hasher;
+  return hasher(f.get_hash_string());
+}
+
+static void indent_dump(unsigned int N) {
+  for (unsigned int i = 0; i < N; ++i) cout << " ";
+}
+
+void exports::module_export::dump(unsigned int indent) {
+  indent_dump(indent);
+  cout << "module " << name << " {" << endl;
   
-  return errors::codegen_call(field_type, [&path_start, &path_end] (type_spec &type) -> typecheck_value {
-      return value_select_field_type(type, path_start+1, path_end);
-    });
+  indent_dump(indent+2);
+  cout << "variables {" << endl;
+  for (auto var_it = variables.begin(); var_it != variables.end(); ++var_it) {
+    indent_dump(indent + 4);
+    cout << var_it->name << " | " << var_it->full_name << " | " << var_it->type->name << endl;
+  }
+  indent_dump(indent+2);
+  cout << "}" << endl;
+
+  indent_dump(indent+2);
+  cout << "functions {" << endl;
+  for (auto func_it = functions.begin(); func_it != functions.end(); ++func_it) {
+    indent_dump(indent + 4);
+    cout << func_it->get_hash_string() << " | " << func_it->full_name << endl;
+  }
+  indent_dump(indent+2);
+  cout << "}" << endl;
+  
+  for (auto mod_it = modules.begin(); mod_it != modules.end(); ++mod_it) {
+    mod_it->second->dump(indent + 2);
+  }
+
+  indent_dump(indent);
+  cout << "}" << endl << endl;
 }
 
-typecheck_value raytrace::variable_type_lookup(module_symbol_table &top,
-					       variable_symbol_table &variables,
-					       const name_path &path) {
-  const string &name = path.front();
-  
-  //lookup the name in the variable table
-  try {
-    //if found, treat as field selection
-    variable_symbol_table::entry_type &var = variables.get(name);
-    return value_select_field_type(var.type, path.begin() + 1, path.end());
+codegen_void export_table::add_variable(const variable_export &variable) {
+  if (module_stack.size() == 0) return nullptr;
+  module_export::pointer &m = module_stack.back();
+  m->variables.insert(variable);
+  return nullptr;
+}
+
+codegen_void export_table::add_function(const function_export &function) {
+  if (module_stack.size() == 0) return nullptr;
+  module_export::pointer &m = module_stack.back();
+  m->functions.insert(function);
+  return nullptr;
+}
+
+
+void export_table::push_module(const string &name) {
+  module_export::pointer m(new module_export);
+  m->name = name;
+  module_stack.push_back(m);
+}
+
+codegen_void export_table::pop_module() {
+  assert(module_stack.size() > 0);
+
+  module_export::pointer m = module_stack.back();
+  module_stack.pop_back();
+
+  boost::unordered_map<string, module_export::pointer> &table = (module_stack.size() > 0 ?
+								 module_stack.back()->modules :
+								 top_modules);
+  auto mod_it = table.find(m->name);
+  if (mod_it != table.end()) {
+    stringstream err_ss;
+    err_ss << "Redeclaration of module '" << m->name << "'";
+    return compile_error(err_ss.str());
   }
-  catch (compile_error &e) {
-    //ignore and move on
+
+  table[m->name] = m;
+  return nullptr;
+}
+
+string export_table::scope_name() {
+  stringstream ss;
+  for (auto scope_it = module_stack.begin(); scope_it != module_stack.end(); ++scope_it) {
+    ss << "." << (*scope_it)->name;
   }
+  return ss.str();
+}
 
-  //check each module going up the stack
-  for (auto module_it = top.scope_begin(); module_it != top.scope_end(); ++module_it) {
-    module_object &curr_module = *module_it->get_module();
-
-    //check any global variables
-    auto var_it = curr_module.variables.find(name);
-    if (var_it != curr_module.variables.end()) {
-      //found global variable with correct name
-      variable_symbol_table::entry_type &var = var_it->second;
-      return value_select_field_type(var.type, path.begin() + 1, path.end());
-    }
-
-    //check any module names
-  }
-
-  stringstream err_ss;
-  err_ss << "Could not find variable or module named '" << name << "'";
-  return compile_error(err_ss.str());
+void export_table::dump() {
+  for (auto mod_it = top_modules.begin(); mod_it != top_modules.end(); ++mod_it) mod_it->second->dump(0);
 }
 

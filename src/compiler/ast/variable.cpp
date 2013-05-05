@@ -91,6 +91,12 @@ raytrace::codegen_value raytrace::ast::global_variable_decl::codegen(llvm::Modul
 
   variable_symbol_table::entry_type entry(gv, type);
   global_scope.set(name, entry);
+
+  exports::variable_export exp;
+  exp.name = name;
+  exp.full_name = full_name();
+  exp.type = type;
+  state->exports.add_variable(exp);
   
   return gv;
 }

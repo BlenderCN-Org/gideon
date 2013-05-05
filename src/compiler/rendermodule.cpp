@@ -25,7 +25,6 @@ render_module::render_module(const string &name, const string &source_code) :
   binop_table::initialize_standard_ops(parser.binary_operations,
 				       parser.types);
   parse_source();
-  load_exports();
 }
 
 render_module::~render_module() { }
@@ -45,12 +44,6 @@ void render_module::parse_source() {
 
   //add a global scene pointer declaration
   top.insert(top.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(&parser, "__gd_scene", parser.types["scene_ptr"])));
-}
-
-void render_module::load_exports() {
-  for (auto ast_it = top.begin(); ast_it != top.end(); ast_it++) {
-    (*ast_it)->get_export_info();
-  }
 }
 
 Module *render_module::compile() {
@@ -79,6 +72,8 @@ Module *render_module::compile() {
   parser.modules.scope_pop(module, builder, false);
   
   boost::apply_visitor(report, result);
+
+  parser.exports.dump();
 
   optimize(module);
   return module;

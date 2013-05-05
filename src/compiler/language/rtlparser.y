@@ -96,6 +96,7 @@ token <i> OUTPUT
 %type <global_list> global_declarations_opt global_declarations
 %type <global> global_declaration
 
+%type <expr> module_import_path
 %type <global> import_declaration
 %type <global> module_declaration
 
@@ -167,9 +168,14 @@ function_declaration
  | external_function_declaration { $$ = $1; }
  ;
 
+module_import_path
+ : IDENTIFIER { $$ = ast::expression_ptr(new ast::variable_ref(gd_data->state, $1)); }
+ | module_import_path '.' IDENTIFIER { $$ = ast::expression_ptr(new ast::field_selection(gd_data->state, $3, $1, yylloc.first_line, yylloc.first_column)); }
+ ;
+
 import_declaration
- : IMPORT expression ';' { $$ = ast::global_declaration_ptr(new ast::import_declaration(gd_data->state, $2,
-											yylloc.first_line, yylloc.first_column)); }
+ : IMPORT module_import_path ';' { $$ = ast::global_declaration_ptr(new ast::import_declaration(gd_data->state, $2,
+												yylloc.first_line, yylloc.first_column)); }
  ;
 
 module_declaration

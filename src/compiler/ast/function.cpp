@@ -230,6 +230,16 @@ codegen_value raytrace::ast::prototype::codegen(Module *module, IRBuilder<> &bui
     entry.member_function = member_function;
     
     function_table().set(entry.to_key(), entry);
+
+    if (!member_function) {
+      exports::function_export exp;
+      exp.name = entry.name;
+      exp.full_name = entry.full_name;
+      exp.return_type = entry.return_type;
+      exp.arguments = entry.arguments;
+      state->exports.add_function(exp);
+    }
+
     return f;
   };
 
@@ -348,7 +358,6 @@ codegen_value raytrace::ast::function::create_function(Value *& val, Module *mod
     //check for a terminator
     BasicBlock *func_end = builder.GetInsertBlock();
     if (!func_end->getTerminator()) {
-      f->dump();
       //no terminator - add if return type is void, error otherwise
       if (f->getReturnType()->isVoidTy()) builder.CreateRetVoid();
       else return compile_error("No return statement in a non-void function");

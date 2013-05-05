@@ -44,7 +44,7 @@ namespace raytrace {
       virtual ~global_variable_decl() { }
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder <> &builder);
-
+      
     private:
       
       std::string name;

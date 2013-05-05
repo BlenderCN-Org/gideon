@@ -33,6 +33,12 @@ codegen_value ast::global_variable_alias::codegen(Module *module, IRBuilder<> &)
   
   variable_symbol_table::entry_type entry(alias, type);
   global_scope.set(alias_name, entry);
+
+  exports::variable_export exp;
+  exp.name = alias_name;
+  exp.full_name = full_name;
+  exp.type = type;
+  state->exports.add_variable(exp);
   
   return alias;
 }
@@ -67,6 +73,7 @@ codegen_value ast::function_alias::codegen(Module *module, IRBuilder<> &builder)
   }
 
   function_entry alias_entry = function_entry::make_entry(alias_name, function_scope_name(), func.return_type, func.arguments);
+  alias_entry.full_name = func.full_name;
   alias_entry.member_function = func.member_function;
   alias_entry.external = false;
   
@@ -75,5 +82,15 @@ codegen_value ast::function_alias::codegen(Module *module, IRBuilder<> &builder)
   alias_entry.func = cast<Function>(func_obj);
   
   function_table().set(alias_entry.to_key(), alias_entry);
+
+  if (!func.member_function) {
+    exports::function_export exp;
+    exp.name = alias_entry.name;
+    exp.full_name = alias_entry.full_name;
+    exp.return_type = alias_entry.return_type;
+    exp.arguments = alias_entry.arguments;
+    state->exports.add_function(exp);
+  }
+
   return func_obj;
 }

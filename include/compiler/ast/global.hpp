@@ -14,9 +14,6 @@ namespace raytrace {
       global_declaration(parser_state *st) : ast_node(st) {}
       virtual ~global_declaration() {}
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
-
-      //If this declaration is visible to other modules, save all the necessary data (like a function prototype) here.
-      virtual void get_export_info() { }
     };
 
     typedef std::shared_ptr<global_declaration> global_declaration_ptr;

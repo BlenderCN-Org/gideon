@@ -46,21 +46,69 @@ namespace raytrace {
   };
 
   typedef scoped_symbol_table<module_scope> module_symbol_table;
-  
-  //Defines a full path to a variable / function name.
-  //This is used to determine what module should be searched for symbol lookups.
-  typedef std::vector<std::string> name_path;
 
-  //Performs a variable using the given path.
-  typed_value_container variable_lookup(module_symbol_table &top,
-					variable_symbol_table &variables,
-					const name_path &path,
-					llvm::Module *module, llvm::IRBuilder<> &builder);
+  /* Types describing data exported by syntax tree nodes. */
+  namespace exports {
 
-  typecheck_value variable_type_lookup(module_symbol_table &top,
-				       variable_symbol_table &variables,
-				       const name_path &path);
-  
+    struct variable_export {
+      std::string name, full_name;
+      type_spec type;
+
+      bool operator==(const variable_export &lhs) const;
+    };
+
+    size_t hash_value(const variable_export &v);
+
+    struct function_export {
+      std::string name, full_name;
+      type_spec return_type;
+      std::vector<function_argument> arguments;
+
+      std::string get_hash_string() const;
+      bool operator==(const function_export &lhs) const;
+    };
+
+    size_t hash_value(const function_export &f);
+
+    struct module_export {
+      typedef std::shared_ptr<module_export> pointer;
+
+      std::string name;
+      boost::unordered_set<variable_export> variables;
+      boost::unordered_set<function_export> functions;
+      boost::unordered_map<std::string, pointer> modules;
+
+      void dump(unsigned int indent);
+    };    
+
+  };
+
+  /* Table describing variables, functions and modules exported by a source file. */
+  struct export_table {
+  public:
+
+    typedef exports::variable_export variable_export;
+    typedef exports::function_export function_export;
+    typedef exports::module_export module_export;
+
+    //adds a new export to the current module
+    codegen_void add_variable(const variable_export &variable);
+    codegen_void add_function(const function_export &function);
+
+    void push_module(const std::string &name);
+    codegen_void pop_module();
+
+    std::string scope_name();
+    
+    void dump();
+
+  private:
+
+    boost::unordered_map<std::string, module_export::pointer> top_modules;
+    std::vector<module_export::pointer> module_stack;
+
+  };
+
 };
 
 #endif

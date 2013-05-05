@@ -72,6 +72,7 @@ codegen_value ast::import_declaration::codegen(Module *module, IRBuilder<> &buil
 	alias_results = errors::codegen_vector_push_back(alias_results, err_val);
       }
       
+      export_module(mod_it->first, mod_it->second);
       curr_m->modules.insert(*mod_it);
     }
 
@@ -81,4 +82,36 @@ codegen_value ast::import_declaration::codegen(Module *module, IRBuilder<> &buil
   };
   
   return errors::codegen_call<code_value, codegen_value>(m, import_func);
+}
+
+void ast::import_declaration::export_module(const string &name, module_ptr &m) {
+  state->exports.push_module(name);
+
+  //export all variables
+  for (auto var_it = m->variables.begin(); var_it != m->variables.end(); ++var_it) {
+    variable_scope::entry_type &entry = var_it->second;
+    exports::variable_export exp;
+    exp.name = var_it->first;
+    exp.full_name = entry.value->getName();
+    exp.type = entry.type;
+    state->exports.add_variable(exp);
+  }
+
+  //export all functions
+  for (auto func_it = m->functions.begin(); func_it != m->functions.end(); ++func_it) {
+    function_scope::entry_type &entry = *func_it;
+    exports::function_export exp;
+    exp.name = entry.name;
+    exp.full_name = entry.full_name;
+    exp.return_type = entry.return_type;
+    exp.arguments = entry.arguments;
+    state->exports.add_function(exp);
+  }
+
+  //recursively export submodules
+  for (auto mod_it = m->modules.begin(); mod_it != m->modules.end(); ++mod_it) {
+    export_module(mod_it->first, mod_it->second);
+  }
+
+  state->exports.pop_module();
 }

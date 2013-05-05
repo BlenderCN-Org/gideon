@@ -17,6 +17,7 @@ namespace raytrace {
       function_symbol_table functions;
       module_symbol_table modules;
       
+      export_table exports;
       type_table types;
       binop_table binary_operations;
       control_state control;

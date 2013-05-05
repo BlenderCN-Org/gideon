@@ -65,10 +65,13 @@ module foo {
 
 module bar {
 
+  float main();
+
   import foo;
 
   float main() {
-    return another_module.yam.my_other_global.y;
+    foo.bar.call_me_maybe();
+    return another_module.yam.my_other_global.y + foo.bar.my_other_global.x;
   }
 
 }

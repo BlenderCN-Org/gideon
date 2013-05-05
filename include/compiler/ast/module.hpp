@@ -44,9 +44,11 @@ namespace raytrace {
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
 
     private:
-
+      
       expression_ptr module_path;
 
+      void export_module(const std::string &name, module_ptr &m);
+      
     };
 
   };
