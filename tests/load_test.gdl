@@ -1,0 +1,19 @@
+load "../tests/helper_module.gdl";
+load "../tests/helper_module.gdl"; //does not load a module twice
+
+module monkey {
+  import help.foo;
+  
+  extern void my_other_extern_func(output vec4 in, output vec4 out) : gde_poopy_func_face2;
+}
+
+void my_main_func(float x) {
+  vec4 f = vec4(1.0, x, 3.0, help.foo.bar());
+  f.z = monkey.bar();
+
+  vec4 g;
+  help.my_extern_func(f, g);
+  monkey.my_other_extern_func(f, g);
+
+  f = help.do_something_vector(f) + g;
+}

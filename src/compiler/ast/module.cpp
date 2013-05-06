@@ -1,6 +1,7 @@
 #include "compiler/ast/module.hpp"
 #include "compiler/ast/expression.hpp"
 #include "compiler/ast/alias.hpp"
+#include "compiler/rendermodule.hpp"
 
 using namespace raytrace;
 using namespace llvm;
@@ -114,4 +115,96 @@ void ast::import_declaration::export_module(const string &name, module_ptr &m) {
   }
 
   state->exports.pop_module();
+}
+
+/* Load Declaration */
+
+ast::load_declaration::load_declaration(parser_state *st, const string &source_name,
+					unsigned int line_no, unsigned int column_no) :
+  global_declaration(st),
+  source_name(source_name),
+  line_no(line_no), column_no(column_no)
+{
+  
+}
+
+codegen_value ast::load_declaration::codegen(Module *module, IRBuilder<> &builder) {
+  if (is_loaded()) return nullptr; //only load a module once
+  if (!has_export_table()) {
+    stringstream err_ss;
+    err_ss << "Unable to load file '" << source_name << "'";
+    return compile_error(err_ss.str());
+  }
+
+  export_table &exports = get_export_table();
+  
+  codegen_vector results;
+  vector<global_declaration_ptr> subtree = generate_subtree(exports);
+
+  for (auto it = subtree.begin(); it != subtree.end(); ++it) {
+    codegen_value v = (*it)->codegen(module, builder);
+    results = errors::codegen_vector_push_back(results, v);
+  }
+
+  set_loaded();
+  
+  return errors::codegen_call<codegen_vector, codegen_value>(results, [] (vector<Value*> &arg) -> codegen_value {
+      return nullptr;
+    });
+}
+
+bool ast::load_declaration::has_export_table() {
+  return state->objects->has_object(source_name);
+}
+
+export_table &ast::load_declaration::get_export_table() {
+  return state->objects->get_export_table(source_name);
+}
+
+bool ast::load_declaration::is_loaded() {
+  return (state->object_is_loaded.find(source_name) != state->object_is_loaded.end());
+}
+
+void ast::load_declaration::set_loaded() {
+  state->object_is_loaded.insert(source_name);
+}
+
+vector<ast::global_declaration_ptr> ast::load_declaration::generate_subtree(export_table &exports) {
+  vector<global_declaration_ptr> imported;
+  for (auto mod_it = exports.top_begin(); mod_it != exports.top_end(); ++mod_it) {
+    imported.push_back(get_module_content(mod_it->second));
+  }
+  return imported;
+}
+
+ast::global_declaration_ptr ast::load_declaration::get_module_content(exports::module_export::pointer &m) {
+  vector<global_declaration_ptr> module_content;
+  
+  //alias all variables
+  for (auto var_it = m->variables.begin(); var_it != m->variables.end(); ++var_it) {
+    module_content.push_back(ast::global_declaration_ptr(new ast::global_variable_alias(state, var_it->full_name, var_it->type,
+											var_it->name, line_no, column_no)));
+  }
+  
+  //alias all functions
+  for (auto func_it = m->functions.begin(); func_it != m->functions.end(); ++func_it) {
+    function_entry entry;
+    entry.name = func_it->name;
+    entry.full_name = func_it->full_name;
+    entry.external = false;
+    entry.member_function = false;
+    entry.return_type = func_it->return_type;
+    
+    entry.arguments = func_it->arguments;
+    module_content.push_back(ast::global_declaration_ptr(new ast::function_alias(state, entry, func_it->name,
+										 line_no, column_no)));
+  }
+  
+  //copy in all submodules
+  for (auto mod_it = m->modules.begin(); mod_it != m->modules.end(); ++mod_it) {
+    module_content.push_back(get_module_content(mod_it->second));
+  }
+
+  return ast::global_declaration_ptr(new ast::module(state, m->name, module_content,
+						     line_no, column_no));
 }

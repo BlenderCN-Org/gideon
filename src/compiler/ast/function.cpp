@@ -123,7 +123,7 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
 
     Function *f = entry->func;
     bool is_member_function = entry->member_function;
-  
+    
     size_t expected_size = entry->arguments.size();
     size_t found_args = args.size();
     if (is_member_function) found_args--;
@@ -154,7 +154,7 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
       }
 
       arg_vals.push_back(arg.get<0>().extract_value());
-
+      
       ++arg_it;
       ++arg_idx;
     }
@@ -234,7 +234,7 @@ codegen_value raytrace::ast::prototype::codegen(Module *module, IRBuilder<> &bui
     if (!member_function) {
       exports::function_export exp;
       exp.name = entry.name;
-      exp.full_name = entry.full_name;
+      exp.full_name = name_to_use;
       exp.return_type = entry.return_type;
       exp.arguments = entry.arguments;
       state->exports.add_function(exp);

@@ -9,6 +9,8 @@
 
 namespace raytrace {
 
+  class render_program;
+
   namespace ast {
     
     /* Stores the state of the language parser. */
@@ -18,9 +20,14 @@ namespace raytrace {
       module_symbol_table modules;
       
       export_table exports;
-      type_table types;
+      type_table &types;
       binop_table binary_operations;
       control_state control;
+
+      render_program *objects;
+      boost::unordered_set<std::string> object_is_loaded;
+      
+      parser_state(type_table &t) : types(t) { }
     };
     
     class ast_node { 

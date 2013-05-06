@@ -1,0 +1,14 @@
+
+module help {
+
+  vec4 do_something_vector(vec4 v) {
+    return vec4(v.w, v.z, v.y, v.x);
+  }
+
+  module foo {
+    float bar() { return 7.3; }
+  }
+
+  extern void my_extern_func(output vec4 in, output vec4 out) : gde_poopy_func_face;
+
+}

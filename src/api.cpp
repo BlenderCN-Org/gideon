@@ -381,11 +381,9 @@ extern "C" {
     boost::function<float ()> rng = bind(uniform_dist, rand_engine);
     auto rng_ptr = &rng;
 
-    ifstream render_file("/home/curtis/Projects/relatively-crazy/tests/render_loop.gdl");
-    string source((istreambuf_iterator<char>(render_file)), istreambuf_iterator<char>());
-    //cout << "Source Code: " << endl << source << endl;
-    render_module render("test_loop", source);
-    Module *module = render.compile();
+    render_program prog("demo_render");
+    prog.load_source_file("/home/curtis/Projects/relatively-crazy/tests/render_loop.gdl");
+    Module *module = prog.compile();
     verifyModule(*module);
     module->dump();
     
@@ -395,11 +393,11 @@ extern "C" {
 
     string error_str;
     ExecutionEngine *engine = EngineBuilder(module).setErrorStr(&error_str).create();
-    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_scene")), (void*)&sd_loc);
-    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_output")), (void*)&rgba_out);
-    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal("__gd_rng")), (void*)&rng_ptr);
+    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(".__gd_scene")), (void*)&sd_loc);
+    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(".__gd_output")), (void*)&rgba_out);
+    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(".__gd_rng")), (void*)&rng_ptr);
 
-    void *fptr = engine->getPointerToFunction(module->getFunction("gdi__2_main_i_i"));
+    void *fptr = engine->getPointerToFunction(module->getFunction("gdi..2.main.i.i"));
     void (*render_entry)(int, int) = (void (*)(int, int))(fptr);
 
     render_entry(s->resolution.x, s->resolution.y);

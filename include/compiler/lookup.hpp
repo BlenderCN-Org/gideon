@@ -102,6 +102,9 @@ namespace raytrace {
     
     void dump();
 
+    boost::unordered_map<std::string, module_export::pointer>::iterator top_begin() { return top_modules.begin(); }
+    boost::unordered_map<std::string, module_export::pointer>::iterator top_end() { return top_modules.end(); }
+
   private:
 
     boost::unordered_map<std::string, module_export::pointer> top_modules;

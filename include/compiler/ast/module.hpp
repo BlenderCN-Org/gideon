@@ -51,6 +51,32 @@ namespace raytrace {
       
     };
 
+    /* Loads exports from an export table into this current syntax tree. */
+    class load_declaration : public global_declaration {
+    public:
+
+      load_declaration(parser_state *st, const std::string &source_name,
+		       unsigned int line_no, unsigned int column_no);
+      virtual ~load_declaration() { }
+
+      virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+
+    private:
+
+      std::string source_name;
+
+      bool has_export_table();
+      export_table &get_export_table();
+      std::vector<global_declaration_ptr> generate_subtree(export_table &exports);
+      global_declaration_ptr get_module_content(exports::module_export::pointer &m);
+
+      bool is_loaded();
+      void set_loaded();
+
+      unsigned int line_no, column_no;
+
+    };
+
   };
 
 };

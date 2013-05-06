@@ -77,6 +77,7 @@
 "continue" { return CONTINUE; }
 
 "import" { return IMPORT; }
+"load" { return LOAD; }
 
 "true" { yylval->i = 1; return BOOL_LITERAL; }
 "false" { yylval->i = 0; return BOOL_LITERAL; }

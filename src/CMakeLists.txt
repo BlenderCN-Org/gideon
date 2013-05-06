@@ -83,17 +83,16 @@ set(RT_PARSER_LEXER_SOURCE ${BISON_rtl_parser_OUTPUTS} ${FLEX_rtl_scanner_OUTPUT
 set(LLVM_INCLUDE_DIR /usr/local/include)
 set(LLVM_DEFINITIONS -D_DEBUG -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS)
 set(LLVM_LIB_DIR /usr/local/lib)
-set(LLVM_LIBS LLVMX86AsmParser LLVMX86Disassembler LLVMX86CodeGen LLVMSelectionDAG LLVMAsmPrinter
-  LLVMMCParser LLVMX86Desc LLVMX86Info LLVMX86AsmPrinter LLVMX86Utils LLVMJIT LLVMRuntimeDyld
-  LLVMExecutionEngine LLVMCodeGen LLVMScalarOpts LLVMInstCombine LLVMTransformUtils LLVMipa
-  LLVMAnalysis LLVMTarget LLVMMC LLVMObject LLVMCore LLVMSupport)
+set(LLVM_LIBS 
+  LLVMAsmParser LLVMInstrumentation LLVMLinker LLVMArchive LLVMBitReader LLVMDebugInfo LLVMJIT LLVMipo LLVMVectorize LLVMBitWriter LLVMTableGen LLVMHexagonCodeGen LLVMHexagonAsmPrinter LLVMHexagonDesc LLVMHexagonInfo LLVMNVPTXCodeGen LLVMNVPTXDesc LLVMNVPTXInfo LLVMNVPTXAsmPrinter LLVMMBlazeDisassembler LLVMMBlazeAsmParser LLVMMBlazeCodeGen LLVMMBlazeDesc LLVMMBlazeInfo LLVMMBlazeAsmPrinter LLVMCppBackendCodeGen LLVMCppBackendInfo LLVMMSP430CodeGen LLVMMSP430Desc LLVMMSP430AsmPrinter LLVMMSP430Info LLVMXCoreCodeGen LLVMXCoreDesc LLVMXCoreInfo LLVMCellSPUCodeGen LLVMCellSPUDesc LLVMCellSPUInfo LLVMMipsDisassembler LLVMMipsCodeGen LLVMMipsAsmParser LLVMMipsDesc LLVMMipsInfo LLVMMipsAsmPrinter LLVMARMDisassembler LLVMARMAsmParser LLVMARMCodeGen LLVMARMDesc LLVMARMInfo LLVMARMAsmPrinter LLVMPowerPCCodeGen LLVMPowerPCDesc LLVMPowerPCInfo LLVMPowerPCAsmPrinter LLVMSparcCodeGen LLVMSparcDesc LLVMSparcInfo LLVMX86AsmParser LLVMX86Disassembler LLVMX86CodeGen LLVMSelectionDAG LLVMAsmPrinter LLVMX86Desc LLVMX86Info LLVMX86AsmPrinter LLVMX86Utils LLVMMCDisassembler LLVMMCParser LLVMInterpreter LLVMCodeGen LLVMScalarOpts LLVMInstCombine LLVMTransformUtils LLVMipa LLVMAnalysis LLVMMCJIT LLVMRuntimeDyld LLVMExecutionEngine LLVMTarget LLVMMC LLVMObject LLVMCore LLVMSupport
+)
 
 include_directories(${RT_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
 link_directories(${LLVM_LIB_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
-#add_library(raytrace SHARED ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE})
-add_executable(raytrace ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE} ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
+add_library(raytrace SHARED ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE})
+#add_executable(raytrace ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE} ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
 
 target_link_libraries(raytrace ${LLVM_LIBS} pthread m dl)
 

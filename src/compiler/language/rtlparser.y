@@ -79,7 +79,7 @@ token <i> OUTPUT
 %token <i> BREAK CONTINUE
 %token <i> RETURN
 
-%token <i> IMPORT
+%token <i> IMPORT LOAD
 
 //Operators
 %right <i> '='
@@ -98,6 +98,7 @@ token <i> OUTPUT
 
 %type <expr> module_import_path
 %type <global> import_declaration
+%type <global> load_declaration
 %type <global> module_declaration
 
 %type <global> function_declaration
@@ -157,6 +158,7 @@ global_declarations
 global_declaration
  : function_declaration
  | typespec IDENTIFIER ';' { $$ = ast::global_declaration_ptr(new ast::global_variable_decl(gd_data->state, $2, $1)); }
+ | load_declaration
  | import_declaration
  | module_declaration
  | distribution_declaration
@@ -176,6 +178,13 @@ module_import_path
 import_declaration
  : IMPORT module_import_path ';' { $$ = ast::global_declaration_ptr(new ast::import_declaration(gd_data->state, $2,
 												yylloc.first_line, yylloc.first_column)); }
+ ;
+
+load_declaration
+ : LOAD STRING_LITERAL ';' {
+   $$ = ast::global_declaration_ptr(new ast::load_declaration(gd_data->state, $2, yylloc.first_line, yylloc.first_column));
+   gd_data->dependencies->push_back($2);
+ }
  ;
 
 module_declaration

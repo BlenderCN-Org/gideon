@@ -26,13 +26,12 @@ int main(int argc, char **argv) {
 
   InitializeNativeTarget();
   
-  ifstream render_file(argv[1]);
-  string source((istreambuf_iterator<char>(render_file)), istreambuf_iterator<char>());
-  cout << "Source Code: " << endl << source << endl;
-  render_module render2("test_loop", source);
-  Module *module2 = render2.compile();
-  module2->dump();
-  verifyModule(*module2);
+  render_program prog("test_program");
+  prog.load_source_file(argv[1]);
+  
+  Module *module = prog.compile();
+  verifyModule(*module);
+  module->dump();
   
   //delete engine;
   return 0;
