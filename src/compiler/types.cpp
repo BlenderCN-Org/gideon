@@ -39,6 +39,7 @@ void raytrace::initialize_types(type_table &tt) {
   tt["light"] = type_ptr(new light_type(&tt));
 
   tt["dfunc"] = type_ptr(new dfunc_type(&tt));
+  tt["shader_handle"] = type_ptr(new shader_handle_type(&tt));
   tt["context_ptr"] = type_ptr(new context_ptr_type(&tt));
   
   tt["module"] = type_ptr(new module_type(&tt));

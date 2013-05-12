@@ -35,6 +35,10 @@ namespace raytrace {
     dfunc_type(type_table *types);
     virtual llvm::Type *llvm_type() const;
 
+    //creates a distribution from a shader
+    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder,
+					 typed_value_vector &args) const;
+
     virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
     virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
@@ -44,6 +48,15 @@ namespace raytrace {
 
   private:
     
+  };
+
+  //Opaque type representing a shader function.
+  class shader_handle_type : public type {
+  public:
+
+    shader_handle_type(type_table *types) : type(types, "shader_handle", "sh") { }
+    virtual llvm::Type *llvm_type() const;
+
   };
 
   //Hidden placeholder type, used to pass a 'this' pointer in distributions and shaders.

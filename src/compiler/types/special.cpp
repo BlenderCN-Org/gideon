@@ -90,6 +90,51 @@ codegen_value dfunc_type::op_add(Module *module, IRBuilder<> &builder,
   return errors::codegen_call_args(op, lhs, rhs);
 }
 
+typed_value_container dfunc_type::create(Module *module, IRBuilder<> &builder,
+					 typed_value_vector &args) const {
+  boost::function<typed_value_container (vector<typed_value>&)> ctor = [this, module, &builder] (vector<typed_value> &args) -> typed_value_container {
+    vector<Value*> shader_args;
+    
+    //ensure the argument types are {shader_handle, ray, vec2, isect}.
+    vector<type_spec> expected_args({types->at("shader_handle"), types->at("ray"), types->at("vec2"), types->at("isect")});
+
+    if (args.size() != 4) {
+      stringstream err_ss;
+      err_ss << "dfunc constructor expected 4 arguments, received " << args.size();
+      return compile_error(err_ss.str());
+    }
+    for (unsigned int i = 0; i < args.size(); ++i) {
+      type_spec arg_ty = args[i].get<1>();
+      if (*arg_ty != *expected_args[i]) {
+	stringstream err_ss;
+	err_ss << "Error in argument " << i << ": Expected type '" << expected_args[i]->name << "' found '" << arg_ty->name << "'";
+	return compile_error(err_ss.str());
+      }
+    }
+    
+    auto arg_it = args.begin();
+    Value *shader_func = arg_it->get<0>().extract_value();
+    ++arg_it;
+
+    while (arg_it != args.end()) {
+      shader_args.push_back(arg_it->get<0>().extract_value());
+      ++arg_it;
+    }
+
+    return typed_value(builder.CreateCall(shader_func, shader_args), types->at("dfunc"));
+  };
+
+  return errors::codegen_call<typed_value_vector, typed_value_container>(args, ctor);
+}
+
+//Shader Handle
+
+Type *shader_handle_type::llvm_type() const {
+  vector<Type*> arg_ty({types->at("ray")->llvm_type(), types->at("vec2")->llvm_type(), types->at("isect")->llvm_type()});
+  FunctionType *ft = FunctionType::get(types->at("dfunc")->llvm_type(), arg_ty, false);
+  return ft->getPointerTo();
+}
+
 //Context Pointer
 
 Type *context_ptr_type::llvm_type() const {

@@ -64,6 +64,7 @@
 
 %token <tspec> RAY_TYPE INTERSECTION_TYPE
 %token <tspec> LIGHT_TYPE SCENE_PTR_TYPE DISTRIBUTION_FUNC_TYPE
+%token <tspec> SHADER_HANDLE_TYPE
 
 %token <tspec> FLOAT2_TYPE FLOAT3_TYPE FLOAT4_TYPE
 
@@ -234,6 +235,7 @@ simple_typename
  | LIGHT_TYPE { $$ = gd_data->state->types["light"]; }
  | SCENE_PTR_TYPE { $$ = gd_data->state->types["scene_ptr"]; }
  | DISTRIBUTION_FUNC_TYPE { $$ = gd_data->state->types["dfunc"]; }
+ | SHADER_HANDLE_TYPE { $$ = gd_data->state->types["shader_handle"]; }
  
  | RAY_TYPE { $$ = gd_data->state->types["ray"]; }
  | INTERSECTION_TYPE { $$ = gd_data->state->types["isect"]; }

@@ -63,6 +63,7 @@
 "light" { return LIGHT_TYPE; }
 "scene" { return SCENE_PTR_TYPE; }
 "dfunc" { return DISTRIBUTION_FUNC_TYPE; }
+"shader_handle" { return SHADER_HANDLE_TYPE; }
 
 "distribution" { return DISTRIBUTION; }
 "module" { return MODULE; }

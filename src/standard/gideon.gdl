@@ -21,6 +21,17 @@ module gideon {
   extern float __isect_distance(output isect i) : gde_isect_dist;
   float isect:distance(isect i) { return __isect_distance(i); }
 
+  extern int __isect_primitive_id(output isect i) : gde_isect_primitive_id;
+  int isect:primitive_id(isect i) { return __isect_primitive_id(i); }
+
+  /* Object/Primitive Access */
+
+  extern int __primitive_object_id(scene s, int p) : gde_primitive_object_id;
+  int primitive:object_id(int p) { return __primitive_object_id(__gd_scene, p); }
+
+  extern shader_handle __object_shader(scene s, int o) : gde_object_shader;
+  shader_handle object:shader(int o) { return __object_shader(__gd_scene, o); }
+
   /* Scene Query */
 
   //Traces a ray through the scene.
@@ -33,6 +44,14 @@ module gideon {
 
   bool trace(ray r, output isect hit, output int aabb_count, output int prim_count) {
     return __trace(r, hit, aabb_count, prim_count, __gd_scene);
+  }
+
+  /* Shading */
+
+  dfunc shade(ray r, vec2 coords, isect hit) {
+    int obj_id = primitive:object_id(isect:primitive_id(hit));
+    return dfunc(object:shader(obj_id),
+		 r, coords, hit);
   }
 
 }
