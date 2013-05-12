@@ -1,0 +1,38 @@
+
+/** Gideon Standard Library Functions **/
+module gideon {
+
+  /* Math */
+
+  extern float exp(float x) : gde_exp_f;
+
+  /* Camera */
+
+  //Generates a ray from the camera in the direction of the given pixel.
+  extern void __camera_shoot_ray(int x, int y, scene s, output ray r) : gde_camera_shoot_ray;
+  ray camera:shoot_ray(int x, int y) {
+    ray r;
+    __camera_shoot_ray(x, y, __gd_scene, r);
+    return r;
+  }
+
+  /* Intersection Access */
+
+  extern float __isect_distance(output isect i) : gde_isect_dist;
+  float isect:distance(isect i) { return __isect_distance(i); }
+
+  /* Scene Query */
+
+  //Traces a ray through the scene.
+  extern bool __trace(output ray r, output isect hit,
+		      output int aabb_count, output int prim_count, scene s) : gde_trace;
+  bool trace(ray r, output isect hit) {
+    int unused;
+    return __trace(r, hit, unused, unused, __gd_scene);
+  }
+
+  bool trace(ray r, output isect hit, output int aabb_count, output int prim_count) {
+    return __trace(r, hit, aabb_count, prim_count, __gd_scene);
+  }
+
+}

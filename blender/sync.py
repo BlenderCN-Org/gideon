@@ -9,6 +9,7 @@ def SyncScene(bl_scene, is_preview):
     for obj in bl_scene.objects:
         try:
             #try to load this object as a mesh first
+            print("Loading Object:", obj.name)
             m = mesh.LoadMeshObject(bl_scene, obj, is_preview)
             s.add_mesh_object(m)
         except RuntimeError:

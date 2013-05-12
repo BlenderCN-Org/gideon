@@ -48,6 +48,7 @@ namespace raytrace {
   /* LLVM Operations */
 
   binop_table::op_codegen llvm_add_i_i();
+  binop_table::op_codegen llvm_mul_i_i();
   binop_table::op_codegen llvm_lt_i_i();
 
   binop_table::op_codegen llvm_add_f_f();

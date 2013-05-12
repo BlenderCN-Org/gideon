@@ -6,10 +6,14 @@ using namespace std;
 
 /* Defines the C function versions of built-in Gideon functions. */
 
-extern "C" bool gde_trace(ray *r, intersection *i, scene_data *s) {
+extern "C" bool gde_trace(ray *r, intersection *i,
+			  int *aabb_count, int *prim_count, scene_data *s) {
   unsigned int aabb_checked, prim_checked;
-  if (s->accel->trace(*r, *i, aabb_checked, prim_checked)) return true;
-  return false;
+  bool hit = s->accel->trace(*r, *i, aabb_checked, prim_checked);
+  *aabb_count = static_cast<int>(aabb_checked);
+  *prim_count = static_cast<int>(prim_checked);
+
+  return hit;
 }
 
 extern "C" void gde_camera_shoot_ray(int x, int y, scene_data *sdata, ray *r) {
@@ -24,6 +28,9 @@ extern "C" float gde_ray_max_dist(ray *r) { return r->max_t; }
 extern "C" float gde_dot_v3(float3 *a, float3 *b) { return dot(*a, *b); }
 extern "C" void gde_normalize_v3(float3 *in, float3 *out) { *out = normalize(*in); }
 extern "C" float gde_length_v3(float3 *v) { return length(*v); }
+
+//Misc Math
+extern "C" float gde_exp_f(float x) { return expf(x); }
 
 //Shade-Tree Evaluation
 

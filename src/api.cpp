@@ -107,6 +107,47 @@ extern "C" int gde_draw_coords(int x, int y, int idx, float3 *color, void *out) 
   return idx + 4;
 }
 
+extern "C" void gde_draw_pixel(int x, int y, int width, int height, float4 *color, void *out) {
+  float *rgba_out = reinterpret_cast<float*>(out);
+  int idx = 4 * (x + width*y);
+  rgba_out[idx] = color->x;
+  rgba_out[idx+1] = color->y;
+  rgba_out[idx+2] = color->z;
+  rgba_out[idx+3] = color->w;
+}
+
+extern "C" void gde_print_stats(int aabb, int prim, int num_pixels) {
+  float avg_aabb = static_cast<float>(aabb) / num_pixels;
+  float avg_prim = static_cast<float>(prim) / num_pixels;
+
+  cout << "Bounding Boxes Checked: " << avg_aabb << " boxes / pixel" << endl;
+  cout << "Primitives Checked: " << avg_prim << " triangles / pixel" << endl;
+}
+
+float interpolate(float val, float y0, float x0, float y1, float x1) {
+  return ((val - x0) * (y1 - y0) / (x1 - x0)) + y0;
+}
+
+float jet_base(float val) {
+  if (val <= -0.75f) return 0.0f;
+  if (val <= -0.25f) return interpolate(val, 0.0f, -0.75f, 1.0f, -0.25f);
+  if (val <= 0.25f) return 1.0f;
+  if (val <= 0.75f) return interpolate(val, 1.0f, 0.25f, 0.0f, 0.75f);
+  return 0.0f;
+}
+
+extern "C" void gde_stats_to_color(int count, float k, float4 *out) {
+  float d = count;
+  d = 1.0f - expf(-k * d);
+
+  float d2 = (2.0f * d) - 1.0f;
+
+  out->x = jet_base(d2 - 0.5f);
+  out->y = jet_base(d2);
+  out->z = jet_base(d2 + 0.5f);
+  out->w = 1.0f;
+}
+
 extern "C" float gde_scene_trace(ray *r, void *sptr) {
   scene_data *sdata = reinterpret_cast<scene_data*>(sptr);
   scene *s = sdata->s;
@@ -203,6 +244,8 @@ extern "C" {
     int prim_offset = s->primitives.size();
     int tri_offset = s->triangle_verts.size();
     int object_id = s->objects.size();
+
+    cout << "Sizes: [" << num_verts << ", " << num_triangles << "]" << endl;
 
     //load all vertices
     for (unsigned int i = 0; i < num_verts; i += 3) {
@@ -382,7 +425,8 @@ extern "C" {
     auto rng_ptr = &rng;
 
     render_program prog("demo_render");
-    prog.load_source_file("/home/curtis/Projects/relatively-crazy/tests/render_loop.gdl");
+    //prog.load_source_file("/home/curtis/Projects/relatively-crazy/tests/render_loop.gdl");
+    prog.load_source_file("/home/curtis/Projects/relatively-crazy/posts/build-your-own-renderer-1/render_debug.gdl");
     Module *module = prog.compile();
     verifyModule(*module);
     module->dump();
@@ -394,8 +438,8 @@ extern "C" {
     string error_str;
     ExecutionEngine *engine = EngineBuilder(module).setErrorStr(&error_str).create();
     engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(".__gd_scene")), (void*)&sd_loc);
-    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(".__gd_output")), (void*)&rgba_out);
-    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(".__gd_rng")), (void*)&rng_ptr);
+    engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(".render.demo.__gd_output")), (void*)&rgba_out);
+    //engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(".__gd_rng")), (void*)&rng_ptr);
 
     void *fptr = engine->getPointerToFunction(module->getFunction("gdi..2.main.i.i"));
     void (*render_entry)(int, int) = (void (*)(int, int))(fptr);

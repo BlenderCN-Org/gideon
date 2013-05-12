@@ -11,6 +11,8 @@
 #include "llvm/Analysis/Passes.h"
 #include "llvm/DataLayout.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/Transforms/IPO.h"
+
 #include "llvm/Attributes.h"
 #include "llvm/Linker.h"
 
@@ -220,28 +222,27 @@ Module *render_program::compile() {
 }
 
 void render_program::optimize(Module *module) {
-  FunctionPassManager fpm(module);
+  PassManager pm;
   
   // Set up the optimizer pipeline.  Start with registering info about how the
   // target lays out data structures.
-  fpm.add(new DataLayout(module));  
-  fpm.add(createPromoteMemoryToRegisterPass());
+  pm.add(new DataLayout(module));  
+  
+  pm.add(createFunctionInliningPass());
+  pm.add(createPromoteMemoryToRegisterPass());
   
   // Provide basic AliasAnalysis support for GVN.
-  fpm.add(createBasicAliasAnalysisPass());
+  pm.add(createBasicAliasAnalysisPass());
   // Do simple "peephole" optimizations and bit-twiddling optzns.
-  fpm.add(createInstructionCombiningPass());
+  pm.add(createInstructionCombiningPass());
   // Reassociate expressions.
-  fpm.add(createReassociatePass());
+  pm.add(createReassociatePass());
   // Eliminate Common SubExpressions.
-  fpm.add(createGVNPass());
+  pm.add(createGVNPass());
   // Simplify the control flow graph (deleting unreachable blocks, etc).
-  fpm.add(createCFGSimplificationPass());
-
-  fpm.doInitialization();
-
-  Module::FunctionListType &funcs = module->getFunctionList();
-  for (auto it = funcs.begin(); it != funcs.end(); it++) fpm.run(*it);
+  pm.add(createCFGSimplificationPass());
+  
+  pm.run(*module);
 }
 
 /* Render Module */
