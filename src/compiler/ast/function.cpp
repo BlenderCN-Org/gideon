@@ -383,9 +383,9 @@ codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<
   if (builder.GetInsertBlock()->getTerminator()) return nullptr;
   
   state->control.set_scope_reaches_end(false);
-  exit_function(module, builder);
 
   if (expr == nullptr) {
+    exit_function(module, builder);
     builder.CreateRetVoid();
     return nullptr;
   }
@@ -394,7 +394,7 @@ codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<
   type_spec &expected_rt = state->control.return_type();  
   
   //make sure the expression type matches this function's return type
-  boost::function<codegen_void (typed_value &)> check = [&expected_rt, module, &builder] (typed_value &result) -> codegen_void {
+  boost::function<codegen_void (typed_value &)> check = [this, &expected_rt, module, &builder] (typed_value &result) -> codegen_void {
     type_spec t = result.get<1>();
     if (expected_rt != t) {
       stringstream err_str;
@@ -403,8 +403,12 @@ codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<
     }
     
     //some values have destructors, so make a copy to ensure that we don't have invalid data (for most types this won't make a difference).
-    Value *copy = t->copy(result.get<0>().extract_value(), module, builder);
+    Value *rt_val = result.get<0>().extract_value();
+    Value *copy = (expr->bound() ? t->copy(rt_val, module, builder) : rt_val);
+
+    exit_function(module, builder);
     builder.CreateRet(copy);
+
     return nullptr;
   };
   
