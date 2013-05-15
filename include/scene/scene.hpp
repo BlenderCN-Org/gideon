@@ -23,7 +23,7 @@ namespace raytrace {
     int2 resolution;
     
     //mesh geometry data
-    std::vector<float3> vertices;
+    std::vector<float3> vertices, vertex_normals;
     std::vector<int3> triangle_verts;
     
     //primitive list
