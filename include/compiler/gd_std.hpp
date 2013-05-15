@@ -5,6 +5,8 @@
 #include "scene/bvh.hpp"
 #include "geometry/ray.hpp"
 
+#include <boost/function.hpp>
+
 namespace gideon {
 
   namespace rl {
@@ -13,6 +15,9 @@ namespace gideon {
     struct scene_data {
       raytrace::scene *s;
       raytrace::bvh *accel;
+      boost::function<float ()> rng;
+
+      scene_data(raytrace::scene *s, raytrace::bvh *accel);
     };
 
   };

@@ -6,6 +6,36 @@ module gideon {
 
   extern float exp(float x) : gde_exp_f;
 
+  float min(float x, float y) {
+    if (x < y) return x;
+    return y;
+  }
+
+  float max(float x, float y) {
+    if (x > y) return x;
+    return y;
+  }
+
+  float clamp(float x, float low, float high) {
+    return min(max(x, low), high);
+  }
+
+  /* Random Number Generation */
+
+  extern float __random(scene s) : gde_random;
+  float random() { return __random(__gd_scene); }
+
+  /* Vector Operations */
+
+  extern float __dot_v3(output vec3 A, output vec3 B) : gde_dot_v3;
+  float dot(vec3 A, vec3 B) { return __dot_v3(A, B); }
+
+  extern void __normalize_v3(output vec3 V, output vec3 N) : gde_normalize_v3;
+  vec3 normalize(vec3 V) { vec3 N; __normalize_v3(V, N); return N; }
+
+  extern float __length_v3(output vec3 V) : gde_length_v3;
+  float length(vec3 V) { return __length_v3(V); }
+
   /* Camera */
 
   //Generates a ray from the camera in the direction of the given pixel.
@@ -16,22 +46,31 @@ module gideon {
     return r;
   }
 
-  /* Intersection Access */
+  /* Ray/Intersection Access */
 
   extern float __isect_distance(output isect i) : gde_isect_dist;
   float isect:distance(isect i) { return __isect_distance(i); }
 
+  extern void __isect_normal(output isect i, scene s, output vec3 N) : gde_isect_normal;
+  vec3 isect:normal(isect i) { vec3 N; __isect_normal(i, __gd_scene, N); return N; }
+
+  extern void __isect_smooth_normal(output isect i, scene s, output vec3 N) : gde_isect_smooth_normal;
+  vec3 isect:smooth_normal(isect i) { vec3 N; __isect_smooth_normal(i, __gd_scene, N); return N; }
+
   extern int __isect_primitive_id(output isect i) : gde_isect_primitive_id;
   int isect:primitive_id(isect i) { return __isect_primitive_id(i); }
 
+  extern void __ray_point_on_ray(output ray r, float t, output vec3 P) : gde_ray_point_on_ray;
+  vec3 ray:point_on_ray(ray r, float t) { vec3 P; __ray_point_on_ray(r, t, P); return P; }
+
+  extern void __ray_origin(output ray r, output vec3 O) : gde_ray_origin;
+  vec3 ray:origin(ray r) { vec3 O; __ray_origin(r, O); return O; }
+
   /* Object/Primitive Access */
 
-  extern int __primitive_object_id(scene s, int p) : gde_primitive_object_id;
-  int primitive:object_id(int p) { return __primitive_object_id(__gd_scene, p); }
-
-  extern shader_handle __object_shader(scene s, int o) : gde_object_shader;
-  shader_handle object:shader(int o) { return __object_shader(__gd_scene, o); }
-
+  extern shader_handle __primitive_shader(scene s, int p) : gde_primitive_shader;
+  shader_handle primitive:shader(int p) { return __primitive_shader(__gd_scene, p); }
+  
   /* Scene Query */
 
   //Traces a ray through the scene.
@@ -46,12 +85,84 @@ module gideon {
     return __trace(r, hit, aabb_count, prim_count, __gd_scene);
   }
 
-  /* Shading */
+  /* Lights */
+  
+  //Returns the number of lights in the current scene.
+  extern int __scene_num_lights(scene s) : gde_scene_num_lights;
+  int scene:num_lights() { return __scene_num_lights(__gd_scene); }
 
-  dfunc shade(ray r, vec2 coords, isect hit) {
-    int obj_id = primitive:object_id(isect:primitive_id(hit));
-    return dfunc(object:shader(obj_id),
-		 r, coords, hit);
+  //Returns a reference to a light in the scene.
+  extern void __scene_get_light(scene s, int id, output light l) : gde_scene_get_light;
+  light scene:get_light(int id) {
+    light l;
+    __scene_get_light(__gd_scene, id, l);
+    return l;
   }
 
+  //Given two uniform random numbers in [0, 1], samples a position on the given light.
+  //If the position's 'w' coordinate is 0, the light is directional.
+  extern void __light_sample_position(light lt, output vec3 P, float rand_u, float rand_v,
+				    output vec4 P_out) : gde_light_sample_position;
+  vec4 light:sample_position(light lt, vec3 P, float rand_u, float rand_v) {
+    vec4 P_out;
+    __light_sample_position(lt, P, rand_u, rand_v, P_out);
+    return P_out;
+  }
+  
+  //Evaluates the radiance of the light at the given point.
+  extern void __light_eval_radiance(light lt, output vec3 P, output vec3 I,
+				    output vec3 R) : gde_light_eval_radiance;
+  vec3 light:eval_radiance(light lt, vec3 P, vec3 I) {
+    vec3 R;
+    __light_eval_radiance(lt, P, I, R);
+    return R;
+  }
+  
+  /* Shading */
+
+  //Evaluates a distribution function.
+  extern void __dfunc_eval(output dfunc d,
+			   output vec3 N,
+			   output vec3 P_in, output vec3 w_in,
+			   output vec3 P_out, output vec3 w_out,
+			   output vec4 out) : gde_dfunc_eval;
+  vec4 dfunc:evaluate(dfunc d, vec3 N,
+		      vec3 P_in, vec3 w_in,
+		      vec3 P_out, vec3 w_out) {
+    vec4 out;
+    __dfunc_eval(d, N, P_in, w_in, P_out, w_out, out);
+    return out;
+  }
+
+  //Evaluates the shader of whatever object the ray hit, returning the associated distribution.
+  dfunc shade(ray r, vec2 coords, isect hit) {
+    int prim_id = isect:primitive_id(hit);
+    return dfunc(primitive:shader(prim_id), r, coords, hit);
+  }
+  
+  /* Render Output */
+
+  //Writes a color to the output buffer at the given coordinates.
+  extern void __write_pixel(int x, int y, int w, int h, output vec4 color, scene buffer) : gde_write_pixel;
+  void write_pixel(int x, int y, int w, int h, vec4 color, scene buffer) { __write_pixel(x, y, w, h, color, buffer); }
+
+  /* Builtin Distributions */
+
+  /*
+    Simple Lambertian Reflectance.
+    Parameters:
+      N -- Shading Normal
+      k -- Reflectance Factor
+      color -- Reflected Color
+  */
+  distribution lambert(vec3 N, float k, vec4 color) {
+
+    vec4 evaluate(vec3 Ng,
+		  vec3 P_in, vec3 w_in,
+		  vec3 P_out, vec3 w_out) {
+      float fac = k*dot(N, w_in);
+      return fac * color;
+    }
+    
+  }
 }
