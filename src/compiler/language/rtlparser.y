@@ -85,7 +85,7 @@ token <i> OUTPUT
 //Operators
 %right <i> '='
 
-%left <i> '<'
+%left <i> '<' '>'
 
 %left <i> '+' '-'
 %left <i> '*' '/'
@@ -387,6 +387,7 @@ binary_expression
  | expression '*' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "*", $1, $3, yylloc.first_line, yylloc.first_column)); }
  | expression '/' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "/", $1, $3, yylloc.first_line, yylloc.first_column)); }
  | expression '<' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, "<", $1, $3, yylloc.first_line, yylloc.first_column)); }
+ | expression '>' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, ">", $1, $3, yylloc.first_line, yylloc.first_column)); }
  ;
 
 %%

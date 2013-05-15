@@ -56,8 +56,12 @@ namespace raytrace {
   binop_table::op_codegen llvm_mul_f_f();
   binop_table::op_codegen llvm_div_f_f();
 
+  binop_table::op_codegen llvm_lt_f_f();
+  binop_table::op_codegen llvm_gt_f_f();
+
   binop_table::op_codegen llvm_add_vec_vec(unsigned int N, type_table &types);
   binop_table::op_codegen llvm_sub_vec_vec(unsigned int N, type_table &types);
+  binop_table::op_codegen llvm_scale_vec(unsigned int N, bool swap_order, type_table &types);
   
   binop_table::op_codegen llvm_add_str_str(llvm::Type *str_type);
  
@@ -65,7 +69,9 @@ namespace raytrace {
 
   //Helpers
 
-  llvm::Value *llvm_builtin_binop(const std::string &func_name, llvm::Type *type, llvm::Value *lhs, llvm::Value *rhs,
+  llvm::Value *llvm_builtin_binop(const std::string &func_name,
+				  llvm::Type *lhs_type, llvm::Type *rhs_type, llvm::Type *rt_type,
+				  llvm::Value *lhs, llvm::Value *rhs,
 				  llvm::Module *module, llvm::IRBuilder<> &builder);
 };
 

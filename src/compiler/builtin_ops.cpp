@@ -34,6 +34,18 @@ extern "C" void gd_builtin_sub_v4_v4(float4 *result, float4 *lhs, float4 *rhs) {
   *result = *lhs - *rhs;
 }
 
+extern "C" void gd_builtin_scale_v2(float2 *result, float *k, float2 *rhs) {
+  *result = *k * (*rhs);
+}
+
+extern "C" void gd_builtin_scale_v3(float3 *result, float *k, float3 *rhs) {
+  *result = *k * (*rhs);
+}
+
+extern "C" void gd_builtin_scale_v4(float4 *result, float *k, float4 *rhs) {
+  *result = *k * (*rhs);
+}
+
 /* String Functions */
 
 extern "C" void gd_builtin_copy_string(bool const0, char *s0,
