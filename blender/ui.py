@@ -1,6 +1,6 @@
 import bpy
 
-class CustomButtonsPanel():
+class GideonButtonsPanel():
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
@@ -10,14 +10,48 @@ class CustomButtonsPanel():
         rd = context.scene.render
         return rd.engine == 'DEMO_RAYTRACE_ENGINE'
 
+class GideonRender_Source_Panel(GideonButtonsPanel, bpy.types.Panel):
+    bl_label = "Program Sources"
 
-class CustomLampPanel(CustomButtonsPanel, bpy.types.Panel):
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        g_scene = scene.gideon
+
+        layout.prop(g_scene, "source_path", text="Search Path")
+
+        row = layout.row()
+        row.template_list("UI_UL_list", "gideon_source_list", g_scene, "sources", g_scene, "active_source_index", rows=2)
+        col = row.column(align=True)
+        col.operator('gideon.add_source', icon='ZOOMIN', text="")
+        col.operator('gideon.remove_source', icon='ZOOMOUT', text="")
+        
+        if g_scene.active_source_index >= 0:
+            active_source = g_scene.sources[g_scene.active_source_index]
+            layout.prop(active_source, "name", text="Filename")
+            layout.prop(active_source, "external", text="External")
+
+class GideonRender_Entry_Panel(GideonButtonsPanel, bpy.types.Panel):
+    bl_label = "Program Entry"
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        g_scene = scene.gideon
+
+        layout.prop(g_scene, "entry_point", text = "Entry Point")
+        layout.prop(scene.render, "tile_x", text = "Tile Width")
+        layout.prop(scene.render, "tile_y", text = "Tile Height")
+
+
+
+class CustomLampPanel(GideonButtonsPanel, bpy.types.Panel):
     bl_label = "Lamp"
     bl_context = "data"
 
     @classmethod
     def poll(cls, context):
-        return context.lamp and CustomButtonsPanel.poll(context)
+        return context.lamp and GideonButtonsPanel.poll(context)
 
     def draw(self, context):
         layout = self.layout
@@ -27,7 +61,70 @@ class CustomLampPanel(CustomButtonsPanel, bpy.types.Panel):
         layout.prop(lamp, "color", text="Color")
         layout.prop(lamp, "shadow_soft_size", text="Size")
         
+class GideonMaterialContextPanel(GideonButtonsPanel, bpy.types.Panel):
+    bl_label = ""
+    bl_context = "material"
+    bl_options = {'HIDE_HEADER'}
 
+    @classmethod
+    def poll(cls, context):
+        return (context.material or context.object) and GideonButtonsPanel.poll(context)
+
+    def draw(self, context):
+        layout = self.layout
+
+        ob = context.object
+        mat = context.material
+        slot = context.material_slot
+        space = context.space_data
+        
+        if ob:
+            row = layout.row()
+
+            row.template_list("MATERIAL_UL_matslots", "", ob, "material_slots", ob, "active_material_index", rows=2)
+
+            col = row.column(align=True)
+            col.operator("object.material_slot_add", icon='ZOOMIN', text="")
+            col.operator("object.material_slot_remove", icon='ZOOMOUT', text="")
+
+            col.menu("MATERIAL_MT_specials", icon='DOWNARROW_HLT', text="")
+
+            if ob.mode == 'EDIT':
+                row = layout.row(align=True)
+                row.operator("object.material_slot_assign", text="Assign")
+                row.operator("object.material_slot_select", text="Select")
+                row.operator("object.material_slot_deselect", text="Deselect")
+
+        split = layout.split(percentage=0.65)
+
+        if ob:
+            split.template_ID(ob, "active_material", new="material.new")
+            row = split.row()
+
+            if slot:
+                row.prop(slot, "link", text="")
+            else:
+                row.label()
+        elif mat:
+            split.template_ID(space, "pin_id")
+            split.separator()
+
+class GideonMaterialPanel(GideonButtonsPanel, bpy.types.Panel):
+    bl_label = "Settings"
+    bl_context = "material"
+
+    @classmethod
+    def poll(cls, context):
+        return context.material and GideonButtonsPanel.poll(context)
+
+    def draw(self, context):
+        layout = self.layout
+        mat = context.material
+        g_mat = mat.gideon
+
+        layout.prop(g_mat, "shader", text = "Shader")
+        layout.prop(mat, "diffuse_color", text = "Viewport Color")
+        
 def get_panels():
     return (
         bpy.types.RENDER_PT_render,
@@ -96,6 +193,7 @@ def get_panels():
         bpy.types.PARTICLE_PT_force_fields,
         bpy.types.PARTICLE_PT_vertexgroups,
         bpy.types.PARTICLE_PT_custom_props,
+        bpy.types.MATERIAL_PT_custom_props,
         )
 
 def register():

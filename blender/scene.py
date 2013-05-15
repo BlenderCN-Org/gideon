@@ -3,6 +3,9 @@ from ctypes import *
 from math import *
 import itertools
 
+from . import engine
+from . import mesh
+
 #Clean up this loader a bit.
 cdll.LoadLibrary('/home/curtis/Projects/relatively-crazy/build/src/libraytrace.so')
 LibRaytrace = CDLL('libraytrace.so')
@@ -217,3 +220,4 @@ class Scene:
 
         color_it = itertools.zip_longest(red_it, green_it, blue_it, alpha_it)
         render_layer.rect = [color for color in color_it]
+

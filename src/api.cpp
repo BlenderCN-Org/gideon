@@ -46,27 +46,13 @@ extern "C" void gde_print_string(sdata *str) {
   cout << str->data << endl;
 }
 
-extern "C" void gde_isect_normal(intersection *i, scene_data *sdata, float3 *N) {
-  scene *s = sdata->s;
-  primitive &prim = s->primitives[i->prim_idx];
-  int3 &tri = s->triangle_verts[prim.data_id];
-  vector<float3> &verts = s->vertices;
 
-  *N = compute_triangle_normal(verts[tri.x], verts[tri.y], verts[tri.z]);
-}
 
 extern "C" void gde_ray_point(ray *r, float t, float3 *P) {
   *P = r->point_on_ray(t);
 }
 
-extern "C" void gde_light_sample_position(light *lt, float3 *P, float rand_u, float rand_v,
-					  float4 *P_out) {
-  *P_out = lt->sample_position(*P, rand_u, rand_v);
-}
 
-extern "C" void gde_light_eval_radiance(light *lt, float3 *P, float3 *I, /* out */ float3 *R) {
-  *R = lt->eval_radiance(*P, *I);
-}
 
 extern "C" void gde_dir_to_point(float4 *P, float3 *O, /* out */ float3 *D, /* out */ float3 *nD) {
   *D = normalize(*O - float3{P->x, P->y, P->z});
@@ -85,14 +71,6 @@ extern "C" void gde_vec4_to_vec3(float4 *v4, float3 *v3) {
   *v3 = float3{v4->x, v4->y, v4->z};
 }
 
-extern "C" int gde_scene_num_lights(scene_data *sdata) {
-  return static_cast<int>(sdata->s->lights.size());
-}
-
-extern "C" void gde_scene_get_light(scene_data *sdata, int id, light **light_id) {
-  *light_id = &sdata->s->lights[id];
-}
-
 extern "C" float gde_gen_random(boost::function<float ()> *rng) {
   return (*rng)();
 };
@@ -108,12 +86,14 @@ extern "C" int gde_draw_coords(int x, int y, int idx, float3 *color, void *out) 
 }
 
 extern "C" void gde_draw_pixel(int x, int y, int width, int height, float4 *color, void *out) {
-  float *rgba_out = reinterpret_cast<float*>(out);
-  int idx = 4 * (x + width*y);
-  rgba_out[idx] = color->x;
-  rgba_out[idx+1] = color->y;
-  rgba_out[idx+2] = color->z;
-  rgba_out[idx+3] = color->w;
+  typedef float buffer_elem_type[4];
+  float (*buffer)[4] = reinterpret_cast<buffer_elem_type*>(out);
+  int idx = x + width*y;
+  float *pix = buffer[idx];
+  pix[0] = color->x;
+  pix[1] = color->y;
+  pix[2] = color->z;
+  pix[3] = color->w;
 }
 
 extern "C" void gde_print_stats(int aabb, int prim, int num_pixels) {
@@ -414,9 +394,7 @@ extern "C" {
     bvh accel = build_bvh_centroid_sah(s);
     cout << "...done." << endl;
     
-    scene_data sd;
-    sd.s = s;
-    sd.accel = &accel;
+    scene_data sd(s, &accel);
     scene_data *sd_loc = &sd;
 
     uniform_real_distribution<float> uniform_dist(0.0f, 1.0f);
@@ -425,8 +403,8 @@ extern "C" {
     auto rng_ptr = &rng;
 
     render_program prog("demo_render");
-    //prog.load_source_file("/home/curtis/Projects/relatively-crazy/tests/render_loop.gdl");
-    prog.load_source_file("/home/curtis/Projects/relatively-crazy/posts/build-your-own-renderer-1/render_debug.gdl");
+    prog.load_source_file("/home/curtis/Projects/relatively-crazy/tests/render_loop.gdl");
+    //prog.load_source_file("/home/curtis/Projects/relatively-crazy/posts/build-your-own-renderer-1/render_debug.gdl");
     Module *module = prog.compile();
     verifyModule(*module);
     module->dump();
@@ -585,4 +563,210 @@ extern "C" {
     //scene_demo_render_nice(sptr, rgba_out);
   }
 
+  /* Program Management */
+
+  void gd_api_initialize(const char *lib_name) {
+    InitializeNativeTarget();
+
+    string load_err;
+    sys::DynamicLibrary dylib = sys::DynamicLibrary::getPermanentLibrary(lib_name, &load_err);
+    cout << "Library Load: " << load_err << endl;
+  }
+
+  void *gd_api_create_program(const char *name) {
+    return reinterpret_cast<void*>(new render_program(name));
+  }
+
+  void gd_api_destroy_program(void *p) {
+    render_program *prog = reinterpret_cast<render_program*>(p);
+    delete prog;
+  }
+  
+  void gd_api_program_load_source(void *p, const char *fname) {
+    render_program *prog = reinterpret_cast<render_program*>(p);
+    prog->load_source_file(fname);
+  }
+
+  void *gd_api_program_compile(void *p) {
+    render_program *prog = reinterpret_cast<render_program*>(p);
+    Module *module = prog->compile();
+    module->dump();
+    return reinterpret_cast<void*>(new compiled_renderer(module));
+  }
+
+  void gd_api_destroy_renderer(void *r) {
+    compiled_renderer *render = reinterpret_cast<compiled_renderer*>(r);
+    delete render;
+  }
+
+  void *gd_api_lookup_function(void *r, const char *fname) {
+    compiled_renderer *render = reinterpret_cast<compiled_renderer*>(r);
+    return render->get_function_pointer(fname);
+  }
+
+  /* Scene Management */
+
+  void *gd_api_create_scene() {
+    return reinterpret_cast<void*>(new scene);
+  }
+
+  void gd_api_destroy_scene(void *s) {
+    scene *scn = reinterpret_cast<scene*>(s);
+    delete scn;
+  }
+
+  int gd_api_add_mesh(void *sptr,
+		      unsigned int num_verts, float *v_data, float *v_norm_data,
+		      unsigned int num_triangles, int *t_data, void *mat_data) {
+    scene *s = reinterpret_cast<scene*>(sptr);
+    
+    int vert_offset = s->vertices.size();
+    int prim_offset = s->primitives.size();
+    int tri_offset = s->triangle_verts.size();
+    int object_id = s->objects.size();
+
+    //load all vertices
+    for (unsigned int i = 0; i < num_verts; i += 3) {
+      float3 v{v_data[i], v_data[i+1], v_data[i+2]};
+      float3 vn{v_norm_data[i], v_norm_data[i+1], v_norm_data[i+2]};
+
+      s->vertices.push_back(v);
+      s->vertex_normals.push_back(vn);
+    }
+
+    //load all triangles, updating triangle vertex indices to match the global vertex array
+    for (unsigned int i = 0; i < num_triangles; i += 3) {
+      int tri_idx = static_cast<int>(s->triangle_verts.size());
+
+      int3 t{t_data[i] + vert_offset, t_data[i+1] + vert_offset, t_data[i+2] + vert_offset};
+      primitive p{primitive::PRIM_TRIANGLE, static_cast<int>(s->primitives.size()), tri_idx, object_id, -1, 0};
+      
+      s->triangle_verts.push_back(t);
+      s->primitives.push_back(p);
+    }
+
+    //add the object
+    int2 prim_range{prim_offset, static_cast<int>(s->primitives.size())};
+    int2 vert_range{vert_offset, static_cast<int>(s->vertices.size())};
+    int2 tri_range{tri_offset, static_cast<int>(s->triangle_verts.size())};
+    object *o = new object;
+    o->vert_range = vert_range;
+    o->prim_range = prim_range;
+    o->tri_range = tri_range;
+
+    s->objects.push_back(o);
+    return object_id;
+  }
+
+  void gd_api_add_texcoord(void *sptr, int object_id,
+			   const char *name, float *uv_data, unsigned int N) {
+    scene *s = reinterpret_cast<scene*>(sptr);
+    attribute *attr = new attribute(attribute::PER_CORNER, attribute_type{attribute_type::FLOAT, attribute_type::VEC2});
+
+    unsigned int num_elements = N/6; //2 coords per item, 3 items per element
+    attr->resize(num_elements);
+    
+    for (unsigned int i = 0; i < N; i += 6) {      
+      int elem_id = i / 6;
+      float2 *coord = attr->data<float2>(elem_id);
+
+      coord[0] = float2{uv_data[i], uv_data[i+1]};
+      coord[1] = float2{uv_data[i+2], uv_data[i+3]};
+      coord[2] = float2{uv_data[i+4], uv_data[i+5]};
+    }
+
+    s->objects[object_id]->attributes[name] = attr;
+  }
+
+  void gd_api_add_vertex_color(void *sptr, int object_id,
+			       const char *name, float *c_data, unsigned int N) {
+    scene *s = reinterpret_cast<scene*>(sptr);
+
+    attribute *attr = new attribute(attribute::PER_CORNER, attribute_type{attribute_type::FLOAT, attribute_type::VEC3});
+    unsigned int num_elements = N / 9;
+    attr->resize(num_elements);
+
+    for (unsigned int i = 0; i < N; i += 9) {
+      int elem_id = i / 9;
+      float3 *color = attr->data<float3>(elem_id);
+
+      color[0] = float3{c_data[i], c_data[i+1], c_data[i+2]};
+      color[1] = float3{c_data[i+3], c_data[i+4], c_data[i+5]};
+      color[2] = float3{c_data[i+6], c_data[i+7], c_data[i+8]};
+    }
+
+    s->objects[object_id]->attributes[name] = attr;
+  }
+
+  void gd_api_set_camera(void *sptr,
+			 int resolution_x, int resolution_y,
+			 float clip_start, float clip_end,
+			 float *camera_to_world_4x4,
+			 float *raster_to_camera_4x4) {
+    scene *s = reinterpret_cast<scene*>(sptr);
+    
+    s->main_camera.clip_start = clip_start;
+    s->main_camera.clip_end = clip_end;
+    
+    s->main_camera.camera_to_world = {{
+	{camera_to_world_4x4[0], camera_to_world_4x4[1], camera_to_world_4x4[2], camera_to_world_4x4[3]},
+	{camera_to_world_4x4[4], camera_to_world_4x4[5], camera_to_world_4x4[6], camera_to_world_4x4[7]},
+	{camera_to_world_4x4[8], camera_to_world_4x4[9], camera_to_world_4x4[10], camera_to_world_4x4[11]},
+	{camera_to_world_4x4[12], camera_to_world_4x4[13], camera_to_world_4x4[14], camera_to_world_4x4[15]}
+      }};
+    
+    s->main_camera.raster_to_camera = {{
+	{raster_to_camera_4x4[0], raster_to_camera_4x4[1], raster_to_camera_4x4[2], raster_to_camera_4x4[3]},
+	{raster_to_camera_4x4[4], raster_to_camera_4x4[5], raster_to_camera_4x4[6], raster_to_camera_4x4[7]},
+	{raster_to_camera_4x4[8], raster_to_camera_4x4[9], raster_to_camera_4x4[10], raster_to_camera_4x4[11]},
+	{raster_to_camera_4x4[12], raster_to_camera_4x4[13], raster_to_camera_4x4[14], raster_to_camera_4x4[15]}
+      }};
+    
+    s->resolution = {resolution_x, resolution_y};
+  }
+
+  void gd_api_add_lamp(void *sptr, float energy, float r, float g, float b, float radius,
+		       float *position) {
+    scene *s = reinterpret_cast<scene*>(sptr);
+    
+    float3 light_pt{position[0], position[1], position[2]};
+    
+    light lamp{light::POINT, {light_pt, radius},
+	energy, float3{r, g, b}};
+    s->lights.push_back(lamp);
+  }
+
+  void *gd_api_build_bvh(void *s) {
+    scene *scn = reinterpret_cast<scene*>(s);
+    cout << "Building Scene BVH..." << endl;
+
+    bvh *accel = new bvh(build_bvh_centroid_sah(scn));
+
+    cout << "...done." << endl;
+    return reinterpret_cast<void*>(accel);
+  }
+
+  void gd_api_destroy_bvh(void *b) {
+    bvh *accel = reinterpret_cast<bvh*>(b);
+    delete accel;
+  }
+
+  /* Rendering */
+
+  void gd_api_render_tile(void *s, void *p, void *b, const char *entry_name,
+			  int x, int y, int w, int h,
+			  float (*output_buffer)[4]) {
+    scene *scn = reinterpret_cast<scene*>(s);
+    compiled_renderer *program = reinterpret_cast<compiled_renderer*>(p);
+    bvh *accel = reinterpret_cast<bvh*>(b);
+
+    scene_data sdata(scn, accel);
+    scene_data *sd_loc = &sdata;
+
+    program->map_global(".__gd_scene", (void*)&sd_loc);
+    void *entry_ptr = program->get_function_pointer(entry_name);
+    
+    void (*entry)(int, int, int, int, void*) = (void (*)(int, int, int, int, void*))(entry_ptr);
+    entry(x, y, w, h, reinterpret_cast<void*>(output_buffer));
+  }
 };

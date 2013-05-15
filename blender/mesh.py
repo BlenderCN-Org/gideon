@@ -96,7 +96,7 @@ def ObjectToMesh(scene, obj, world_tfm, normal_3x3_tfm, do_preview):
     mode = 'RENDER'
     if do_preview:
         mode = 'PREVIEW'
-
+    
     bl_mesh = obj.to_mesh(scene, True, mode)
 
     #load mesh vertices and vertex normals

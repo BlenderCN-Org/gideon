@@ -9,13 +9,15 @@ bl_info = {
     "category": "Render"
 }
 
-from . import render, ui
+from . import render, ui, properties
 
 def register():
+    properties.register()
     ui.register()
     bpy.utils.register_module(__name__)
 
 
 def unregister():
     ui.unregister()
+    properties.unregister()
     bpy.utils.unregister_module(__name__)
