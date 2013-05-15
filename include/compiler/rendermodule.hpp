@@ -3,6 +3,9 @@
 
 #include "compiler/ast/ast.hpp"
 
+#include "llvm/ExecutionEngine/ExecutionEngine.h"
+#include "llvm/ExecutionEngine/JIT.h"
+
 namespace raytrace {
 
   /* A single source file in a renderer program. */
@@ -23,6 +26,22 @@ namespace raytrace {
     static llvm::Module *compile(const std::string &name, ast::parser_state *parser,
 				 std::vector<ast::global_declaration_ptr> &syntax_tree);
     
+  };
+
+  /* Compiled form of a render_program. */
+  class compiled_renderer {
+  public:
+
+    compiled_renderer(llvm::Module *module);
+
+    void *get_function_pointer(const std::string &func_name);
+    void map_global(const std::string &name, void *location_ptr);
+
+  private:
+
+    llvm::Module *module;
+    std::unique_ptr<llvm::ExecutionEngine> engine;
+
   };
 
   /* A group of objects that can be linked together to form a complete program. */

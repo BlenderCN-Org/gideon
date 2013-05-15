@@ -71,6 +71,24 @@ Module *render_object::compile(const string &name, ast::parser_state *parser,
   return module;
 }
 
+/* Compiled Renderer */
+
+compiled_renderer::compiled_renderer(Module *module) :
+  module(module),
+  engine(EngineBuilder(module).create())
+{
+  
+}
+
+void *compiled_renderer::get_function_pointer(const string &func_name) {
+  return engine->getPointerToFunction(module->getFunction(func_name));
+}
+
+void compiled_renderer::map_global(const string &name, void *location_ptr) {
+  //engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(name)), location_ptr);
+  engine->updateGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(name)), location_ptr);
+}
+
 /* Render Program */
 
 render_program::render_program(const string &name) :
