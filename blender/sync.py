@@ -29,7 +29,7 @@ class GideonScene:
         self.renderer = renderer
         
     def __del__(self):
-        engine.destroy_scene(self.gideon, self.scene)
+        pass
     
     #Converts a mesh object to Gideon's format.
     def add_mesh(self, bl_scene, obj, is_preview = False):
@@ -38,6 +38,17 @@ class GideonScene:
 
         #map material indices to shader handles
         shader_arr = (len(gd_mesh['shaders'])*ctypes.c_void_p)()
+        for shader_idx in range(len(gd_mesh['shaders'])):
+            material_slot = gd_mesh['shaders'][shader_idx]
+            mat = obj.material_slots[material_slot]
+            
+            shader_name = obj.material_slots[gd_mesh['shaders'][shader_idx]].material.gideon.shader
+            shader_func = None
+            if len(shader_name) > 0:
+                shader_func = engine.lookup_function(self.gideon, self.renderer, shader_name)
+                
+            shader_arr[shader_idx] = shader_func
+        
         gd_mesh['shaders'] = shader_arr
         
         #add the mesh to gideon
@@ -69,7 +80,7 @@ class GideonScene:
         return engine.build_bvh(self.gideon, self.scene)
 
 #Convert a Blender Scene to a Gideon Scene
-def convert_scene(bl_scene, gd_scene, program, is_preview = False):
+def convert_scene(bl_scene, gd_scene, is_preview = False):
     for obj in bl_scene.objects:
         if obj.type == 'MESH':
             gd_scene.add_mesh(bl_scene, obj, is_preview)

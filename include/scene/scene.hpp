@@ -16,7 +16,8 @@ namespace raytrace {
 
   /* Holds all geometry data for a scene. */
   struct scene {
-    ~scene();
+    //clears all primitives, objects and lights in this scene
+    void clear();
 
     //camera
     camera main_camera;
@@ -28,7 +29,7 @@ namespace raytrace {
     
     //primitive list
     std::vector<primitive> primitives;
-    std::vector<object*> objects;
+    std::vector<object_ptr> objects;
 
     //lights
     std::vector<light> lights;

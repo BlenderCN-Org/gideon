@@ -134,10 +134,14 @@ module gideon {
     return out;
   }
 
+  //Returns true if a shader handle references a valid shader function.
+  extern bool shader_handle:is_valid(shader_handle h) : gde_shader_handle_is_valid;
+  
   //Evaluates the shader of whatever object the ray hit, returning the associated distribution.
   dfunc shade(ray r, vec2 coords, isect hit) {
     int prim_id = isect:primitive_id(hit);
-    return dfunc(primitive:shader(prim_id), r, coords, hit);
+    shader_handle shader = primitive:shader(prim_id);
+    return dfunc(shader, r, coords, hit);
   }
   
   /* Render Output */

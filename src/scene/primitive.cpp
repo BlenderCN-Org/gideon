@@ -42,7 +42,7 @@ float3 raytrace::primitive_geometry_normal(const primitive &prim, const scene &a
 }
 
 int3 raytrace::primitive_get_attribute_id_per_vertex(const primitive &prim, const scene &active_scene) {
-  object *obj = active_scene.objects[prim.object_id];
+  object_ptr obj = active_scene.objects[prim.object_id];
   
   if (prim.type == primitive::PRIM_TRIANGLE) {
     int3 verts = active_scene.triangle_verts[prim.data_id];
@@ -54,12 +54,12 @@ int3 raytrace::primitive_get_attribute_id_per_vertex(const primitive &prim, cons
 }
 
 int raytrace::primitive_get_attribute_id_per_primitive(const primitive &prim, const scene &active_scene) {
-  object *obj = active_scene.objects[prim.object_id]; 
+  object_ptr obj = active_scene.objects[prim.object_id]; 
   return prim.id - obj->prim_range.x;
 }
 
 int raytrace::primitive_get_attribute_id_per_corner(const primitive &prim, const scene &active_scene) {
-  object *obj = active_scene.objects[prim.object_id]; 
+  object_ptr obj = active_scene.objects[prim.object_id]; 
   
   if (prim.type == primitive::PRIM_TRIANGLE) return prim.data_id - obj->tri_range.x;
   else return 0;

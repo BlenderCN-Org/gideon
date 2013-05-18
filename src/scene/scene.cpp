@@ -3,7 +3,13 @@
 using namespace std;
 using namespace raytrace;
 
-raytrace::scene::~scene() {
-  for (vector<object*>::iterator it = objects.begin(); it != objects.end(); it++)
-    delete *it;
+void raytrace::scene::clear() {
+  vertices.clear();
+  vertex_normals.clear();
+  triangle_verts.clear();
+
+  primitives.clear();
+  objects.clear();
+
+  lights.clear();
 }

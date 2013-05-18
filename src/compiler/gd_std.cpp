@@ -2,9 +2,12 @@
 #include "scene/scene.hpp"
 #include "geometry/triangle.hpp"
 
+#include "engine/context.hpp"
+
 #include <random>
 #include <functional>
 
+using namespace gideon;
 using namespace gideon::rl;
 using namespace raytrace;
 using namespace std;
@@ -20,7 +23,7 @@ scene_data::scene_data(scene *s, bvh *accel) :
 /* Defines the C function versions of built-in Gideon functions. */
 
 extern "C" bool gde_trace(ray *r, intersection *i,
-			  int *aabb_count, int *prim_count, scene_data *s) {
+			  int *aabb_count, int *prim_count, render_context::scene_data *s) {
   unsigned int aabb_checked, prim_checked;
   bool hit = s->accel->trace(*r, *i, aabb_checked, prim_checked);
   *aabb_count = static_cast<int>(aabb_checked);
@@ -29,15 +32,23 @@ extern "C" bool gde_trace(ray *r, intersection *i,
   return hit;
 }
 
-extern "C" void gde_camera_shoot_ray(int x, int y, scene_data *sdata, ray *r) {
+extern "C" void gde_camera_shoot_ray(int x, int y, render_context::scene_data *sdata, ray *r) {
   *r = camera_shoot_ray(sdata->s->main_camera, x, y);
+}
+
+//Primitive Functions
+
+extern "C" void *gde_primitive_shader(render_context::scene_data *sdata, int prim_id) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[prim_id];
+  return prim.shader_id;
 }
 
 //Intersection Functions
 
 extern "C" float gde_isect_dist(intersection *i) { return i->t; }
 
-extern "C" void gde_isect_normal(intersection *i, scene_data *sdata, float3 *N) {
+extern "C" void gde_isect_normal(intersection *i, render_context::scene_data *sdata, float3 *N) {
   scene *s = sdata->s;
   primitive &prim = s->primitives[i->prim_idx];
   int3 &tri = s->triangle_verts[prim.data_id];
@@ -46,7 +57,7 @@ extern "C" void gde_isect_normal(intersection *i, scene_data *sdata, float3 *N) 
   *N = compute_triangle_normal(verts[tri.x], verts[tri.y], verts[tri.z]);
 }
 
-extern "C" void gde_isect_smooth_normal(intersection *i, scene_data *sdata, float3 *N) {
+extern "C" void gde_isect_smooth_normal(intersection *i, render_context::scene_data *sdata, float3 *N) {
   scene *s = sdata->s;
   primitive &prim = s->primitives[i->prim_idx];
   int3 &tri = s->triangle_verts[prim.data_id];
@@ -55,6 +66,12 @@ extern "C" void gde_isect_smooth_normal(intersection *i, scene_data *sdata, floa
   float inv = 1.0f - i->u - i->v;
   *N = normalize(inv*vnorms[tri.x] + i->u*vnorms[tri.y] + i->v*vnorms[tri.z]);
 }
+
+extern "C" int gde_isect_primitive_id(intersection *i) {
+  return i->prim_idx;
+}
+
+/* Ray */
 
 extern "C" void gde_ray_point_on_ray(ray *r, float t, float3 *P) {
   *P = r->point_on_ray(t);
@@ -72,7 +89,7 @@ extern "C" float gde_length_v3(float3 *v) { return length(*v); }
 extern "C" float gde_exp_f(float x) { return expf(x); }
 
 extern "C" float gde_random(void *s) { 
-  scene_data *scn = reinterpret_cast<scene_data*>(s);
+  render_context::scene_data *scn = reinterpret_cast<render_context::scene_data*>(s);
   return scn->rng();
 }
 
@@ -87,13 +104,17 @@ extern "C" void gde_dfunc_eval(void *dfunc,
   shade_tree::evaluate(node, N, P_in, w_in, P_out, w_out, out);
 }
 
+extern "C" bool gde_shader_handle_is_valid(void *shader) {
+  return (shader != nullptr);
+}
+
 //Scene Access
 
-extern "C" int gde_scene_num_lights(scene_data *sdata) {
+extern "C" int gde_scene_num_lights(render_context::scene_data *sdata) {
   return static_cast<int>(sdata->s->lights.size());
 }
 
-extern "C" void gde_scene_get_light(scene_data *sdata, int id, light **light_id) {
+extern "C" void gde_scene_get_light(render_context::scene_data *sdata, int id, light **light_id) {
   *light_id = &sdata->s->lights[id];
 }
 

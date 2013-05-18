@@ -6,6 +6,8 @@
 
 #include "compiler/gd_std.hpp"
 
+#include "engine/context.hpp"
+
 #include "vm/vm.hpp"
 #include "vm/instruction.hpp"
 #include "vm/standard.hpp"
@@ -31,6 +33,7 @@ using namespace std;
 using namespace raytrace;
 using namespace llvm;
 using namespace gideon::rl;
+using namespace gideon;
 
 #define GDRL_DLL_EXPORT __attribute__ ((visibility ("default")))
 
@@ -152,7 +155,7 @@ extern "C" bool gde_isect_get_attribute3(intersection *i,
   vector<float3> &verts = s->vertices;
 
   int object_id = prim.object_id;
-  object *obj = s->objects[object_id];
+  object_ptr obj = s->objects[object_id];
   if (obj->attributes.find(attr_name) == obj->attributes.end()) return false;
 
   int attr_id = prim.data_id - obj->tri_range.x;
@@ -175,7 +178,7 @@ extern "C" bool gde_isect_get_attribute2(intersection *i,
   vector<float3> &verts = s->vertices;
 
   int object_id = prim.object_id;
-  object *obj = s->objects[object_id];
+  object_ptr obj = s->objects[object_id];
   if (obj->attributes.find(attr_name) == obj->attributes.end()) return false;
 
   int attr_id = prim.data_id - obj->tri_range.x;
@@ -243,7 +246,7 @@ extern "C" {
       int tri_idx = static_cast<int>(s->triangle_verts.size());
 
       int3 t{t_data[i] + vert_offset, t_data[i+1] + vert_offset, t_data[i+2] + vert_offset};
-      primitive p{primitive::PRIM_TRIANGLE, static_cast<int>(s->primitives.size()), tri_idx, object_id, -1, s_data[tri_idx]};
+      primitive p{primitive::PRIM_TRIANGLE, static_cast<int>(s->primitives.size()), tri_idx, object_id, -1, 0};
       
       s->triangle_verts.push_back(t);
       s->primitives.push_back(p);
@@ -253,7 +256,7 @@ extern "C" {
     int2 prim_range{prim_offset, static_cast<int>(s->primitives.size())};
     int2 vert_range{vert_offset, static_cast<int>(s->vertices.size())};
     int2 tri_range{tri_offset, static_cast<int>(s->triangle_verts.size())};
-    object *o = new object;
+    object_ptr o = object_ptr(new object);
     o->vert_range = vert_range;
     o->prim_range = prim_range;
     o->tri_range = tri_range;
@@ -483,7 +486,7 @@ extern "C" {
 	  vector<float3> &verts = s->vertices;
 
 	  int object_id = prim.object_id;
-	  object *obj = s->objects[object_id];
+	  object_ptr obj = s->objects[object_id];
 
 	  if (obj->attributes.find("uv:UVMap") != obj->attributes.end()) {
 	    int attr_id = prim.data_id - obj->tri_range.x;
@@ -563,7 +566,7 @@ extern "C" {
     //scene_demo_render_nice(sptr, rgba_out);
   }
 
-  /* Program Management */
+  /* Context Management */
 
   void gd_api_initialize(const char *lib_name) {
     InitializeNativeTarget();
@@ -572,6 +575,37 @@ extern "C" {
     sys::DynamicLibrary dylib = sys::DynamicLibrary::getPermanentLibrary(lib_name, &load_err);
     cout << "Library Load: " << load_err << endl;
   }
+
+  void *gd_api_create_context() {
+    return reinterpret_cast<void*>(new render_context);
+  }
+
+  void gd_api_destroy_context(void *ctx_ptr) {
+    render_context *ctx = reinterpret_cast<render_context*>(ctx_ptr);
+    delete ctx;
+  }
+
+  void gd_api_context_set_kernel(void *ctx_ptr, void *kernel_ptr) {
+    render_context *ctx = reinterpret_cast<render_context*>(ctx_ptr);
+    ctx->set_kernel(unique_ptr<render_kernel>(reinterpret_cast<render_kernel*>(kernel_ptr)));
+  }
+
+  void *gd_api_context_get_kernel(void *ctx_ptr) {
+    render_context *ctx = reinterpret_cast<render_context*>(ctx_ptr);
+    return reinterpret_cast<void*>(ctx->get_kernel());
+  }
+
+  void gd_api_context_set_scene(void *ctx_ptr, void *scene_ptr) {
+    render_context *ctx = reinterpret_cast<render_context*>(ctx_ptr);
+    ctx->set_scene(unique_ptr<scene>(reinterpret_cast<scene*>(scene_ptr)));
+  }
+
+  void gd_api_context_build_bvh(void *ctx_ptr) {
+    render_context *ctx = reinterpret_cast<render_context*>(ctx_ptr);
+    ctx->build_bvh();
+  }
+
+  /* Program Management */
 
   void *gd_api_create_program(const char *name) {
     return reinterpret_cast<void*>(new render_program(name));
@@ -617,7 +651,7 @@ extern "C" {
 
   int gd_api_add_mesh(void *sptr,
 		      unsigned int num_verts, float *v_data, float *v_norm_data,
-		      unsigned int num_triangles, int *t_data, void *mat_data) {
+		      unsigned int num_triangles, int *t_data, void **mat_data) {
     scene *s = reinterpret_cast<scene*>(sptr);
     
     int vert_offset = s->vertices.size();
@@ -637,9 +671,11 @@ extern "C" {
     //load all triangles, updating triangle vertex indices to match the global vertex array
     for (unsigned int i = 0; i < num_triangles; i += 3) {
       int tri_idx = static_cast<int>(s->triangle_verts.size());
+      int mat_idx = i / 3;
 
       int3 t{t_data[i] + vert_offset, t_data[i+1] + vert_offset, t_data[i+2] + vert_offset};
-      primitive p{primitive::PRIM_TRIANGLE, static_cast<int>(s->primitives.size()), tri_idx, object_id, -1, 0};
+
+      primitive p{primitive::PRIM_TRIANGLE, static_cast<int>(s->primitives.size()), tri_idx, object_id, -1, mat_data[mat_idx]};
       
       s->triangle_verts.push_back(t);
       s->primitives.push_back(p);
@@ -649,7 +685,7 @@ extern "C" {
     int2 prim_range{prim_offset, static_cast<int>(s->primitives.size())};
     int2 vert_range{vert_offset, static_cast<int>(s->vertices.size())};
     int2 tri_range{tri_offset, static_cast<int>(s->triangle_verts.size())};
-    object *o = new object;
+    object_ptr o = object_ptr(new object);
     o->vert_range = vert_range;
     o->prim_range = prim_range;
     o->tri_range = tri_range;
@@ -753,19 +789,12 @@ extern "C" {
 
   /* Rendering */
 
-  void gd_api_render_tile(void *s, void *p, void *b, const char *entry_name,
+  void gd_api_render_tile(void *ctx_ptr, const char *entry_name,
 			  int x, int y, int w, int h,
 			  float (*output_buffer)[4]) {
-    scene *scn = reinterpret_cast<scene*>(s);
-    compiled_renderer *program = reinterpret_cast<compiled_renderer*>(p);
-    bvh *accel = reinterpret_cast<bvh*>(b);
+    render_context *ctx = reinterpret_cast<render_context*>(ctx_ptr);
 
-    scene_data sdata(scn, accel);
-    scene_data *sd_loc = &sdata;
-
-    program->map_global(".__gd_scene", (void*)&sd_loc);
-    void *entry_ptr = program->get_function_pointer(entry_name);
-    
+    void *entry_ptr = ctx->get_kernel()->get_function_pointer(entry_name);    
     void (*entry)(int, int, int, int, void*) = (void (*)(int, int, int, int, void*))(entry_ptr);
     entry(x, y, w, h, reinterpret_cast<void*>(output_buffer));
   }

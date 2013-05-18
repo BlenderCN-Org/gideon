@@ -36,13 +36,14 @@ namespace raytrace {
 
     void *get_function_pointer(const std::string &func_name);
     void map_global(const std::string &name, void *location_ptr);
-
+    
   private:
-
+    
     llvm::Module *module;
     std::unique_ptr<llvm::ExecutionEngine> engine;
 
   };
+  typedef compiled_renderer render_kernel;
 
   /* A group of objects that can be linked together to form a complete program. */
   class render_program {

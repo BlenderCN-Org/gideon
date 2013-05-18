@@ -10,6 +10,41 @@ def load_gideon(path):
     init('libraytrace.so'.encode('ascii'))
     return libgideon
 
+#-- Context Management --#
+
+#Creates a new gideon context.
+def create_context(libgideon):
+    create = libgideon.gd_api_create_context
+    create.restype = c_void_p
+    return create()
+
+#Destroys a gideon context.
+def destroy_context(libgideon, context):
+    destroy = libgideon.gd_api_destroy_context
+    destroy.argtypes = [c_void_p]
+    destroy(context)
+
+#Sets the context's render kernel.
+def context_set_kernel(libgideon, context, kernel):
+    set_kernel = libgideon.gd_api_context_set_kernel
+    set_kernel.argtypes = [c_void_p, c_void_p]
+    set_kernel(context, kernel)
+
+#Sets the context's scene.
+def context_set_scene(libgideon, context, scene):
+    set_scene = libgideon.gd_api_context_set_scene
+    set_scene.argtypes = [c_void_p, c_void_p]
+    set_scene(context, scene)
+
+#Rebuild's the BVH for the context's current scene.
+def context_build_bvh(libgideon, context):
+    build = libgideon.gd_api_context_build_bvh
+    build.argtypes = [c_void_p]
+    build(context)
+
+#-- Program Management --#
+
+
 #Returns a handle to the renderer program.
 def create_program(libgideon, name):
     create = libgideon.gd_api_create_program
@@ -137,17 +172,17 @@ def scene_add_lamp(libgideon, scene, lamp):
              
 
 #Renders a tile.
-def render_tile(libgideon, scene, program, bvh,
+def render_tile(libgideon, context,
                 entry_name,
                 tile_x, tile_y, tile_w, tile_h,
                 output_buffer):
     render = libgideon.gd_api_render_tile
     
-    render.argtypes = [c_void_p, c_void_p, c_void_p, c_char_p,
+    render.argtypes = [c_void_p, c_char_p,
                        c_int, c_int, c_int, c_int,
                        POINTER(4*c_float)]
     
-    render(scene, program, bvh, entry_name,
+    render(context, entry_name,
            tile_x, tile_y, tile_w, tile_h,
            output_buffer)
     

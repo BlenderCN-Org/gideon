@@ -2,10 +2,13 @@
 #include "shading/distribution.hpp"
 #include "math/vector.hpp"
 
+#include "engine/context.hpp"
+
 #include <cstring>
 
 #include <iostream>
 
+using namespace gideon;
 using namespace raytrace;
 using namespace gideon::rl;
 using namespace std;
@@ -80,7 +83,7 @@ extern "C" char *gd_builtin_concat_string(char *s0, char *s1) {
 
 /* Scene Access Functions */
 
-extern "C" void gd_builtin_light_iterator_begin(scene_data *s,
+extern "C" void gd_builtin_light_iterator_begin(render_context::scene_data *s,
 						/* out */ void **s_ptr, /* out */ int *light_idx) {
   *s_ptr = s->s;
   *light_idx = 0;

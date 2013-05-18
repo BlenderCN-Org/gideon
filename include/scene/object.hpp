@@ -8,6 +8,8 @@
 #include "math/vector.hpp"
 #include "scene/attribute.hpp"
 
+#include <memory>
+
 namespace raytrace {
 
   /* Container for per-object attributes. */
@@ -17,6 +19,8 @@ namespace raytrace {
     int2 vert_range, prim_range, tri_range;
     std::map<std::string, attribute*> attributes;
   };
+
+  typedef std::shared_ptr<object> object_ptr;
   
 };
 

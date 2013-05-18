@@ -23,6 +23,8 @@ set(RT_SOURCE_FILES
   scene/scene.cpp
   scene/light.cpp
 
+  engine/context.cpp
+
   vm/instruction.cpp
   vm/standard.cpp
 

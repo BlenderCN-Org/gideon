@@ -8,7 +8,7 @@ namespace raytrace {
   /* Reads a per-vertex attribute over the surface of a triangle. */
   template<typename T>
   T triangle_get_attribute(attribute *attr,
-			   const primitive &prim, const object *obj,
+			   const primitive &prim, const object_ptr &obj,
 			   const scene &active_scene,
 			   const float4 &coords) {
     T *c0, *c1, *c2;
@@ -35,7 +35,7 @@ namespace raytrace {
   bool primitive_get_attribute(const primitive &prim, const scene &active_scene,
 			       const std::string &attr_name, const float4 &coords,
 			       /* out */ T &result) {
-    object *obj = active_scene.objects[prim.object_id];
+    object_ptr obj = active_scene.objects[prim.object_id];
 
     auto attr_it = obj->attributes.find(attr_name);
     if (attr_it == obj->attributes.end()) return false; //no attribute with this name
