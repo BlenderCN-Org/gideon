@@ -6,31 +6,6 @@ import itertools
 from . import engine
 from . import mesh
 
-#Clean up this loader a bit.
-cdll.LoadLibrary('/home/curtis/Projects/relatively-crazy/build/src/libraytrace.so')
-LibRaytrace = CDLL('libraytrace.so')
-LibRaytrace.rt_scene_init.restype = c_void_p
-
-LibRaytrace.rt_scene_add_mesh.restype = c_int
-LibRaytrace.rt_scene_add_mesh.argtypes = [c_void_p,
-                                          c_uint, POINTER(c_float),
-                                          c_uint, POINTER(c_int), POINTER(c_int),
-                                          ]
-
-LibRaytrace.rt_add_texcoord.argtypes = [c_void_p, c_int, c_char_p, POINTER(c_float), c_uint]
-LibRaytrace.rt_add_vcolor.argtypes = [c_void_p, c_int, c_char_p, POINTER(c_float), c_uint]
-
-LibRaytrace.rt_scene_stats.argtypes = [c_void_p]
-
-LibRaytrace.scene_set_camera.argtypes = [c_void_p,
-                                         c_int, c_int,
-                                         c_float, c_float,
-                                         POINTER(c_float), POINTER(c_float)]
-LibRaytrace.scene_add_lamp.argtypes = [c_void_p, c_float, c_float, c_float, c_float,
-                                       c_float, POINTER(c_float)]
-
-LibRaytrace.scene_demo_render.argtypes = [c_void_p, POINTER(c_float)]
-
 #Helper class used for exporting Blender scene data to the renderer.
 class Scene:
 

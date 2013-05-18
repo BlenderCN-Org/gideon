@@ -17,25 +17,40 @@ extern "C" void gd_builtin_add_v2_v2(float2 *result, float2 *lhs, float2 *rhs) {
   *result = *lhs + *rhs;
 }
 
+extern "C" void gd_builtin_mul_v2_v2(float2 *result, float2 *lhs, float2 *rhs) {
+  *result = *lhs * *rhs;
+}
+
 extern "C" void gd_builtin_sub_v2_v2(float2 *result, float2 *lhs, float2 *rhs) {
   *result = *lhs - *rhs;
 }
 
+
 extern "C" void gd_builtin_add_v3_v3(float3 *result, float3 *lhs, float3 *rhs) {
   *result = *lhs + *rhs;
+}
+
+extern "C" void gd_builtin_mul_v3_v3(float3 *result, float3 *lhs, float3 *rhs) {
+  *result = *lhs * *rhs;
 }
 
 extern "C" void gd_builtin_sub_v3_v3(float3 *result, float3 *lhs, float3 *rhs) {
   *result = *lhs - *rhs;
 }
 
+
 extern "C" void gd_builtin_add_v4_v4(float4 *result, float4 *lhs, float4 *rhs) {
   *result = *lhs + *rhs;
+}
+
+extern "C" void gd_builtin_mul_v4_v4(float4 *result, float4 *lhs, float4 *rhs) {
+  *result = *lhs * *rhs;
 }
 
 extern "C" void gd_builtin_sub_v4_v4(float4 *result, float4 *lhs, float4 *rhs) {
   *result = *lhs - *rhs;
 }
+
 
 extern "C" void gd_builtin_scale_v2(float2 *result, float *k, float2 *rhs) {
   *result = *k * (*rhs);

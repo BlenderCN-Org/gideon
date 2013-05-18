@@ -60,6 +60,7 @@ namespace raytrace {
   binop_table::op_codegen llvm_gt_f_f();
 
   binop_table::op_codegen llvm_add_vec_vec(unsigned int N, type_table &types);
+  binop_table::op_codegen llvm_mul_vec_vec(unsigned int N, type_table &types);
   binop_table::op_codegen llvm_sub_vec_vec(unsigned int N, type_table &types);
   binop_table::op_codegen llvm_scale_vec(unsigned int N, bool swap_order, type_table &types);
   

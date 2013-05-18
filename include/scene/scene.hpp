@@ -10,7 +10,6 @@
 #include "scene/light.hpp"
 
 #include "shading/distribution.hpp"
-#include "vm/program.hpp"
 
 namespace raytrace {
 
@@ -33,12 +32,6 @@ namespace raytrace {
 
     //lights
     std::vector<light> lights;
-
-    //reflectance distribution functions
-    std::vector<distribution_function> distributions;
-
-    //list of programs used by the scene's shaders and distributions
-    std::vector<program> programs;
   };
 
 };

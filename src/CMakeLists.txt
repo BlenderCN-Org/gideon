@@ -25,24 +25,7 @@ set(RT_SOURCE_FILES
 
   engine/context.cpp
 
-  vm/instruction.cpp
-  vm/standard.cpp
-
-  vm/instructions/standard/arithmetic.cpp
-  vm/instructions/standard/control.cpp
-  vm/instructions/standard/data.cpp
-  vm/instructions/standard/attributes.cpp
-  vm/instructions/standard/geometry.cpp
-  vm/instructions/standard/shading.cpp
-  vm/instructions/standard/query.cpp
-  vm/instructions/standard/debug.cpp
-
-  vm/registers.cpp
-  vm/parameters.cpp
-  vm/vm.cpp
-
   shading/distribution.cpp
-  shading/shadetree.cpp
 
   compiler/rendermodule.cpp
   compiler/types.cpp

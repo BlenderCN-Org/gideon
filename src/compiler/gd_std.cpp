@@ -96,12 +96,12 @@ extern "C" float gde_random(void *s) {
 //Shade-Tree Evaluation
 
 extern "C" void gde_dfunc_eval(void *dfunc,
-			       float3 *N,
+			       float4 *L_in,
 			       float3 *P_in, float3 *w_in,
 			       float3 *P_out, float3 *w_out,
 			       /* out */ float4 *out) {
   shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
-  shade_tree::evaluate(node, N, P_in, w_in, P_out, w_out, out);
+  shade_tree::evaluate(node, L_in, P_in, w_in, P_out, w_out, out);
 }
 
 extern "C" bool gde_shader_handle_is_valid(void *shader) {
@@ -125,7 +125,7 @@ extern "C" void gde_light_sample_position(light *lt, float3 *P, float rand_u, fl
   *P_out = lt->sample_position(*P, rand_u, rand_v);
 }
 
-extern "C" void gde_light_eval_radiance(light *lt, float3 *P, float3 *I, /* out */ float3 *R) {
+extern "C" void gde_light_eval_radiance(light *lt, float3 *P, float3 *I, /* out */ float4 *R) {
   *R = lt->eval_radiance(*P, *I);
 }
 

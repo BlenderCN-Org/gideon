@@ -26,7 +26,7 @@ namespace raytrace {
     float4 sample_position(const float3 &P, float rand_u, float rand_v) const;
     
     /* Evaluates the light emitted from a point on a light in a given direction. */
-    float3 eval_radiance(const float3 &P, const float3 &I) const;
+    float4 eval_radiance(const float3 &P, const float3 &I) const;
   };
 
 

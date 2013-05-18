@@ -68,7 +68,7 @@
 
 %token <tspec> FLOAT2_TYPE FLOAT3_TYPE FLOAT4_TYPE
 
-%token <i> DISTRIBUTION
+%token <i> DISTRIBUTION FUNCTION
 
 %token<i> MODULE
 
@@ -196,7 +196,7 @@ module_declaration
 /** Functions **/
 
 function_prototype
- : typespec IDENTIFIER '(' function_formal_params_opt ')' { $$ = ast::prototype_ptr(new ast::prototype(gd_data->state, $2, $1, $4)); }
+ : FUNCTION IDENTIFIER '(' function_formal_params_opt ')' typespec { $$ = ast::prototype_ptr(new ast::prototype(gd_data->state, $2, $6, $4)); }
  ;
 
 external_function_declaration

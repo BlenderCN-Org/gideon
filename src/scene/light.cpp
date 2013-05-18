@@ -17,9 +17,10 @@ float4 raytrace::light::sample_position(const float3 &P, float rand_u, float ran
   return {0.0f, 0.0f, 0.0f, 1.0f};
 }
 
-float3 raytrace::light::eval_radiance(const float3 &P, const float3 &I) const {
+float4 raytrace::light::eval_radiance(const float3 &P, const float3 &I) const {
   if (type == POINT) {
-    return energy*color;
+    float3 R = energy*color;
+    return {R.x, R.y, R.z, 1.0f};
   }
 
   return {0.0f, 0.0f, 0.0f};

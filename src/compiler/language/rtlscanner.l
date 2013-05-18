@@ -66,6 +66,7 @@
 "shader_handle" { return SHADER_HANDLE_TYPE; }
 
 "distribution" { return DISTRIBUTION; }
+"function" { return FUNCTION; }
 "module" { return MODULE; }
 
 "extern" { return EXTERN; }

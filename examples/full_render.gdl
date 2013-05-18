@@ -3,11 +3,11 @@ load "/home/curtis/Projects/relatively-crazy/src/standard/gideon.gdl";
 module render {
   
   module demo {
-    extern void __gen_shadow_ray(output vec3 O, output vec3 D, float max_t, output ray r) : gde_gen_ray;
-    ray shadow_ray(vec3 O, vec3 D, float max_t) { ray r; __gen_shadow_ray(O, D, max_t, r); return r; }
+    extern function __gen_shadow_ray(output vec3 O, output vec3 D, float max_t, output ray r) void : gde_gen_ray;
+    function shadow_ray(vec3 O, vec3 D, float max_t) ray { ray r; __gen_shadow_ray(O, D, max_t, r); return r; }
   }
-
-  bool in_shadow(vec3 P, vec3 P_lt) {
+  
+  function in_shadow(vec3 P, vec3 P_lt) bool {
     vec3 D = P_lt - P;
     ray r = demo.shadow_ray(P, gideon.normalize(D), gideon.length(D));
     isect hit;
@@ -16,9 +16,9 @@ module render {
     return false;
   }
 
-  vec3 light_loop(dfunc surface, vec3 N, vec3 O,
-		  vec3 P, vec3 w_out) {
-    vec3 L = vec3(0.0, 0.0, 0.0);
+  function light_loop(dfunc surface, vec3 O,
+		      vec3 P, vec3 w_out) vec4 {
+    vec4 L = vec4(0.0, 0.0, 0.0, 0.0);
 
     int num_samples = 8;
     float fN = 8.0;
@@ -37,12 +37,11 @@ module render {
 	else {
 	  //evaluate the radiance from the light
 	  vec3 I = gideon.normalize(lP - P);
-	  vec3 R = gideon.light:eval_radiance(lt, P, I);
+	  vec4 R = gideon.light:eval_radiance(lt, P, I);
 	  
 	  //shade this point
-	  vec4 refl = gideon.dfunc:evaluate(surface, N, P, I, P, w_out);
-	  
-	  L = L + inv_N * vec3(R.x*refl.x, R.y*refl.y, R.z*refl.z);
+	  vec4 refl = gideon.dfunc:evaluate(surface, R, P, I, P, w_out);
+	  L = L + inv_N * refl;
 	}
       }
     }
@@ -50,7 +49,7 @@ module render {
     return L;
   }
 
-  vec4 shade(ray r) {
+  function shade(ray r) vec4 {
     isect ray_hit; //will contain information about whatever the ray hits
     if (gideon.trace(r, ray_hit)) {
       //find the surface normal, dot it with the light
@@ -59,7 +58,7 @@ module render {
       vec3 P = gideon.ray:point_on_ray(r, gideon.isect:distance(ray_hit));
 
       dfunc surface = gideon.shade(r, vec2(0.0, 0.0), ray_hit);
-      vec3 L = light_loop(surface, N, O,
+      vec4 L = light_loop(surface, O,
 			  P, gideon.normalize(P - O));
       return vec4(L.x, L.y, L.z, 1.0);
     }
@@ -71,12 +70,12 @@ module render {
 
 module shaders {
   
-  dfunc dummy(ray r, vec2 coords, isect hit) {
+  function dummy(ray r, vec2 coords, isect hit) dfunc {
     vec3 N = gideon.isect:smooth_normal(hit);
     return gideon.lambert(N, 0.9, vec4(1.0, 1.0, 1.0, 1.0));
   }
 
-  dfunc dummy_blue(ray r, vec2 coords, isect hit) {
+  function dummy_blue(ray r, vec2 coords, isect hit) dfunc {
     vec3 N = gideon.isect:smooth_normal(hit);
     return gideon.lambert(N, 0.9, vec4(0.2, 0.2, 1.0, 1.0));
   }
@@ -84,7 +83,7 @@ module shaders {
 }
 
 //Renderer Entry Point
-void main(int x0, int y0, int width, int height, scene output_buffer) {
+function main(int x0, int y0, int width, int height, scene output_buffer) void {
   for (int y = 0; y < height; y = y + 1) {
     for (int x = 0; x < width; x = x + 1) {
       //shoot a ray from the camera to the scene

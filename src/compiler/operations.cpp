@@ -33,7 +33,7 @@ binop_table::op_result_value binop_table::find_best_operation(const std::string 
   int max_score = std::numeric_limits<int>::max();
   int best_score = max_score;
   op_candidate_vector best_list;
-
+  
   for (auto it = candidates.begin(); it != candidates.end(); ++it) {
     int score = candidate_score(it->first, lhs, rhs);
     if (score >= max_score) continue;
@@ -85,6 +85,10 @@ void binop_table::initialize_standard_ops(binop_table &table, type_table &types)
   table.add_operation("+", types["vec2"], types["vec2"], types["vec2"], llvm_add_vec_vec(2, types));
   table.add_operation("+", types["vec3"], types["vec3"], types["vec3"], llvm_add_vec_vec(3, types));
   table.add_operation("+", types["vec4"], types["vec4"], types["vec4"], llvm_add_vec_vec(4, types));
+
+  table.add_operation("*", types["vec2"], types["vec2"], types["vec2"], llvm_mul_vec_vec(2, types));
+  table.add_operation("*", types["vec3"], types["vec3"], types["vec3"], llvm_mul_vec_vec(3, types));
+  table.add_operation("*", types["vec4"], types["vec4"], types["vec4"], llvm_mul_vec_vec(4, types));
 
   table.add_operation("-", types["vec2"], types["vec2"], types["vec2"], llvm_sub_vec_vec(2, types));
   table.add_operation("-", types["vec3"], types["vec3"], types["vec3"], llvm_sub_vec_vec(3, types));
@@ -180,6 +184,22 @@ binop_table::op_codegen raytrace::llvm_add_vec_vec(unsigned int N, type_table &t
 	     Module *module, IRBuilder<> &builder) -> Value *{
     stringstream op_ss;
     op_ss << "gd_builtin_add_v" << N << "_v" << N;
+    string op_func = op_ss.str();
+
+    return llvm_builtin_binop(op_func, llvm_type, llvm_type, llvm_type,
+			      lhs, rhs, module, builder);
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_mul_vec_vec(unsigned int N, type_table &types) {
+  stringstream tname;
+  tname << "vec" << N;
+  Type *llvm_type = types[tname.str()]->llvm_type();
+
+  return [N, llvm_type] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    stringstream op_ss;
+    op_ss << "gd_builtin_mul_v" << N << "_v" << N;
     string op_func = op_ss.str();
 
     return llvm_builtin_binop(op_func, llvm_type, llvm_type, llvm_type,
