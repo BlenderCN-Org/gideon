@@ -53,7 +53,6 @@ module render {
     isect ray_hit; //will contain information about whatever the ray hits
     if (gideon.trace(r, ray_hit)) {
       //find the surface normal, dot it with the light
-      vec3 N = gideon.isect:smooth_normal(ray_hit);
       vec3 O = gideon.ray:origin(r);
       vec3 P = gideon.ray:point_on_ray(r, gideon.isect:distance(ray_hit));
 
@@ -78,6 +77,11 @@ module shaders {
   function dummy_blue(ray r, vec2 coords, isect hit) dfunc {
     vec3 N = gideon.isect:smooth_normal(hit);
     return gideon.lambert(N, 0.9, vec4(0.2, 0.2, 1.0, 1.0));
+  }
+
+  function dummy_dark(ray r, vec2 coords, isect hit) dfunc {
+    vec3 N = gideon.isect:smooth_normal(hit);
+    return gideon.lambert(N, 0.4, vec4(0.5, 0.5, 0.5, 1.0));
   }
   
 }
