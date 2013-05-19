@@ -77,11 +77,17 @@ link_directories(${LLVM_LIB_DIR})
 add_definitions(${LLVM_DEFINITIONS})
 
 add_library(raytrace SHARED ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE})
-#add_executable(raytrace ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE} ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
+add_executable(gideon_compiler ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
 
 target_link_libraries(raytrace ${LLVM_LIBS} pthread m dl)
+target_link_libraries(gideon_compiler raytrace)
 
 set_target_properties(raytrace
+  PROPERTIES
+  COMPILE_FLAGS "-std=c++0x"
+  )
+
+set_target_properties(gideon_compiler
   PROPERTIES
   COMPILE_FLAGS "-std=c++0x"
   )
