@@ -21,6 +21,7 @@ namespace raytrace {
 
   typedef codegen<type_spec, compile_error>::value typecheck_value;
   typedef codegen<type_spec, compile_error>::vector typecheck_vector;
+  
 
   //typedef errors::argument_value_join<codegen_value, typecheck_value>::result_value_type typed_value;
   //typedef errors::argument_value_join<codegen_value, typecheck_value>::result_type typed_value_container;
@@ -31,7 +32,7 @@ namespace raytrace {
   typedef errors::argument_value_join<code_value, typecheck_value>::result_type typed_value_container;
   typedef codegen<typed_value, compile_error>::vector typed_value_vector;
 
-  typedef codegen<std::nullptr_t, compile_error>::vector void_vector;
+  typedef codegen<empty_type, compile_error>::vector void_vector;
   
   /* A table of types. */
   typedef boost::unordered_map< std::string, std::shared_ptr<type> > type_table;
@@ -61,13 +62,13 @@ namespace raytrace {
       return false;
     };
     virtual codegen_value gen_cast(const type &other, llvm::Value *value,
-				   llvm::Module *module, llvm::IRBuilder<> &builder) const { return compile_error("Invalid cast"); }
+				   llvm::Module *module, llvm::IRBuilder<> &builder) const { return errors::make_error<errors::error_message>("Invalid cast", 0, 0); }
 
     //destruction/copy
     virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const {
       return typed_value(static_cast<llvm::Value*>(nullptr), types->at(name));
     }
-    virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return nullptr; }
+    virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return empty_type(); }
     
     virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return value; }
     
@@ -82,26 +83,7 @@ namespace raytrace {
 
     virtual typed_value_container access_field_ptr(const std::string &field, llvm::Value *value_ptr,
 						   llvm::Module *module, llvm::IRBuilder<> &builder) const;
-
-    //operations
-    virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-
-    virtual codegen_value op_sub(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-
-    virtual codegen_value op_mul(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
     
-    virtual codegen_value op_div(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-    
-    
-    virtual codegen_value op_less(llvm::Module *module, llvm::IRBuilder<> &builder,
-				  codegen_value &lhs, codegen_value &rhs) const;
-    
-    
-
   protected:
 
     type_table *types;

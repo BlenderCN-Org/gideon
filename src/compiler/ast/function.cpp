@@ -43,11 +43,11 @@ ast::func_call::entry_or_error ast::func_call::lookup_function() {
 
       stringstream err_ss;
       err_ss << "Undeclared function '" << fname << "'";
-      return compile_error(err_ss.str());
+      return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
     }
     else {
       code_value module_path = path_expr->codegen_module();
-      return errors::codegen_call<code_value, entry_or_error>(module_path, [&fkey] (value &val) -> entry_or_error {
+      return errors::codegen_call<code_value, entry_or_error>(module_path, [this, &fkey] (value &val) -> entry_or_error {
 	  module_ptr m = val.extract_module();
 	  function_scope &fscope = m->functions;
 	  auto func_it = fscope.find(fkey);
@@ -55,7 +55,7 @@ ast::func_call::entry_or_error ast::func_call::lookup_function() {
 
 	  stringstream err_ss;
 	  err_ss << "Could not find function named '" << fkey.name << "' in specified module.";
-	  return compile_error(err_ss.str());
+	  return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
 	});
     }
   };
@@ -131,7 +131,7 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
     if (found_args != expected_size) {
       stringstream err_str;
       err_str << "Expected " << expected_size << " arguments, found " << found_args << ".";
-      return compile_error(err_str.str());
+      return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
     }
 
     vector<Value*> arg_vals;
@@ -150,7 +150,7 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
       if (*arg_ts != *entry->arguments[arg_idx].type) {
 	stringstream err_str;
 	err_str << "Error in " << arg_idx << "-th argument: Expected type '" << entry->arguments[arg_idx].type->name << "' but found type '" << arg_ts->name << "'.";
-	return compile_error(err_str.str());
+	return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
       }
 
       arg_vals.push_back(arg.get<0>().extract_value());
@@ -263,13 +263,13 @@ codegen_value raytrace::ast::prototype::check_for_entry() {
   if (entry.external && !external) {
     stringstream err_str;
     err_str << "Function " << name << " was previously declared as external";
-    return compile_error(err_str.str());
+    return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
   }
 
   if (!entry.external && external) {
     stringstream err_str;
     err_str << "Function " << name << " was previously declared as local";
-    return compile_error(err_str.str());
+    return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
   }
 
   vector<type_spec> arg_types;
@@ -280,7 +280,7 @@ codegen_value raytrace::ast::prototype::check_for_entry() {
   if (!entry.compare(return_type, arg_types)) {
     stringstream err_str;
     err_str << "Invalid redeclaration of function: " << name;
-    return runtime_error(err_str.str());
+    return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
   }
 
   return entry.func;
@@ -312,7 +312,7 @@ codegen_value raytrace::ast::function::create_function(Value *& val, Module *mod
   Function *f = cast<Function>(val);
   if (!f->empty()) {
     string err = string("Redefinition of function: ") + defn->function_name();
-    return compile_error(err);
+    return errors::make_error<errors::error_message>(err, line_no, column_no);
   }
   
   bool is_member_function = defn->is_member_function();
@@ -360,10 +360,10 @@ codegen_value raytrace::ast::function::create_function(Value *& val, Module *mod
     if (!func_end->getTerminator()) {
       //no terminator - add if return type is void, error otherwise
       if (f->getReturnType()->isVoidTy()) builder.CreateRetVoid();
-      else return compile_error("No return statement in a non-void function");
+      else return errors::make_error<errors::error_message>("No return statement in a non-void function", line_no, column_no);
     }
     
-    if (verifyFunction(*f)) return compile_error("Error verifying function");
+    if (verifyFunction(*f)) return errors::make_error<errors::error_message>("Error verifying function", line_no, column_no);
     return f;
   };
   
@@ -380,14 +380,14 @@ raytrace::ast::return_statement::return_statement(parser_state *st, const expres
 }
 
 codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<> &builder) {
-  if (builder.GetInsertBlock()->getTerminator()) return nullptr;
+  if (builder.GetInsertBlock()->getTerminator()) return empty_type();
   
   state->control.set_scope_reaches_end(false);
 
   if (expr == nullptr) {
     exit_function(module, builder);
     builder.CreateRetVoid();
-    return nullptr;
+    return empty_type();
   }
   
   typed_value_container rt_val = expr->codegen(module, builder);
@@ -399,7 +399,7 @@ codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<
     if (expected_rt != t) {
       stringstream err_str;
       err_str << "Invalid return type '" << result.get<1>()->name << "', expected '" << expected_rt->name << "'";
-      return compile_error(err_str.str());
+      return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
     }
     
     //some values have destructors, so make a copy to ensure that we don't have invalid data (for most types this won't make a difference).
@@ -409,7 +409,7 @@ codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<
     exit_function(module, builder);
     builder.CreateRet(copy);
 
-    return nullptr;
+    return empty_type();
   };
   
   return errors::codegen_call<typed_value_container, codegen_void>(rt_val, check);

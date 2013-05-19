@@ -70,7 +70,7 @@ namespace raytrace {
     void scope_push(const std::string &scope_name = "") { table.push_back(scope_type(push_name(scope_name))); }
     
     codegen_void scope_pop(llvm::Module *module, llvm::IRBuilder<> &builder, bool destroy = true) {
-      codegen_void rt = nullptr;
+      codegen_void rt = empty_type();
       if (destroy) rt = scope_destroy(module, builder);
       table.pop_back();
       pop_name();
@@ -92,7 +92,7 @@ namespace raytrace {
 	scope.destroy(module, builder);
       }
 
-      return nullptr;
+      return empty_type();
     }
 
     std::string scope_name() const { return get_full_scope_name(); }
@@ -111,7 +111,7 @@ namespace raytrace {
     void throw_not_found(const key_type &name) {
       std::stringstream err_str;
       err_str << "Undeclared " << symbol_name<entry_type>() << ": " << Scope::key_to_string(name);
-      throw std::runtime_error(err_str.str());
+      throw errors::make_error<errors::error_message>(err_str.str(), 0, 0);
     }
 
     //Concatenates all the names of all the scopes on the stack.
@@ -279,7 +279,7 @@ namespace raytrace {
     entry_type &extract_entry(iterator it);
     
     void set(const key_type &f, const entry_type &entry);
-    codegen_void destroy(llvm::Module *module, llvm::IRBuilder<> &builder) { return nullptr; }
+    codegen_void destroy(llvm::Module *module, llvm::IRBuilder<> &builder) { return empty_type(); }
 
     static std::string key_to_string(const key_type &key) { return key.name; }
 

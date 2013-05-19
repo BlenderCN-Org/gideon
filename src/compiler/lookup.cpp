@@ -88,17 +88,17 @@ void exports::module_export::dump(unsigned int indent) {
 }
 
 codegen_void export_table::add_variable(const variable_export &variable) {
-  if (module_stack.size() == 0) return nullptr;
+  if (module_stack.size() == 0) return empty_type();
   module_export::pointer &m = module_stack.back();
   m->variables.insert(variable);
-  return nullptr;
+  return empty_type();
 }
 
 codegen_void export_table::add_function(const function_export &function) {
-  if (module_stack.size() == 0) return nullptr;
+  if (module_stack.size() == 0) return empty_type();
   module_export::pointer &m = module_stack.back();
   m->functions.insert(function);
-  return nullptr;
+  return empty_type();
 }
 
 
@@ -121,11 +121,11 @@ codegen_void export_table::pop_module() {
   if (mod_it != table.end()) {
     stringstream err_ss;
     err_ss << "Redeclaration of module '" << m->name << "'";
-    return compile_error(err_ss.str());
+    return errors::make_error<errors::error_message>(err_ss.str(), 0, 0);
   }
 
   table[m->name] = m;
-  return nullptr;
+  return empty_type();
 }
 
 string export_table::scope_name() {

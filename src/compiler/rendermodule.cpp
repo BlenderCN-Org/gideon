@@ -299,14 +299,14 @@ Module *render_module::compile() {
 
   auto report_errors = [] (compile_error &err) -> codegen_void {
     cout << "--- Error Report ---" << endl;
-    cout << err.what() << endl;
+    cout << err->report() << endl;
     exit(-1);
     
-    return nullptr;
+    return empty_type();
   };
   raytrace::errors::error_container_operation<codegen_void, codegen_void> report(report_errors);
   
-  codegen_void result = nullptr;
+  codegen_void result = empty_type();
   
   parser.modules.scope_push();
   

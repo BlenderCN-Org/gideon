@@ -17,7 +17,7 @@ raytrace::ast::conditional_statement::conditional_statement(parser_state *st, co
 codegen_void raytrace::ast::conditional_statement::codegen(Module *module, IRBuilder<> &builder) {
   typed_value_container cond_val = cond->codegen(module, builder);
   cond_val = errors::codegen_call(cond_val, [this] (typed_value &cond) -> typed_value_container {
-      if (*cond.get<1>() != *state->types["bool"]) return compile_error("Condition must be a boolean expression");
+      if (*cond.get<1>() != *state->types["bool"]) return errors::make_error<errors::error_message>("Condition must be a boolean expression", line_no, column_no);
       return cond;
     });
   
@@ -34,7 +34,7 @@ codegen_void raytrace::ast::conditional_statement::codegen(Module *module, IRBui
     //generate code for if-block
     builder.SetInsertPoint(if_bb);
     
-    codegen_void if_val = (if_branch ? if_branch->codegen(module, builder) : nullptr);
+    codegen_void if_val = (if_branch ? if_branch->codegen(module, builder) : empty_type());
     if (!builder.GetInsertBlock()->getTerminator()) builder.CreateBr(merge_bb); //only go to the merge block if we don't return
     
     if_bb = builder.GetInsertBlock();
@@ -43,7 +43,7 @@ codegen_void raytrace::ast::conditional_statement::codegen(Module *module, IRBui
     func->getBasicBlockList().push_back(else_bb);
     builder.SetInsertPoint(else_bb);
     
-    codegen_void else_val = (else_branch ? else_branch->codegen(module, builder) : nullptr);
+    codegen_void else_val = (else_branch ? else_branch->codegen(module, builder) : empty_type());
     if (!builder.GetInsertBlock()->getTerminator()) builder.CreateBr(merge_bb);
     
     else_bb = builder.GetInsertBlock();
@@ -53,7 +53,7 @@ codegen_void raytrace::ast::conditional_statement::codegen(Module *module, IRBui
     builder.SetInsertPoint(merge_bb);
 
     typedef errors::argument_value_join<codegen_void, codegen_void>::result_value_type arg_val_type;
-    boost::function<codegen_void (arg_val_type &)> check_branches = [] (arg_val_type &) -> codegen_void { return nullptr; };
+    boost::function<codegen_void (arg_val_type &)> check_branches = [] (arg_val_type &) -> codegen_void { return empty_type(); };
     return errors::codegen_call_args(check_branches, if_val, else_val);
   };
   
@@ -88,7 +88,7 @@ codegen_void raytrace::ast::for_loop_statement::codegen(Module *module, IRBuilde
   state->control.push_loop(post_bb, next_bb);
 
   //initialize the loop
-  codegen_void init_val = (init ? init->codegen(module, builder) : nullptr);
+  codegen_void init_val = (init ? init->codegen(module, builder) : empty_type());
 
   //jump into the loop condition check
   builder.CreateBr(pre_bb);
@@ -97,7 +97,7 @@ codegen_void raytrace::ast::for_loop_statement::codegen(Module *module, IRBuilde
   //evaluate and ensure that the loop condition is a bool
   typed_value_container cond_test = cond->codegen(module, builder);
   boost::function<typed_value_container (typed_value &)> bool_check = [this, &builder, loop_bb, post_bb] (typed_value &arg) -> typed_value_container {
-    if (*arg.get<1>() != *state->types["bool"]) return compile_error("Condition must be a boolean expression");
+    if (*arg.get<1>() != *state->types["bool"]) return errors::make_error<errors::error_message>("Condition must be a boolean expression", line_no, column_no);
     
     builder.CreateCondBr(arg.get<0>().extract_value(), loop_bb, post_bb);
     return arg;
@@ -109,7 +109,7 @@ codegen_void raytrace::ast::for_loop_statement::codegen(Module *module, IRBuilde
   builder.SetInsertPoint(loop_bb);
     
   //execute the body
-  codegen_void body_val = (body ? body->codegen(module, builder) : nullptr);
+  codegen_void body_val = (body ? body->codegen(module, builder) : empty_type());
   if (!builder.GetInsertBlock()->getTerminator()) builder.CreateBr(next_bb); //return to the start of the loop
   
   func->getBasicBlockList().push_back(next_bb);
@@ -127,7 +127,7 @@ codegen_void raytrace::ast::for_loop_statement::codegen(Module *module, IRBuilde
 
   //merge all the generated values to propagate any errors
   typedef raytrace::errors::argument_value_join<codegen_void, typed_value_container, codegen_void, typed_value_container>::result_value_type arg_val_type;
-  boost::function<codegen_void (arg_val_type &)> final_check = [] (arg_val_type &) { return nullptr; };
+  boost::function<codegen_void (arg_val_type &)> final_check = [] (arg_val_type &) { return empty_type(); };
   codegen_void result = errors::codegen_call_args(final_check, init_val, cond_test, body_val, after_val);
   
   if (!cond->bound()) ast::expression::destroy_unbound(cond_test, module, builder);
@@ -144,14 +144,14 @@ raytrace::ast::break_statement::break_statement(parser_state *st) :
 }
 
 codegen_void raytrace::ast::break_statement::codegen(Module *module, IRBuilder<> &builder) {
-  if (builder.GetInsertBlock()->getTerminator()) return nullptr;
-  if (!state->control.inside_loop()) return compile_error("Invalid use of 'break' outside any loop");
+  if (builder.GetInsertBlock()->getTerminator()) return empty_type();
+  if (!state->control.inside_loop()) return errors::make_error<errors::error_message>("Invalid use of 'break' outside any loop", line_no, column_no);
   state->control.set_scope_reaches_end(false);
   
   exit_loop_scopes(module, builder);
   BasicBlock *bb = state->control.post_loop();
   builder.CreateBr(bb);
-  return nullptr;
+  return empty_type();
 }
 
 /** Continue **/
@@ -163,12 +163,12 @@ raytrace::ast::continue_statement::continue_statement(parser_state *st) :
 }
 
 codegen_void raytrace::ast::continue_statement::codegen(Module *module, IRBuilder<> &builder) {
-  if (builder.GetInsertBlock()->getTerminator()) return nullptr;
-  if (!state->control.inside_loop()) return compile_error("Invalid use of 'continue' outside any loop");
+  if (builder.GetInsertBlock()->getTerminator()) return empty_type();
+  if (!state->control.inside_loop()) return errors::make_error<errors::error_message>("Invalid use of 'continue' outside any loop", line_no, column_no);
   state->control.set_scope_reaches_end(false);
 
   exit_to_loop_scope(module, builder);
   BasicBlock *bb = state->control.next_iter();
   builder.CreateBr(bb);
-  return nullptr;
+  return empty_type();
 }

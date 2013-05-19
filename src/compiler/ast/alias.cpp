@@ -22,7 +22,7 @@ codegen_value ast::global_variable_alias::codegen(Module *module, IRBuilder<> &)
   if (it != global_scope.end()) {
     stringstream err;
     err << "Redeclaration of variable '" << alias_name << "'.";
-    return compile_error(err.str());
+    return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
   }
 
   stringstream alias_ss;
@@ -61,7 +61,7 @@ codegen_value ast::function_alias::codegen(Module *module, IRBuilder<> &builder)
   if (func_it != function_table().end()) {
     stringstream err_ss;
     err_ss << "Invalid redeclaration of function '" << alias_name << "'";
-    return compile_error(err_ss.str());
+    return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
   }
 
   Type *rt = func.return_type->llvm_type();

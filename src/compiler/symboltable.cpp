@@ -17,7 +17,7 @@ namespace raytrace {
     if (entry.destroy_on_scope_exit)
       return entry.type->destroy(entry.value, module, builder);
 
-    return nullptr;
+    return empty_type();
   }
 
   variable_scope::iterator variable_scope::find(const key_type &name) { return table.find(name); }
@@ -34,9 +34,9 @@ namespace raytrace {
 
   codegen_void variable_scope::destroy(Module *module, IRBuilder<> &builder) {
     TerminatorInst *term = builder.GetInsertBlock()->getTerminator();
-    if (term) return nullptr; //we've already exited this block, don't add anymore code
+    if (term) return empty_type(); //we've already exited this block, don't add anymore code
 
-    codegen_void rt = nullptr;
+    codegen_void rt = empty_type();
 
     for (auto it = begin(); it != end(); it++) {
       codegen_void d = destroy_entry<entry_type>(it->second, module, builder);

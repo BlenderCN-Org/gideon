@@ -14,7 +14,7 @@ typed_value_container make_llvm_vec_N(IRBuilder<> &builder, const string &vname,
     if (args.size() != N) {
       stringstream err_ss;
       err_ss << vname << " constructor expects " << N << "arguments, received " << args.size();
-      return compile_error(err_ss.str());
+      return errors::make_error<errors::error_message>(err_ss.str(), 0, 0);
     }
     
     //check argument types
@@ -22,7 +22,7 @@ typed_value_container make_llvm_vec_N(IRBuilder<> &builder, const string &vname,
       if (elem_type != args[i].get<1>()) {
 	stringstream ss;
 	ss << "Error in " << vname << " constructor argument " << i << ": Expected '" << elem_type->name << "' found '" << args[i].get<1>()->name << "'.";
-	return compile_error(ss.str());
+	return errors::make_error<errors::error_message>(ss.str(), 0, 0);
       }
     }
 
@@ -91,7 +91,7 @@ bool floatN_type::get_element_idx(char c, /* out */ unsigned int &idx) const {
 compile_error floatN_type::invalid_field(const string &field) const {
   stringstream ss;
   ss << type_name(N) << " has no field named '" << field << "'";
-  return compile_error(ss.str());
+  return errors::make_error<errors::error_message>(ss.str(), 0, 0);
 }
 
 typecheck_value floatN_type::field_type(const string &field) const {

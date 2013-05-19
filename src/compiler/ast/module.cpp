@@ -20,7 +20,7 @@ codegen_value ast::module::codegen(Module *module, IRBuilder<> &builder) {
   codegen_void save_module = pop_module(name, module, builder);
   
   typedef errors::argument_value_join<codegen_vector, codegen_void>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> op = [] (arg_val_type &) -> codegen_void { return nullptr; };
+  boost::function<codegen_value (arg_val_type &)> op = [] (arg_val_type &) -> codegen_value { return nullptr; };
   return errors::codegen_call_args(op, content_eval, save_module);
 }
 
@@ -69,7 +69,7 @@ codegen_value ast::import_declaration::codegen(Module *module, IRBuilder<> &buil
 	//module name already exists, return an error
 	stringstream err_ss;
 	err_ss << "Cannot import module named '" << mod_it->first << ".' A module with that name already exists.";
-	codegen_value err_val = compile_error(err_ss.str());
+	codegen_value err_val = errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
 	alias_results = errors::codegen_vector_push_back(alias_results, err_val);
       }
       
@@ -133,7 +133,7 @@ codegen_value ast::load_declaration::codegen(Module *module, IRBuilder<> &builde
   if (!has_export_table()) {
     stringstream err_ss;
     err_ss << "Unable to load file '" << source_name << "'";
-    return compile_error(err_ss.str());
+    return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
   }
 
   export_table &exports = get_export_table();

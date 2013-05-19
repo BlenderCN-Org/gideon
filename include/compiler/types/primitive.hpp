@@ -26,22 +26,7 @@ namespace raytrace {
 
     int_type(type_table *types) : type(types, "int", "i") { }
     virtual llvm::Type *llvm_type() const;
-    
-    //operations
-    virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
 
-    virtual codegen_value op_sub(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-
-    virtual codegen_value op_mul(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-    
-    virtual codegen_value op_div(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-
-    virtual codegen_value op_less(llvm::Module *module, llvm::IRBuilder<> &builder,
-				  codegen_value &lhs, codegen_value &rhs) const;
   };
 
   class float_type : public type {
@@ -49,22 +34,7 @@ namespace raytrace {
 
     float_type(type_table *types) : type(types, "float", "f", true) { }
     virtual llvm::Type *llvm_type() const;
-
-    //operations
-    virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-
-    virtual codegen_value op_sub(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
     
-    virtual codegen_value op_mul(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-    
-    virtual codegen_value op_div(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-
-    virtual codegen_value op_less(llvm::Module *module, llvm::IRBuilder<> &builder,
-				  codegen_value &lhs, codegen_value &rhs) const;
   };
 
   //Strings
@@ -80,10 +50,6 @@ namespace raytrace {
 
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
     
-    virtual codegen_value op_add(llvm::Module *module, llvm::IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const;
-    
-
   private:
 
     llvm::Type *str_type_value;

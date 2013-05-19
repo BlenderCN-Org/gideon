@@ -26,7 +26,7 @@ codegen_void raytrace::ast::expression_statement::codegen(Module *module, IRBuil
 	t->destroy(ptr, module, builder);
       }
     }
-    return nullptr;
+    return empty_type();
   };
 
   return errors::codegen_call<typed_value_container, codegen_void>(result, op);
@@ -41,12 +41,11 @@ raytrace::ast::statement_list::statement_list(const vector<statement_ptr> &state
 }
 
 codegen_void raytrace::ast::statement_list::codegen(Module *module, IRBuilder<> &builder) {
-  codegen_void result = nullptr;
+  codegen_void result = empty_type();
 
   for (auto it = statements.begin(); it != statements.end(); it++) {
-    codegen_value val = (*it)->codegen(module, builder);
-    codegen_void stmt_rt = errors::codegen_ignore_value(val);
-    result = errors::merge_void_values(result, stmt_rt);
+    codegen_void val = (*it)->codegen(module, builder);
+    result = errors::merge_void_values(result, val);
     
     if ((*it)->is_terminator()) break; //ignore all statements after a terminator
   }
@@ -66,7 +65,7 @@ codegen_void raytrace::ast::scoped_statement::codegen(Module *module, IRBuilder<
   push_scope();
 
   typedef errors::argument_value_join<codegen_void>::result_value_type arg_val_type;
-  boost::function<codegen_void (arg_val_type &)> add_null_value = [] (arg_val_type &) -> codegen_void { return nullptr; };
+  boost::function<codegen_void (arg_val_type &)> add_null_value = [] (arg_val_type &) -> codegen_void { return empty_type(); };
 
   codegen_void rt = statements.codegen(module, builder);
   

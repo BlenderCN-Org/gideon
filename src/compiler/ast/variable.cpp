@@ -27,7 +27,7 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
   if (variables().has_local(name)) {
     stringstream err;
     err << "Redeclaration of variable '" << name << "'.";
-    return compile_error(err.str());
+    return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
   }
   
   typed_value_container init_value = typed_value(nullptr, type);
@@ -44,7 +44,7 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
     if (val_type != type) {
       stringstream err_ss;
       err_ss << "Line " << line_no << ":" << column_no << " - Initializer of invalid type";
-      return compile_error(err_ss.str());
+      return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
     }
 
     Value *val = args.get<0>().extract_value();
@@ -60,7 +60,7 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
     variable_symbol_table::entry_type entry(ptr, type);
     variables().set(name, entry);
 
-    return nullptr;
+    return empty_type();
   };
   
   return errors::codegen_call<typed_value_container, codegen_void>(init_value, op);
@@ -83,7 +83,7 @@ raytrace::codegen_value raytrace::ast::global_variable_decl::codegen(llvm::Modul
   if (it != global_scope.end()) {
     stringstream err;
     err << "Redeclaration of variable '" << name << "'.";
-    return compile_error(err.str());
+    return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
   }
   
   GlobalVariable *gv = new GlobalVariable(type->llvm_type(), NULL, GlobalValue::ExternalLinkage, NULL, full_name());
@@ -144,9 +144,9 @@ typed_value_container ast::variable_ref::codegen_ptr(Module *module, IRBuilder<>
 
 code_value ast::variable_ref::codegen_module() {
   typed_value_container var = lookup_typed_var();
-  return errors::codegen_call<typed_value_container, code_value>(var, [] (typed_value &v) -> code_value {
+  return errors::codegen_call<typed_value_container, code_value>(var, [this] (typed_value &v) -> code_value {
       if (v.get<0>().type() == value::MODULE_VALUE) return v.get<0>();
-      return compile_error("Name does not refer to a module.");
+      return errors::make_error<errors::error_message>("Name does not refer to a module.", line_no, column_no);
     });
 }
 
@@ -174,7 +174,7 @@ typed_value_container ast::assignment::codegen(Module *module, IRBuilder<> &buil
     if (!rt->can_cast_to(*lt, cost)) {
       stringstream err;
       err << "Cannot convert value of type '" << rt->name << "' to variable of type '" << lt->name << "' in assignment.";
-      return compile_error(err.str());
+      return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
     }
     
     Value *new_val = args.get<1>().get<0>().extract_value();
@@ -258,7 +258,7 @@ typecheck_value ast::field_selection::typecheck_module_member(code_value &module
 
       stringstream err_ss;
       err_ss << "Unable to find name '" << field << "' in the given module.";
-      return compile_error(err_ss.str());
+      return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
     });
 }
 
@@ -291,7 +291,7 @@ typed_value_container ast::field_selection::codegen(Module *module, IRBuilder<> 
 
     stringstream err_ss;
     err_ss << "Unable to find name '" << field << "' in the given module.";
-    return compile_error(err_ss.str());
+    return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
   };
 
   typed_value_container result = errors::codegen_call(value, access);
@@ -322,7 +322,7 @@ typed_value_container ast::field_selection::codegen_ptr(Module *module, IRBuilde
 
     stringstream err_ss;
     err_ss << "Unable to find name '" << field << "' in the given module.";
-    return compile_error(err_ss.str());
+    return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
   };
 
   return errors::codegen_call(ptr, access);
@@ -335,7 +335,7 @@ code_value ast::field_selection::codegen_module() {
       
       //search module variables
       auto var_it = m->variables.find(field);
-      if (var_it != m->variables.end()) return compile_error("Expression cannot be converted to a module");
+      if (var_it != m->variables.end()) return errors::make_error<errors::error_message>("Expression cannot be converted to a module", line_no, column_no);
       
       //search sub-modules
       auto mod_it = m->modules.find(field);
@@ -343,6 +343,6 @@ code_value ast::field_selection::codegen_module() {
       
       stringstream err_ss;
       err_ss << "Unable to find module named '" << field << "' in the given module.";
-      return compile_error(err_ss.str());
+      return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
     });
 }

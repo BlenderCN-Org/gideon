@@ -41,13 +41,13 @@ codegen_void ast::ast_node::pop_module(const string &name, Module *module, IRBui
   auto scope_it = state->modules.scope_begin();
   auto parent_scope = scope_it + 1;
   if (parent_scope != state->modules.scope_end()) {
-    codegen_void saved = nullptr;
+    codegen_void saved = empty_type();
     module_ptr &module = scope_it->get_module();
     auto mod_it = parent_scope->get_module()->modules.find(name);
     if (mod_it != parent_scope->get_module()->modules.end()) {
       stringstream err_ss;
       err_ss << "Redeclaration of module '" << name << "'";
-      saved = compile_error(err_ss.str());
+      saved = errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
     }
     else parent_scope->get_module()->modules[name] = module;
 
@@ -57,8 +57,8 @@ codegen_void ast::ast_node::pop_module(const string &name, Module *module, IRBui
   state->exports.pop_module();
   state->modules.scope_pop(module, builder, false);
 
-  return errors::codegen_call<void_vector, codegen_void>(result, [] (vector<std::nullptr_t> &arg) -> codegen_void {
-      return nullptr;
+  return errors::codegen_call<void_vector, codegen_void>(result, [] (vector<empty_type> &arg) -> codegen_void {
+      return empty_type();
     });
 }
 
@@ -163,7 +163,7 @@ typecheck_value ast::ast_node::variable_type_lookup(const string &name) {
 
   stringstream err_ss;
   err_ss << "No such variable or module named '" << name << "'";
-  return compile_error(err_ss.str());
+  return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
 }
 
 typed_value_container ast::ast_node::variable_lookup(const string &name) {
@@ -194,5 +194,5 @@ typed_value_container ast::ast_node::variable_lookup(const string &name) {
 
   stringstream err_ss;
   err_ss << "No such variable or module named '" << name << "'";
-  return compile_error(err_ss.str());
+  return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
 }

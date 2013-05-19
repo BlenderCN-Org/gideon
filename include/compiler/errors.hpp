@@ -18,12 +18,28 @@
 
 namespace raytrace {
 
-  typedef std::runtime_error compile_error;
+  namespace errors {
+    class error;
+    typedef std::shared_ptr<error> error_ptr;
+  };
   
+  struct compile_error {
+    errors::error_ptr e;
+    
+    explicit compile_error(const errors::error_ptr &e) : e(e) { }
+
+    errors::error &operator*() const { return *e; }
+    errors::error *operator->() const { return e.get(); }
+  };
+
+    //typedef errors::error_ptr compile_error;
+  
+  struct empty_type { };
+
   template<typename ValueType, typename ErrorType>
   struct codegen {
     typedef boost::variant<ValueType, ErrorType> value;
-    typedef boost::variant<std::nullptr_t, ErrorType> empty;
+    typedef boost::variant<empty_type, ErrorType> empty;
 
     typedef boost::tuple<ValueType, ValueType> pair;
     typedef boost::variant<pair, ErrorType> binary_value;
@@ -38,6 +54,121 @@ namespace raytrace {
   typedef codegen<llvm::Value*, compile_error>::vector codegen_vector;
   
   namespace errors {
+    
+    /* Error Classes */
+
+    //Base error class.
+    class error {
+    public:
+
+      error(unsigned int line_no, unsigned int column_no);
+
+      virtual std::string report() const = 0;
+      void set_location(unsigned int line, unsigned int column);
+
+    protected:
+
+      unsigned int line_no, column_no;
+      std::string location() const;
+
+    };
+    
+    //Builds a compiler error object.
+    template<typename Error, typename... ArgTypes>
+    compile_error make_error(ArgTypes... args) { return compile_error(error_ptr(new Error(args...))); }
+
+    //A pair of errors (used for implementing the merge functionality).
+    class error_pair : public error {
+    public:
+
+      error_pair(const error_ptr &first, const error_ptr &second);
+
+      virtual std::string report() const;
+
+    private:
+
+      error_ptr first, second;
+
+    };
+
+    //A container wrapping other errors into a group.
+    class error_group : public error {
+    public:
+      
+      error_group(const std::string &group_name,
+		  const error_ptr &errors,
+		  unsigned int line_no, unsigned int column_no);
+
+      virtual std::string report() const;
+
+    private:
+
+      std::string group_name;
+      error_ptr errors;
+
+    };
+
+    //Generic error message.
+    class error_message : public error {
+    public:
+
+      error_message(const std::string &msg,
+		    unsigned int line_no, unsigned int column_no);
+
+      virtual std::string report() const;
+
+    private:
+
+      std::string msg;
+
+    };
+
+    //A reference to an undefined variable.
+    class undefined_variable : public error {
+    public:
+
+      undefined_variable(const std::string &name,
+			 unsigned int line_no, unsigned int column_no);
+
+      virtual std::string report() const;
+
+    private:
+      
+      std::string name;
+
+    };
+
+    //An invalid function call.
+    class invalid_function_call : public error {
+    public:
+      
+      invalid_function_call(const std::string &name, const std::string &error_msg,
+			    unsigned int line_no, unsigned int column_no);
+
+      virtual std::string report() const;
+      
+    private:
+
+      std::string name, error_msg;
+      
+    };
+
+    //Type mistmatch error.
+    class type_mismatch : public error {
+    public:
+
+      type_mismatch(const std::string &type, const std::string &expected,
+		    unsigned int line_no, unsigned int column_no);
+
+      virtual std::string report() const;
+
+    private:
+
+      std::string type, expected;
+      
+    };
+
+    /* Error Helper Functions */
 
     /* Helper struct for gathering a variant's type data. */
     template<typename ContainerType>
@@ -71,7 +202,7 @@ namespace raytrace {
     public:
 
       void operator()(llvm::Value *&) const { std::cout << "VALUE!" << std::endl; }
-      void operator()(compile_error &e) const { std::cout << "ERROR: " << e.what() << std::endl; }
+      void operator()(compile_error &e) const { std::cout << "ERROR: " << e->report() << std::endl; }
 
     };
 
@@ -102,7 +233,7 @@ namespace raytrace {
     public:
 
       T operator()(T &v) const { return v; }
-      T operator()(compile_error &e) const { throw e; }
+      T operator()(compile_error &e) const { throw std::runtime_error(e->report()); }
       
     };
     
@@ -160,7 +291,7 @@ namespace raytrace {
 
     template<typename... ArgTypes>
     struct argument_value_join;
-
+    
     template<typename T0>
     struct argument_value_join<T0> {
 
@@ -201,9 +332,9 @@ namespace raytrace {
     class merge_void : public boost::static_visitor<codegen_void> {
     public:
 
-      codegen_void operator()(std::nullptr_t &, std::nullptr_t &) const { return nullptr; }
-      codegen_void operator()(compile_error &e, std::nullptr_t &) const { return e; }
-      codegen_void operator()(std::nullptr_t &, compile_error &e) const { return e; }
+      codegen_void operator()(empty_type &, empty_type &) const { return empty_type(); }
+      codegen_void operator()(compile_error &e, empty_type &) const { return e; }
+      codegen_void operator()(empty_type &, compile_error &e) const { return e; }
       codegen_void operator()(compile_error &e0, compile_error &e1) const;
 
     };
@@ -265,6 +396,8 @@ namespace raytrace {
 
     //Merges two void values.
     codegen_void merge_void_values(codegen_void &v0, codegen_void &v1);
+
+
   };
 };
 

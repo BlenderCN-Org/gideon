@@ -26,7 +26,7 @@ binop_table::op_candidate_vector binop_table::find_operation(const string &op, c
 
 binop_table::op_result_value binop_table::find_best_operation(const std::string &op, const type_spec &lhs, const type_spec &rhs) const {
   auto table_it = operations.find(op);
-  if (table_it == operations.end()) return compile_error(string("Unsupported operation: ") + op);
+  if (table_it == operations.end()) return errors::make_error<errors::error_message>(string("Unsupported operation: ") + op, 0, 0);
   
   const op_codegen_table &candidates = table_it->second;
 
@@ -46,8 +46,8 @@ binop_table::op_result_value binop_table::find_best_operation(const std::string 
     if (score == best_score) best_list.push_back(*it);
   }
 
-  if (best_list.size() == 0) return compile_error("Invalid operation for those types"); //no matches
-  if (best_list.size() > 1) return compile_error("Binary operation is ambiguous"); //ambiguous
+  if (best_list.size() == 0) return errors::make_error<errors::error_message>("Invalid operation for those types", 0, 0); //no matches
+  if (best_list.size() > 1) return errors::make_error<errors::error_message>("Binary operation is ambiguous", 0, 0); //ambiguous
   return best_list[0];
 }
 

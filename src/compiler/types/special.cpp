@@ -42,7 +42,7 @@ Type *dfunc_type::llvm_type() const {
 }
 
 typed_value_container dfunc_type::initialize(Module *, IRBuilder<> &) const {
-  return compile_error("No default initialization for distributions.");
+  return errors::make_error<errors::error_message>("No default initialization for distributions.", 0, 0);
 }
 
 Value *dfunc_type::copy(Value *value, Module *module, IRBuilder<> &builder) {
@@ -65,29 +65,7 @@ codegen_void dfunc_type::destroy(Value *value, Module *module, IRBuilder<> &buil
   Function *dtor = cast<Function>(module->getOrInsertFunction("gd_builtin_destroy_dfunc", ty));
 
   builder.CreateCall(dtor, value);
-  return nullptr;
-}
-
-codegen_value dfunc_type::op_add(Module *module, IRBuilder<> &builder,
-				 codegen_value &lhs, codegen_value &rhs) const {
-  typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type arg_val_type;
-  boost::function<codegen_value (arg_val_type &)> op = [this, &builder, module] (arg_val_type &val) {
-    Type *pointer_type = llvm_type()->getPointerTo();
-    vector<Type*> arg_type({pointer_type, pointer_type, pointer_type});
-    FunctionType *ty = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_type, false);
-    Function *add_f = cast<Function>(module->getOrInsertFunction("gd_builtin_dfunc_add", ty));
-    
-    Value *lhs_ptr = CreateEntryBlockAlloca(builder, llvm_type(), "dfunc_lhs");
-    builder.CreateStore(val.get<0>(), lhs_ptr, false);
-
-    Value *rhs_ptr = CreateEntryBlockAlloca(builder, llvm_type(), "dfunc_lhs");
-    builder.CreateStore(val.get<1>(), rhs_ptr, false);
-
-    Value *sum = CreateEntryBlockAlloca(builder, llvm_type(), "dfunc_add");
-    builder.CreateCall3(add_f, lhs_ptr, rhs_ptr, sum);
-    return builder.CreateLoad(sum);
-  };
-  return errors::codegen_call_args(op, lhs, rhs);
+  return empty_type();
 }
 
 typed_value_container dfunc_type::create(Module *module, IRBuilder<> &builder,
@@ -101,14 +79,14 @@ typed_value_container dfunc_type::create(Module *module, IRBuilder<> &builder,
     if (args.size() != 4) {
       stringstream err_ss;
       err_ss << "dfunc constructor expected 4 arguments, received " << args.size();
-      return compile_error(err_ss.str());
+      return errors::make_error<errors::error_message>(err_ss.str(), 0, 0);
     }
     for (unsigned int i = 0; i < args.size(); ++i) {
       type_spec arg_ty = args[i].get<1>();
       if (*arg_ty != *expected_args[i]) {
 	stringstream err_ss;
 	err_ss << "Error in argument " << i << ": Expected type '" << expected_args[i]->name << "' found '" << arg_ty->name << "'";
-	return compile_error(err_ss.str());
+	return errors::make_error<errors::error_message>(err_ss.str(), 0, 0);
       }
     }
     

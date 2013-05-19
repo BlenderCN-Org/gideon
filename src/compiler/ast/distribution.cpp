@@ -63,7 +63,7 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
   
   codegen_value eval_func = nullptr;
   if (functions().has_local(eval_key)) eval_func = functions().get(eval_key).func;
-  else eval_func = compile_error("Distribution must define an 'evaluate' function.");
+  else eval_func = errors::make_error<errors::error_message>("Distribution must define an 'evaluate' function.", line_no, column_no);
 
   //leave new scope
   pop_distribution_context(module, builder);

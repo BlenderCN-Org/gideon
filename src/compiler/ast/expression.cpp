@@ -11,16 +11,16 @@ using namespace llvm;
 /** Expression Base **/
 
 typed_value_container ast::expression::codegen_ptr(Module *module, IRBuilder<> &builder) {
-  return compile_error("Cannot convert expression to lvalue");
+  return errors::make_error<errors::error_message>("Cannot convert expression to lvalue", 0, 0);
 }
 
 code_value ast::expression::codegen_module() {
-  return compile_error("Cannot convert expression to module");
+  return errors::make_error<errors::error_message>("Cannot convert expression to module", 0, 0);
 }
 
 void ast::expression::destroy_unbound(typed_value_container &val, Module *module, IRBuilder<> &builder) {
   boost::function<codegen_void (typed_value &)> dtor = [module, &builder] (typed_value &arg) -> codegen_void {
-    if (arg.get<0>().type() != value::LLVM_VALUE) return nullptr;
+    if (arg.get<0>().type() != value::LLVM_VALUE) return empty_type();
 
     type_spec t = arg.get<1>();    
     Value *val = arg.get<0>().extract_value();
