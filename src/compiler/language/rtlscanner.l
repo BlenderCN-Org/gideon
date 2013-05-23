@@ -84,7 +84,10 @@
 "true" { yylval->i = 1; return BOOL_LITERAL; }
 "false" { yylval->i = 0; return BOOL_LITERAL; }
 
-
+"+=" { return ADD_ASSIGN; }
+"-=" { return SUB_ASSIGN; }
+"*=" { return MUL_ASSIGN; }
+"/=" { return DIV_ASSIGN; }
 
 [ \t\r]      ;
 \n           ;

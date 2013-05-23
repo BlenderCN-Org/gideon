@@ -49,6 +49,7 @@ set(RT_SOURCE_FILES
   compiler/ast/literal.cpp
   compiler/ast/expression.cpp
   compiler/ast/variable.cpp
+  compiler/ast/assignment.cpp
   compiler/ast/function.cpp
   compiler/ast/statement.cpp
   compiler/ast/control.cpp

@@ -1,10 +1,13 @@
 
 function foo(float f) float {
-  return 3.0 + -f;
+  vec3 v = vec3(1.0, 2.0, 3.0);
+  v.x += 7.2;
+  return v.x + -f;
 }
 
 function foo(int i) int { return -i; }
 
 function main(bool arg) bool {
+  bool a = arg;
   return !arg;
 }

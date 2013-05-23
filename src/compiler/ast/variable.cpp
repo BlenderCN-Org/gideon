@@ -150,49 +150,6 @@ code_value ast::variable_ref::codegen_module() {
     });
 }
 
-/** Assignment **/
-
-raytrace::ast::assignment::assignment(parser_state *st, const expression_ptr &lhs, const expression_ptr &rhs) :
-  expression(st), lhs(lhs), rhs(rhs)
-{
-  
-}
-
-typecheck_value ast::assignment::typecheck() {
-  return lhs->typecheck();
-}
-
-typed_value_container ast::assignment::codegen(Module *module, IRBuilder<> &builder) {
-  typed_value_container ptr = lhs->codegen_ptr(module, builder);
-  typed_value_container value = rhs->codegen(module, builder);
-
-  typedef raytrace::errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type arg_val_type;  
-  boost::function<typed_value_container (arg_val_type &)> op = [this, module, &builder] (arg_val_type &args) -> typed_value_container {
-    type_spec lt = args.get<0>().get<1>();
-    type_spec rt = args.get<1>().get<1>();
-    int cost;
-    if (!rt->can_cast_to(*lt, cost)) {
-      stringstream err;
-      err << "Cannot convert value of type '" << rt->name << "' to variable of type '" << lt->name << "' in assignment.";
-      return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
-    }
-    
-    Value *new_val = args.get<1>().get<0>().extract_value();
-    
-    //if the rhs is already bound to a variable, make a copy
-    if (rhs->bound()) new_val = rt->copy(new_val, module, builder);
-
-    //now destroy the old value
-    Value *ptr = args.get<0>().get<0>().extract_value();
-    lt->destroy(ptr, module, builder);
-      
-    builder.CreateStore(new_val, ptr, false);
-    return typed_value(new_val, lt);
-  };
-  
-  return errors::codegen_call_args(op, ptr, value);
-}
-
 /** Type Constructors **/
 
 raytrace::ast::type_constructor::type_constructor(parser_state *st, const type_spec &type, const vector<expression_ptr> &args) :

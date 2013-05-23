@@ -83,6 +83,7 @@ token <i> OUTPUT
 %token <i> IMPORT LOAD
 
 //Operators
+%right <i> ADD_ASSIGN SUB_ASSIGN DIV_ASSIGN MUL_ASSIGN
 %right <i> '='
 
 %left <i> '<' '>'
@@ -355,6 +356,14 @@ expression
 
 assignment_expression
  : expression '=' expression { $$ = ast::expression_ptr(new ast::assignment(gd_data->state, $1, $3)); }
+ | expression ADD_ASSIGN expression { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state, "+", $1, $3,
+											    yylloc.first_line, yylloc.first_column)); }
+ | expression SUB_ASSIGN expression { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state, "-", $1, $3,
+											   yylloc.first_line, yylloc.first_column)); }
+ | expression MUL_ASSIGN expression { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state, "*", $1, $3,
+											    yylloc.first_line, yylloc.first_column)); }
+ | expression DIV_ASSIGN expression { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state, "/", $1, $3,
+											    yylloc.first_line, yylloc.first_column));} 
  ;
 
 type_constructor

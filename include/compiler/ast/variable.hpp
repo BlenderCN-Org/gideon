@@ -75,24 +75,6 @@ namespace raytrace {
       typed_value_container lookup_typed_var();
     };
 
-    /* Assigns an expression to an lvalue. */
-    class assignment : public expression {
-    public:
-
-      assignment(parser_state *st, const expression_ptr &lhs, const expression_ptr &rhs);
-      virtual ~assignment() {}
-      
-      virtual typecheck_value typecheck();
-      virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
-
-      virtual bool bound() const { return true; }
-
-    private:
-
-      expression_ptr lhs, rhs;
-      
-    };
-
     /* Type Constructors. */
     class type_constructor : public expression {
     public:
