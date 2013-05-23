@@ -1,0 +1,10 @@
+
+function foo(float f) float {
+  return 3.0 + -f;
+}
+
+function foo(int i) int { return -i; }
+
+function main(bool arg) bool {
+  return !arg;
+}

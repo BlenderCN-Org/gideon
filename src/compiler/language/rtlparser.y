@@ -90,6 +90,8 @@ token <i> OUTPUT
 %left <i> '+' '-'
 %left <i> '*' '/'
 
+%right <i> '!' UMINUS_PREC
+
 %left <i> '(' ')' '.'
 
 //Non-terminals
@@ -130,7 +132,7 @@ token <i> OUTPUT
 
 %type <stmt> return_statement
 
-%type <expr> expression binary_expression
+%type <expr> expression binary_expression unary_expression
 %type <expr> assignment_expression variable_ref
 %type <expr> type_constructor
 %type <expr> field_selection
@@ -345,6 +347,7 @@ expression
  | field_selection
  | assignment_expression
  | binary_expression
+ | unary_expression
  | type_constructor
  | function_call
  | '(' expression ')' { $$ = $2; }
@@ -390,5 +393,9 @@ binary_expression
  | expression '>' expression { $$ = ast::expression_ptr(new ast::binary_expression(gd_data->state, ">", $1, $3, yylloc.first_line, yylloc.first_column)); }
  ;
 
+unary_expression
+ : '!' expression { $$ = ast::expression_ptr(new ast::unary_op_expression(gd_data->state, "!", $2, yylloc.first_line, yylloc.first_column)); }
+ | '-' expression %prec UMINUS_PREC { $$ = ast::expression_ptr(new ast::unary_op_expression(gd_data->state, "-", $2, yylloc.first_line, yylloc.first_column)); }
+ ;
 %%
 

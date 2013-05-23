@@ -66,6 +66,27 @@ namespace raytrace {
 				       llvm::Module *module, llvm::IRBuilder<> &builder,
 				       llvm::Value* lhs_val, llvm::Value *rhs_val);
     };
+
+    /* A unary arithmetic operation */
+    class unary_op_expression : public expression {
+    public:
+      
+      unary_op_expression(parser_state *st, const std::string &op, const expression_ptr &arg,
+			  unsigned int line_no, unsigned int column_no);
+      virtual ~unary_op_expression() {}
+
+      virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual typecheck_value typecheck();
+
+    private:
+      
+      std::string op;
+      expression_ptr arg;
+      
+      typed_value_container execute_op(unary_op_table::op_candidate_value &op_func,
+				       llvm::Module *module, llvm::IRBuilder<> &builder,
+				       llvm::Value* arg_val);
+    };
   
   };
 };

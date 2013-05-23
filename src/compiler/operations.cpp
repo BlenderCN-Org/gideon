@@ -313,3 +313,89 @@ Value *raytrace::llvm_builtin_binop(const string &func_name,
   builder.CreateCall(op_func, args);
   return builder.CreateLoad(out_ptr);
 }
+
+/** Unary Operations Table **/
+
+unary_op_table::op_candidate_vector unary_op_table::find_operation(const string &op, const type_spec &type) const {
+  op_candidate_vector candidates;
+
+  auto table_it = operations.find(op);
+  if (table_it != operations.end()) {
+    auto op_it = table_it->second.find(type);
+    if (op_it != table_it->second.end()) candidates.push_back(*op_it);
+  }
+
+  return candidates;
+}
+
+unary_op_table::op_candidate_value unary_op_table::find_best_operation(const std::string &op, const type_spec &type) const {
+  auto table_it = operations.find(op);
+  if (table_it == operations.end()) return errors::make_error<errors::error_message>(string("Unsupported operation: ") + op, 0, 0);
+  
+  const op_codegen_table &candidates = table_it->second;
+
+  int max_score = std::numeric_limits<int>::max();
+  int best_score = max_score;
+  op_candidate_vector best_list;
+  
+  for (auto it = candidates.begin(); it != candidates.end(); ++it) {
+    int score = candidate_score(it->first, type);
+    if (score >= max_score) continue;
+    
+    if (score < best_score) {
+      best_score = score;
+      best_list.clear();
+    }
+    
+    if (score == best_score) best_list.push_back(*it);
+  }
+
+  if (best_list.size() == 0) return errors::make_error<errors::error_message>("Invalid operation for this type", 0, 0); //no matches
+  if (best_list.size() > 1) return errors::make_error<errors::error_message>("Operation is ambiguous", 0, 0); //ambiguous
+  return best_list[0];
+}
+
+void unary_op_table::add_operation(const string &op, const type_spec &type,
+				   const type_spec &result_type, const op_codegen &codegen) {
+  op_info info{result_type, codegen};
+
+  op_codegen_table &table = operations[op];
+  table[type] = info;
+}
+
+int unary_op_table::candidate_score(const type_spec &expected_type,
+				    const type_spec &type) const {
+  int cost;
+  type->can_cast_to(*expected_type, cost);
+  return cost;  
+}
+
+void unary_op_table::initialize_standard_ops(unary_op_table &table, type_table &types) {
+  table.add_operation("!", types["bool"], types["bool"], llvm_not_b());
+
+  table.add_operation("-", types["int"], types["int"], llvm_negate_i());
+  table.add_operation("-", types["float"], types["float"], llvm_negate_f());
+}
+
+/* LLVM Unary Op Codegen Functions */
+
+unary_op_table::op_codegen raytrace::llvm_not_b() {
+  return [] (Value *arg,
+	     Module *module, IRBuilder<> &builder) -> Value* {
+    return builder.CreateNot(arg, "bool_not_tmp");
+  };
+}
+
+unary_op_table::op_codegen raytrace::llvm_negate_i() {
+  return [] (Value *arg,
+	     Module *module, IRBuilder<> &builder) -> Value* {
+    return builder.CreateNeg(arg, "i_neg_tmp");
+  };
+}
+
+unary_op_table::op_codegen raytrace::llvm_negate_f() {
+  return [] (Value *arg,
+	     Module *module, IRBuilder<> &builder) -> Value* {
+    return builder.CreateFNeg(arg, "f_neg_tmp");
+  };
+}

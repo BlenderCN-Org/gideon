@@ -101,9 +101,10 @@ render_program::object_entry::object_entry(render_program *prog, const render_ob
   obj(obj),
   parser(prog->types)
 {
-  //initialize_types(parser.types);
   binop_table::initialize_standard_ops(parser.binary_operations,
 				       parser.types);
+  unary_op_table::initialize_standard_ops(parser.unary_operations,
+					  parser.types);
   parser.objects = prog;
 }
 

@@ -68,6 +68,53 @@ namespace raytrace {
  
   binop_table::op_codegen llvm_add_dfunc_dfunc(llvm::Type *dfunc_type);
 
+  /* Unary Operations */
+
+  class unary_op_table {
+  public:
+  
+    typedef boost::function<llvm::Value *(llvm::Value *,
+					  llvm::Module *, llvm::IRBuilder<> &)> op_codegen;
+
+    struct op_info {
+      type_spec result_type;
+      op_codegen codegen;
+    };
+
+    typedef std::pair<type_spec, op_info> op_candidate;
+    typedef std::vector<op_candidate> op_candidate_vector;
+    typedef codegen<op_candidate, compile_error>::value op_candidate_value;
+
+    //Given an operation and the operand type, returns a list of potential operations.
+    op_candidate_vector find_operation(const std::string &op, const type_spec &type) const;
+
+    //Accounting for cast operations, finds the most appropriate version of the given operation to use.
+    op_candidate_value find_best_operation(const std::string &op, const type_spec &type) const;
+    
+    //Inserts a new operation into the table.
+    void add_operation(const std::string &op, const type_spec &ty,
+		       const type_spec &result_type, const op_codegen &codegen);
+
+    static void initialize_standard_ops(unary_op_table &table, type_table &types);
+
+  private:
+
+    typedef boost::unordered_map<type_spec, op_info> op_codegen_table;    
+    boost::unordered_map<std::string, op_codegen_table> operations;
+
+    int candidate_score(const type_spec &expected_type,
+			const type_spec &type) const;
+    
+  };
+
+  /* LLVM Unary Operations */
+
+  unary_op_table::op_codegen llvm_not_b();
+
+  unary_op_table::op_codegen llvm_negate_i();
+  
+  unary_op_table::op_codegen llvm_negate_f();
+
   //Helpers
 
   llvm::Value *llvm_builtin_binop(const std::string &func_name,

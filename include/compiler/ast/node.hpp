@@ -22,6 +22,7 @@ namespace raytrace {
       export_table exports;
       type_table &types;
       binop_table binary_operations;
+      unary_op_table unary_operations;
       control_state control;
 
       render_program *objects;

@@ -89,3 +89,50 @@ typed_value_container ast::binary_expression::codegen(Module *module, IRBuilder<
   };
   return errors::codegen_call_args(exec_op, lhs_val, rhs_val);
 }
+
+/** Unary Op Expression **/
+
+ast::unary_op_expression::unary_op_expression(parser_state *st, const string &op, const expression_ptr &arg,
+					      unsigned int line_no, unsigned int column_no) :
+  expression(st, line_no, column_no),
+  op(op), arg(arg)
+{
+  
+}
+
+typecheck_value ast::unary_op_expression::typecheck() {
+  typecheck_value arg_type = arg->typecheck();
+  
+  boost::function<unary_op_table::op_candidate_value (type_spec&)> lookup = [this] (type_spec &arg) -> unary_op_table::op_candidate_value {
+    return state->unary_operations.find_best_operation(op, arg);
+  };
+
+  unary_op_table::op_candidate_value op_func = errors::codegen_call<typecheck_value, unary_op_table::op_candidate_value>(arg_type, lookup);
+  
+  return errors::codegen_call<unary_op_table::op_candidate_value, typecheck_value>(op_func,
+										   [] (unary_op_table::op_candidate &op_func) -> typecheck_value {
+										     return op_func.second.result_type;
+										   });
+}
+
+typed_value_container ast::unary_op_expression::codegen(Module *module, IRBuilder<> &builder) {
+  typed_value_container arg_val = arg->codegen(module, builder);
+
+  return errors::codegen_call(arg_val, [this, module, &builder] (typed_value &arg) -> typed_value_container {
+      unary_op_table::op_candidate_value op_func = state->unary_operations.find_best_operation(op, arg.get<1>());
+      return execute_op(op_func, module, builder, arg.get<0>().extract_value());
+    });
+}
+
+typed_value_container ast::unary_op_expression::execute_op(unary_op_table::op_candidate_value &op_func,
+							   Module *module, IRBuilder<> &builder,
+							   Value* arg_val) {
+  boost::function<typed_value_container (unary_op_table::op_candidate&)> exec_op = [module, &builder, arg_val] 
+    (unary_op_table::op_candidate &op_func) -> typed_value_container {
+    type_spec rt = op_func.second.result_type;
+    Value *result = op_func.second.codegen(arg_val, module, builder);
+    return typed_value(result, rt);
+  };
+
+  return errors::codegen_call<unary_op_table::op_candidate_value, typed_value_container>(op_func, exec_op);
+}
