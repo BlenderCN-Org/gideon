@@ -46,6 +46,9 @@ class GideonSourceFileSettings(bpy.types.PropertyGroup):
     name = bpy.props.StringProperty(name = "Source Name", default = "", subtype = 'FILE_PATH')
     external = bpy.props.BoolProperty(name = "External Source", default = False)
 
+class GideonMaterialFunctionSettings(bpy.types.PropertyGroup):
+    name = bpy.props.StringProperty(name = "Function Name", default = "")
+
 #Gideon-Specific Render Settings
 class GideonRenderSettings(bpy.types.PropertyGroup):
     @classmethod
@@ -77,6 +80,12 @@ class GideonRenderSettings(bpy.types.PropertyGroup):
             default = -1,
             min = -1, max = 1000
             )
+        
+        cls.shader_list = CollectionProperty(
+            name = "Material Functions",
+            description = "List of externally visible material functions in the compiled renderer",
+            type = GideonMaterialFunctionSettings
+            )
 
     @classmethod
     def unregister(cls):
@@ -104,7 +113,7 @@ class SOURCE_LIST_OT_del(bpy.types.Operator):
     def invoke(self, context, event):
         g_scene = context.scene.gideon
         idx = g_scene.active_source_index
-
+        
         if (idx >= 0):
             g_scene.sources.remove(idx)
             g_scene.active_source_index = -1
@@ -119,7 +128,9 @@ def register():
     bpy.utils.register_class(GideonMaterialSettings)
 
     bpy.utils.register_class(GideonSourceFileSettings)
+    bpy.utils.register_class(GideonMaterialFunctionSettings)
     bpy.utils.register_class(GideonRenderSettings)
+
 
 def unregister():
     bpy.utils.unregister_class(SOURCE_LIST_OT_add)
@@ -129,4 +140,5 @@ def unregister():
     bpy.utils.unregister_class(GideonMaterialSettings)
 
     bpy.utils.unregister_class(GideonRenderSettings)
+    bpy.utils.unregister_class(GideonMaterialFunctionSettings)
     bpy.utils.unregister_class(GideonSourceFileSettings)

@@ -121,8 +121,10 @@ class GideonMaterialPanel(GideonButtonsPanel, bpy.types.Panel):
         layout = self.layout
         mat = context.material
         g_mat = mat.gideon
+        g_scene = context.scene.gideon
+        
+        layout.prop_search(g_mat, "shader", g_scene, "shader_list", icon = 'MATERIAL')
 
-        layout.prop(g_mat, "shader", text = "Shader")
         layout.prop(mat, "diffuse_color", text = "Viewport Color")
         
 def get_panels():
