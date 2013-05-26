@@ -5,6 +5,9 @@
 #include "compiler/types/primitive.hpp"
 #include "compiler/types/vector.hpp"
 #include "compiler/types/special.hpp"
+#include "compiler/types/array.hpp"
+
+#include "compiler/llvm_helper.hpp"
 
 #include "llvm/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -15,6 +18,30 @@
 using namespace raytrace;
 using namespace std;
 using namespace llvm;
+
+/** Type Table **/
+
+type_spec type_table::get_array(const type_spec &base, unsigned int N) {
+  string arr_ty_name = array_type::type_name(base, N);
+
+  auto it = array_types.find(arr_ty_name);
+  if (it != array_types.end()) return it->second;
+
+  type_spec arr_type(new array_type(this, base, N));
+  array_types.insert(make_pair(arr_ty_name, arr_type));
+  return arr_type;
+}
+
+type_spec type_table::get_array_ref(const type_spec &base) {
+  string arr_ty_name = array_reference_type::type_name(base);
+
+  auto it = array_types.find(arr_ty_name);
+  if (it != array_types.end()) return it->second;
+
+  type_spec arr_type(new array_reference_type(this, base));
+  array_types.insert(make_pair(arr_ty_name, arr_type));
+  return arr_type;
+}
 
 size_t raytrace::hash_value(const type_spec &ts) {
   return boost::hash<type*>()(ts.get());
@@ -47,6 +74,22 @@ void raytrace::initialize_types(type_table &tt) {
 
 /** Type Base Class **/
 
+Value *type::allocate(Module *, IRBuilder<> &builder) const {
+  stringstream ss;
+  ss << name << "_data";
+  return CreateEntryBlockAlloca(builder, llvm_type(), ss.str());
+}
+
+Value *type::load(llvm::Value *ptr, Module *, IRBuilder<> &builder) const {
+  return builder.CreateLoad(ptr);
+}
+
+void type::store(llvm::Value *value, llvm::Value *ptr, Module *, IRBuilder<> &builder) const {
+  builder.CreateStore(value, ptr, false);
+}
+
+Type *type::llvm_ptr_type() const { return llvm_type()->getPointerTo(); }
+
 typed_value_container type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args) const {
   stringstream ss;
   ss << "Type '" << name << "' has no constructor.";
@@ -70,6 +113,26 @@ typed_value_container type::access_field_ptr(const string &field, Value *value_p
 					     Module *, IRBuilder<> &) const {
   stringstream ss;
   ss << "Type '" << name << "' has no assignable field named '" << field << "'.";
+  return errors::make_error<errors::error_message>(ss.str(), 0, 0);
+}
+
+type_spec type::element_type() const {
+  stringstream ss;
+  ss << "Type '" << name << "' has no array elements.";
+  throw runtime_error(ss.str());
+}
+
+typed_value_container type::access_element(Value *value, Value *elem_idx,
+					   Module *module, IRBuilder<> &builder) const {
+  stringstream ss;
+  ss << "Type '" << name << "' has no array elements.";
+  return errors::make_error<errors::error_message>(ss.str(), 0, 0);
+}
+
+typed_value_container type::access_element_ptr(Value *value_ptr, Value *elem_idx,
+					       Module *module, IRBuilder<> &builder) const {
+  stringstream ss;
+  ss << "Type '" << name << "' has no array elements.";
   return errors::make_error<errors::error_message>(ss.str(), 0, 0);
 }
 

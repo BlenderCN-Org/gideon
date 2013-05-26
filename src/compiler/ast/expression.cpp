@@ -26,9 +26,9 @@ void ast::expression::destroy_unbound(typed_value_container &val, Module *module
     Value *val = arg.get<0>().extract_value();
 
     //ensure we have a pointer to this object
-    Value *val_ptr = CreateEntryBlockAlloca(builder, t->llvm_type(), "dtor_tmp");
-    builder.CreateStore(val, val_ptr, false);
-
+    Value *val_ptr = t->allocate(module, builder);
+    t->store(val, val_ptr, module, builder);
+    
     return t->destroy(val_ptr, module, builder);
   };
 

@@ -215,7 +215,7 @@ codegen_value raytrace::ast::prototype::codegen(Module *module, IRBuilder<> &bui
     
     for (vector<function_argument>::iterator it = args.begin(); it != args.end(); it++) {
       Type *arg_type = it->type->llvm_type();
-      if (it->output) arg_types.push_back(PointerType::getUnqual(arg_type));
+      if (it->output) arg_types.push_back(it->type->llvm_ptr_type());
       else arg_types.push_back(arg_type);
     }
     
@@ -295,11 +295,6 @@ raytrace::ast::function::function(parser_state *st, const prototype_ptr &defn, c
   
 }
 
-AllocaInst *raytrace::ast::function::create_argument_alloca(Function *f, const function_argument &arg) {
-  IRBuilder<> tmp(&f->getEntryBlock(), f->getEntryBlock().begin());
-  return tmp.CreateAlloca(arg.type->llvm_type(), NULL, arg.name.c_str());
-}
-
 codegen_value raytrace::ast::function::codegen(Module *module, IRBuilder<> &builder) {
   codegen_value ptype = defn->codegen(module, builder);
   auto op = [this, module, &builder] (Value *&val) -> codegen_value {
@@ -330,7 +325,7 @@ codegen_value raytrace::ast::function::create_function(Value *& val, Module *mod
     arg_it++;
   }
 
-  for (unsigned int i = 0; i < defn->num_args(); i++, arg_it++) {
+  for (unsigned int i = 0; i < defn->num_args(); ++i, ++arg_it) {
     const function_argument &arg = defn->get_arg(i);
     variable_symbol_table::entry_type arg_var;
 
@@ -340,8 +335,8 @@ codegen_value raytrace::ast::function::create_function(Value *& val, Module *mod
     }
     else {
       //create a local copy of this parameter
-      AllocaInst *alloca = create_argument_alloca(f, arg);
-      builder.CreateStore(arg_it, alloca);
+      Value *alloca = arg.type->allocate(module, builder);
+      arg.type->store(arg_it, alloca, module, builder);
       arg_var = variable_symbol_table::entry_type(alloca, arg.type, false);
     }
     

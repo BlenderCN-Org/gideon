@@ -118,7 +118,7 @@ Function *ast::distribution::createConstructor(Module *module, IRBuilder<> &buil
   Value *scene_ptr = builder.CreateLoad(gd_scene);
 
   //get memory for a new distribution object
-  Value *dfunc_ptr = CreateEntryBlockAlloca(builder, state->types["dfunc"]->llvm_type(), "new_dist");
+  Value *dfunc_ptr = state->types["dfunc"]->allocate(module, builder);
   
   //initialize the object and dynamically allocate parameter memory (calling a builtin function)
   vector<Type*> alloc_arg_types({state->types["scene_ptr"]->llvm_type(), Type::getInt32Ty(getGlobalContext()),
@@ -136,7 +136,7 @@ Function *ast::distribution::createConstructor(Module *module, IRBuilder<> &buil
   unsigned int field_idx = 0;
   for (auto it = params.begin(); it != params.end(); ++it, ++arg_it, ++field_idx) {
     Value *param_copy = it->type->copy(arg_it, module, builder);
-    builder.CreateStore(param_copy, builder.CreateStructGEP(param_ptr, field_idx));
+    it->type->store(param_copy, builder.CreateStructGEP(param_ptr, field_idx), module, builder);
   }
   
   //return the object

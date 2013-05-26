@@ -16,12 +16,15 @@ namespace raytrace {
       
       virtual typecheck_value typecheck();
       virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual typed_value_container codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
 
       virtual bool bound() const { return true; }
 
     private:
 
       expression_ptr lhs, rhs;
+
+      std::pair<typed_value_container, typed_value_container> get_value_and_pointer(llvm::Module *module, llvm::IRBuilder<> &builder);
       
     };
 
@@ -36,6 +39,7 @@ namespace raytrace {
       
       virtual typecheck_value typecheck();
       virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual typed_value_container codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
 
       virtual bool bound() const { return true; }
 
@@ -44,6 +48,8 @@ namespace raytrace {
       std::string op;
       expression_ptr lhs, rhs;
       
+      std::pair<typed_value_container, typed_value_container> get_value_and_pointer(llvm::Module *module, llvm::IRBuilder<> &builder);
+
       typed_value_container execute_assignment(binop_table::op_result_value &op_func,
 					       llvm::Module *module, llvm::IRBuilder<> &builder,
 					       type_spec &lhs_type,

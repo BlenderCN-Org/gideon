@@ -35,7 +35,22 @@ namespace raytrace {
   typedef codegen<empty_type, compile_error>::vector void_vector;
   
   /* A table of types. */
-  typedef boost::unordered_map< std::string, std::shared_ptr<type> > type_table;
+  class type_table {
+  public:
+
+    type_spec &operator[](const std::string &key) { return entries[key]; }
+    type_spec &at(const std::string &key) { return entries.at(key); }
+
+    type_spec get_array(const type_spec &base, unsigned int N);
+    type_spec get_array_ref(const type_spec &base);
+
+  private:
+
+    boost::unordered_map< std::string, type_spec > entries;
+    boost::unordered_map< std::string, type_spec > array_types;
+    
+  };
+
   void initialize_types(type_table &tt);
   
   /* Describes a type in the Gideon Render Language. */
@@ -47,6 +62,7 @@ namespace raytrace {
     const bool is_differentiable;
 
     virtual bool is_iterator() const { return false; }
+    virtual bool is_array() const { return false; }
     
     bool operator==(const type &rhs) const { return type_id == rhs.type_id; }
     bool operator!=(const type &rhs) const { return !(*this == rhs); }
@@ -64,6 +80,15 @@ namespace raytrace {
     virtual codegen_value gen_cast(const type &other, llvm::Value *value,
 				   llvm::Module *module, llvm::IRBuilder<> &builder) const { return errors::make_error<errors::error_message>("Invalid cast", 0, 0); }
 
+    //allocates memory for a new value of this type, returning a pointer.
+    virtual llvm::Value *allocate(llvm::Module *module, llvm::IRBuilder<> &builder) const;
+
+    //dereferences a pointer to a value of this type.
+    virtual llvm::Value *load(llvm::Value *ptr, llvm::Module *module, llvm::IRBuilder<> &builder) const;
+
+    //stores the given value at the location provided by the pointer.
+    virtual void store(llvm::Value *value, llvm::Value *ptr, llvm::Module *module, llvm::IRBuilder<> &builder) const;
+
     //destruction/copy
     virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const {
       return typed_value(static_cast<llvm::Value*>(nullptr), types->at(name));
@@ -75,6 +100,9 @@ namespace raytrace {
     virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
 
     virtual llvm::Type *llvm_type() const = 0;
+    
+    //Returns the llvm type corresponding to a pointer to this type.
+    virtual llvm::Type *llvm_ptr_type() const;
 
     //field access
     virtual typecheck_value field_type(const std::string &field) const;
@@ -83,6 +111,15 @@ namespace raytrace {
 
     virtual typed_value_container access_field_ptr(const std::string &field, llvm::Value *value_ptr,
 						   llvm::Module *module, llvm::IRBuilder<> &builder) const;
+
+    //array element access
+    virtual type_spec element_type() const;
+
+    virtual typed_value_container access_element(llvm::Value *value, llvm::Value *elem_idx,
+						 llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    
+    virtual typed_value_container access_element_ptr(llvm::Value *value_ptr, llvm::Value *elem_idx,
+						     llvm::Module *module, llvm::IRBuilder<> &builder) const;
     
   protected:
 

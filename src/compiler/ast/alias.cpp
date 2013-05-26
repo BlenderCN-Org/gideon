@@ -68,7 +68,7 @@ codegen_value ast::function_alias::codegen(Module *module, IRBuilder<> &builder)
   vector<Type*> arg_types;
   for (auto arg_it = func.arguments.begin(); arg_it != func.arguments.end(); ++arg_it) {
     arg_types.push_back(arg_it->output ?
-			arg_it->type->llvm_type()->getPointerTo() :
+			arg_it->type->llvm_ptr_type() :
 			arg_it->type->llvm_type());
   }
 

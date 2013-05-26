@@ -98,7 +98,6 @@ namespace raytrace {
       prototype_ptr defn;
       statement_list body;
       
-      llvm::AllocaInst *create_argument_alloca(llvm::Function *f, const function_argument &arg_name);
       codegen_value create_function(llvm::Value *& val, llvm::Module *module, llvm::IRBuilder<> &builder);
 
     };

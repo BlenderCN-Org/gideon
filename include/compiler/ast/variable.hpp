@@ -31,7 +31,6 @@ namespace raytrace {
       expression_ptr initializer;
       
       typed_value_container initialize_from_type(llvm::Module *module, llvm::IRBuilder<> &builder);
-
     };
     
     /* Declares a new global variable. */
@@ -90,6 +89,7 @@ namespace raytrace {
       type_spec type;
       std::vector<expression_ptr> args;
       typed_value_container get_arg(int i, llvm::Module *module, llvm::IRBuilder<> &builder);
+      
     };
 
     /* Access the field of a vector or struct (as the result of an expression). */
@@ -106,7 +106,7 @@ namespace raytrace {
       
       virtual code_value codegen_module();
 
-      virtual bool bound() const { return true; }
+      virtual bool bound() const { return expr->bound(); }
       
     private:
 
@@ -116,6 +116,27 @@ namespace raytrace {
       typecheck_value typecheck_module_member(code_value &module_val);
       typed_value load_global(llvm::Value *ptr, type_spec &type,
 			      llvm::Module *module, llvm::IRBuilder<> &builder);
+    };
+
+    /* Access an element in an array. */
+    class element_selection : public expression {
+    public:
+
+      element_selection(parser_state *st, const expression_ptr &expr, const expression_ptr &idx_expr,
+			unsigned int line_no, unsigned int column_no);
+      virtual ~element_selection() {}
+      
+      virtual typecheck_value typecheck();
+      virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+      virtual typed_value_container codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
+      
+      virtual bool bound() const { return expr->bound(); }
+      
+    private:
+
+      expression_ptr expr;
+      expression_ptr idx_expr;
+      
     };
 
   };

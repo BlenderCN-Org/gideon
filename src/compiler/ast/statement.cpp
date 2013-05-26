@@ -21,8 +21,9 @@ codegen_void raytrace::ast::expression_statement::codegen(Module *module, IRBuil
     if (!expr->bound() && (!t->llvm_type()->isVoidTy())) {
       //nobody captured this expression, destroy it
       if (val.get<0>().type() == value::LLVM_VALUE) {
-	Value *ptr = CreateEntryBlockAlloca(builder, t->llvm_type(), "uncaptured_tmp");
-	builder.CreateStore(val.get<0>().extract_value(), ptr, false);
+	Value *ptr = t->allocate(module, builder);
+	t->store(val.get<0>().extract_value(), ptr, module, builder);
+	
 	t->destroy(ptr, module, builder);
       }
     }

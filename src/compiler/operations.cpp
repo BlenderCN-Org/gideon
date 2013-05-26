@@ -71,6 +71,7 @@ int binop_table::candidate_score(const op_type &types,
 
 void binop_table::initialize_standard_ops(binop_table &table, type_table &types) {
   table.add_operation("+", types["int"], types["int"], types["int"], llvm_add_i_i());
+  table.add_operation("-", types["int"], types["int"], types["int"], llvm_sub_i_i());
   table.add_operation("*", types["int"], types["int"], types["int"], llvm_mul_i_i());
   table.add_operation("<", types["int"], types["int"], types["bool"], llvm_lt_i_i());
 
@@ -116,6 +117,13 @@ binop_table::op_codegen raytrace::llvm_add_i_i() {
   return [] (Value *lhs, Value *rhs,
 	     Module *module, IRBuilder<> &builder) -> Value *{
     return builder.CreateAdd(lhs, rhs, "i_add_tmp");
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_sub_i_i() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    return builder.CreateSub(lhs, rhs, "i_sub_tmp");
   };
 }
 

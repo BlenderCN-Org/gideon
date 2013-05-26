@@ -32,7 +32,10 @@ namespace raytrace {
       virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
       virtual typed_value_container codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
 
-      virtual bool bound() const { return false; } //returns true if the result of this expression is bound to a variable
+      //returns true if the result of this expression is bound to a variable,
+      //which basically means it has an address.
+      //if this function returns true, then codegen_ptr() must also be implemented
+      virtual bool bound() const { return false; }
       static void destroy_unbound(typed_value_container &val, llvm::Module *module, llvm::IRBuilder<> &builder);
       
       //special function for use in type checking, where we may need the module's name, but can't call codegen() directly.

@@ -43,6 +43,7 @@ set(RT_SOURCE_FILES
   compiler/types/primitive.cpp
   compiler/types/special.cpp
   compiler/types/vector.cpp
+  compiler/types/array.cpp
 
   compiler/ast/ast.cpp
   compiler/ast/node.cpp
@@ -60,7 +61,7 @@ set(RT_SOURCE_FILES
 
 find_package(BISON)
 find_package(FLEX)
-bison_target(rtl_parser compiler/language/rtlparser.y ${CMAKE_CURRENT_BINARY_DIR}/rtlparser.cpp)
+bison_target(rtl_parser compiler/language/rtlparser.y ${CMAKE_CURRENT_BINARY_DIR}/rtlparser.cpp COMPILE_FLAGS "--verbose")
 flex_target(rtl_scanner compiler/language/rtlscanner.l ${CMAKE_CURRENT_BINARY_DIR}/rtlscanner.cpp COMPILE_FLAGS "--header-file=${CMAKE_CURRENT_BINARY_DIR}/rtlscanner.hpp" )
 add_flex_bison_dependency(rtl_scanner rtl_parser)
 

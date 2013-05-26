@@ -36,14 +36,16 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
   if (initializer) {
     init_value = initializer->codegen(module, builder);
     make_copy = initializer->bound();
+    cout << "Typename: " << type->name << " | Copy: " << make_copy << endl;
   }
   else init_value = initialize_from_type(module, builder);
   
   boost::function<codegen_void (typed_value &)> op = [this, make_copy, module, &builder] (typed_value &args) -> codegen_void {
     type_spec val_type = args.get<1>();
-    if (val_type != type) {
+    
+    if (*val_type != *type) {
       stringstream err_ss;
-      err_ss << "Line " << line_no << ":" << column_no << " - Initializer of invalid type";
+      err_ss << "Initializer of invalid type";
       return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
     }
 
@@ -53,9 +55,12 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
       val = val_type->copy(val, module, builder);
     }
 
-    Value *ptr = NULL;
-    ptr = CreateEntryBlockAlloca(builder, type->llvm_type(), name);
-    if (val) builder.CreateStore(val, ptr, false);
+    Value *ptr = type->allocate(module, builder);
+    if (val) {
+      val->dump(); cout << endl;
+      cout << "Storing!" << endl;
+      type->store(val, ptr, module, builder);
+    }
     
     variable_symbol_table::entry_type entry(ptr, type);
     variables().set(name, entry);
@@ -121,9 +126,10 @@ typecheck_value ast::variable_ref::typecheck() {
 }
 
 typed_value_container ast::variable_ref::codegen(Module *module, IRBuilder<> &builder) {
-  boost::function<typed_value_container (typed_value &)> op = [&builder] (typed_value &val) -> typed_value_container {
+  boost::function<typed_value_container (typed_value &)> op = [module, &builder] (typed_value &val) -> typed_value_container {
     if (val.get<0>().type() == value::LLVM_VALUE) {
-      return typed_value(builder.CreateLoad(val.get<0>().extract_value(), "var_ref"), val.get<1>());
+      type_spec t = val.get<1>();
+      return typed_value(t->load(val.get<0>().extract_value(), module, builder), t);
     }
     
     //no need to generate a load, return directly
@@ -220,8 +226,8 @@ typecheck_value ast::field_selection::typecheck_module_member(code_value &module
 }
 
 typed_value ast::field_selection::load_global(Value *ptr, type_spec &type,
-					      Module *, IRBuilder<> &builder) {
-  return typed_value(builder.CreateLoad(ptr, "var_ref"), type);
+					      Module *module, IRBuilder<> &builder) {
+  return typed_value(type->load(ptr, module, builder), type);
 }
 
 typed_value_container ast::field_selection::codegen(Module *module, IRBuilder<> &builder) {
@@ -302,4 +308,87 @@ code_value ast::field_selection::codegen_module() {
       err_ss << "Unable to find module named '" << field << "' in the given module.";
       return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
     });
+}
+
+/** Element Selection **/
+
+ast::element_selection::element_selection(parser_state *st, const expression_ptr &expr, const expression_ptr &idx_expr,
+					  unsigned int line_no, unsigned int column_no) :
+  expression(st, line_no, column_no),
+  expr(expr), idx_expr(idx_expr)
+{
+  
+}
+
+typecheck_value ast::element_selection::typecheck() {
+  typecheck_value expr_type = expr->typecheck();
+
+  return errors::codegen_call(expr_type, [this] (type_spec &t) -> typecheck_value {
+      return t->element_type();
+    });
+}
+
+typed_value_container ast::element_selection::codegen(Module *module, IRBuilder<> &builder) {
+  if (expr->bound()) {
+    //we know the resulting value is located in memory, so no need to load it
+    //this allows us to do array access without loading the entire array
+    typed_value_container elem_ptr = codegen_ptr(module, builder);
+
+    boost::function<typed_value_container (typed_value &)> loader = [module, &builder] (typed_value &ptr) -> typed_value_container {
+      Value *elem = ptr.get<1>()->load(ptr.get<0>().extract_value(), module, builder);
+      return typed_value(elem, ptr.get<1>());
+    };
+
+    return errors::codegen_call(elem_ptr, loader);
+  }
+  else {
+    typed_value_container expr_val = expr->codegen(module, builder);
+    typed_value_container idx = idx_expr->codegen(module, builder);
+    
+    typedef errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type typed_value_pair;
+    boost::function<typed_value_container (typed_value_pair &)> access = [this, &expr_val, &idx, module, &builder] (typed_value_pair &args) -> typed_value_container {
+      type_spec expr_type = args.get<0>().get<1>();
+      type_spec idx_type = args.get<1>().get<1>();
+      
+      if (*idx_type != *state->types["int"]) {
+	return errors::make_error<errors::error_message>("Array index must be an integer.", line_no, column_no);
+      }
+      
+      Value *arr_val = args.get<0>().get<0>().extract_value();
+      Value *idx_val = args.get<1>().get<0>().extract_value();
+      
+      typed_value_container result = expr_type->access_element(arr_val, idx_val, module, builder);
+      
+      if (!idx_expr->bound()) destroy_unbound(idx, module, builder);
+      if (!expr->bound()) destroy_unbound(expr_val, module, builder);
+      return result;
+    };
+
+    return errors::codegen_call_args(access, expr_val, idx);
+  }
+}
+
+typed_value_container ast::element_selection::codegen_ptr(Module *module, IRBuilder<> &builder) {
+  typed_value_container ptr = expr->codegen_ptr(module, builder);
+  typed_value_container idx = idx_expr->codegen(module, builder);
+
+  typedef errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type typed_value_pair;
+  boost::function<typed_value_container (typed_value_pair &)> access = [this, &idx, module, &builder] (typed_value_pair &args) -> typed_value_container {
+    type_spec ptr_type = args.get<0>().get<1>();
+    type_spec idx_type = args.get<1>().get<1>();
+    
+    if (*idx_type != *state->types["int"]) {
+      return errors::make_error<errors::error_message>("Array index must be an integer.", line_no, column_no);
+    }
+
+    Value *ptr_val = args.get<0>().get<0>().extract_value();
+    Value *idx_val = args.get<1>().get<0>().extract_value();
+
+    typed_value_container result = ptr_type->access_element_ptr(ptr_val, idx_val, module, builder);
+    
+    if (!idx_expr->bound()) destroy_unbound(idx, module, builder);
+    return result;
+  };
+
+  return errors::codegen_call_args(access, ptr, idx);
 }

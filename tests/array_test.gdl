@@ -1,0 +1,57 @@
+
+function foo() float {
+  float[3] f;
+  f[2] = 7.4;
+
+  float[3] b = f;
+  return f[3];
+}
+
+extern function bar() float[3] : gde_float3;
+function monkey(int i) float {
+  float[3] b = bar();
+  return b[i] + b[i+1] + b[i+2];
+}
+
+function assignment(int[5] b, int x) float {
+  int[5] a;
+  vec3[2] v;
+
+  return (v[(a = b)[x]] += vec3(1.0, 2.0, 3.0)).z;
+}
+
+function can_pass(output float[3] arr, int i) float {
+  return arr[i];
+}
+
+function test_ref(float[] my_arr, int i) float {
+  return my_arr[my_arr.length - i];
+}
+
+function ctor(int i) float {
+  float[6] f = float[](1.0, 2.0, 3.0, 4.0, 5.0, 6.0);
+  return f[i];
+}
+
+/*
+function main_f() float {
+  vec3[] x = vec3[6]();
+  float[] f = vec3[10]();
+  
+  x[3] = vec3(1.0, 2.0, 3.0);
+  arrays_pass_by_value(x);
+  float y = can_pass(f, 2);
+
+  int i = x.length - 1;
+  return x[i].y + y;
+}
+
+*/
+
+/*function strings(int i) string {
+  string[2] slist;
+  slist[0] = "hello";
+  slist[1] = "wassup";
+
+  return slist[i];
+  }*/
