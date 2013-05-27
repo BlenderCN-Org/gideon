@@ -247,7 +247,7 @@ function_definition
 
 function_formal_params_opt
  : function_formal_params
- | { } //empty
+ | { $$ = std::vector<raytrace::function_argument>(); } //empty
  ;
 
 function_formal_params
@@ -372,7 +372,7 @@ jump_statement
 
 statement_list
  : statement_list statement { $$ = $1; if ($2) $$.push_back($2); }
- | { }
+ | { $$ = std::vector<raytrace::ast::statement_ptr>(); }
  ;
 
 statement
@@ -426,8 +426,13 @@ type_constructor
 
 function_call
  : type_constructor
- | IDENTIFIER '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::func_call(gd_data->state, nullptr, $1, $3)); }
- | postfix_expression '.' IDENTIFIER '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::func_call(gd_data->state, $1, $3, $5)); }
+ | IDENTIFIER '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::func_call(gd_data->state, nullptr, $1, $3,
+										      yylloc.first_line, yylloc.first_column)); }
+ | postfix_expression '.' IDENTIFIER '(' function_args_opt ')' {
+   $$ = ast::expression_ptr(new ast::func_call(gd_data->state, $1, $3, $5,
+					       yylloc.first_line,
+					       yylloc.first_column));
+   }
  ;
 
 function_args_opt

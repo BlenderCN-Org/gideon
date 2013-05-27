@@ -120,10 +120,11 @@ extern "C" void gd_builtin_light_iterator_next(void *s_ptr, /* inout */ int *lig
 extern "C" void *gd_builtin_alloc_dfunc(void *,
 					int param_size,
 					shade_tree::leaf::eval_func_type eval,
+					shade_tree::leaf::sample_func_type sample,
 					shade_tree::leaf::dtor_func_type dtor,
 					/* out */ void *out) {
   char *params = new char[param_size];
-  new (out) shade_tree::node_ptr(shade_tree::leaf_ptr(new shade_tree::leaf(params, eval, dtor)));
+  new (out) shade_tree::node_ptr(shade_tree::leaf_ptr(new shade_tree::leaf(params, eval, sample, dtor)));
   return params;
 }
 

@@ -10,8 +10,9 @@ using namespace llvm;
 
 raytrace::ast::func_call::func_call(parser_state *st,
 				    const expression_ptr &path_expr, const string &fname,
-				    const vector<expression_ptr> &args) :
-  expression(st, st->types["void"]),
+				    const vector<expression_ptr> &args,
+				    unsigned int line_no, unsigned int column_no) :
+  expression(st, st->types["void"], line_no, column_no),
   path_expr(path_expr), fname(fname), args(args)
 {
   
@@ -305,6 +306,7 @@ codegen_value raytrace::ast::function::codegen(Module *module, IRBuilder<> &buil
 
 codegen_value raytrace::ast::function::create_function(Value *& val, Module *module, IRBuilder<> &builder) {
   Function *f = cast<Function>(val);
+  
   if (!f->empty()) {
     string err = string("Redefinition of function: ") + defn->function_name();
     return errors::make_error<errors::error_message>(err, line_no, column_no);

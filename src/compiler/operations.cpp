@@ -74,6 +74,7 @@ void binop_table::initialize_standard_ops(binop_table &table, type_table &types)
   table.add_operation("-", types["int"], types["int"], types["int"], llvm_sub_i_i());
   table.add_operation("*", types["int"], types["int"], types["int"], llvm_mul_i_i());
   table.add_operation("<", types["int"], types["int"], types["bool"], llvm_lt_i_i());
+  table.add_operation(">", types["int"], types["int"], types["bool"], llvm_gt_i_i());
 
   table.add_operation("+", types["float"], types["float"], types["float"], llvm_add_f_f());
   table.add_operation("-", types["float"], types["float"], types["float"], llvm_sub_f_f());
@@ -138,6 +139,13 @@ binop_table::op_codegen raytrace::llvm_lt_i_i() {
   return [] (Value *lhs, Value *rhs,
 	     Module *module, IRBuilder<> &builder) -> Value *{
     return builder.CreateICmpSLT(lhs, rhs, "i_lt_tmp");
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_gt_i_i() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    return builder.CreateICmpSGT(lhs, rhs, "i_gt_tmp");
   };
 }
 

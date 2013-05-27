@@ -19,7 +19,8 @@ namespace raytrace {
 
       func_call(parser_state *st,
 		const expression_ptr &path_expr, const std::string &fname,
-		const std::vector<expression_ptr> &args);
+		const std::vector<expression_ptr> &args,
+		unsigned int line_no, unsigned int column_no);
       virtual ~func_call() {}
 
       virtual typecheck_value typecheck();

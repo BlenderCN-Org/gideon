@@ -29,9 +29,12 @@ namespace raytrace {
       llvm::Type *param_type;
 
       llvm::StructType *getParameterType();
-      llvm::Function *createConstructor(llvm::Module *module, llvm::IRBuilder<> &builder, llvm::Function *eval, llvm::Function *dtor);
+      llvm::Function *createConstructor(llvm::Module *module, llvm::IRBuilder<> &builder,
+					llvm::Function *eval, llvm::Function *sample, llvm::Function *dtor);
       llvm::Function *createDestructor(llvm::Module *module, llvm::IRBuilder<> &builder);
+
       llvm::Function *createEvaluator(llvm::Function *eval, llvm::Module *module, llvm::IRBuilder<> &builder);
+      llvm::Function *createSampler(llvm::Function *sample, llvm::Module *module, llvm::IRBuilder<> &builder);
     };
 
   };

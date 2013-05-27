@@ -16,15 +16,20 @@ namespace raytrace {
       typedef void (*eval_func_type)(const void*,
 				     float4*,
 				     float3*, float3*, float3*, float3*,
-				     float4*);
+				     float*, float4*);
+      typedef float (*sample_func_type)(const void *,
+					float3*, float3*,
+					float2*, float2*,
+					float3*, float3*);
 
       typedef void (*dtor_func_type)(void*);
 
-      leaf(char *p, eval_func_type eval, dtor_func_type dtor);
+      leaf(char *p, eval_func_type eval, sample_func_type sample, dtor_func_type dtor);
       ~leaf();
       
       char *params;
       eval_func_type evaluate;
+      sample_func_type sample;
       dtor_func_type destructor;
     };
 
@@ -52,7 +57,12 @@ namespace raytrace {
 		  float4 *L_in,
 		  float3 *P_in, float3 *w_in,
 		  float3 *P_out, float3 *w_out,
-		  /* out */ float4 *out);
+		  /* out */ float *pdf, /* out */ float4 *out);
+
+    float sample(node_ptr &node,
+		 float3 *P_out, float3 *w_out,
+		 float2 *rand_P, float2 *rand_w,
+		 /* out */ float3 *P_in, /* out */ float3 *w_in);
   };
 };
 

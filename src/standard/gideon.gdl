@@ -20,6 +20,22 @@ module gideon {
     return min(max(x, low), high);
   }
 
+  function abs(float f) float {
+    if (f < 0.0) return -f;
+    return f;
+  }
+
+  /* Sampling */
+
+  extern function __cosine_sample_hemisphere(output vec3 N,
+					     float rand_u, float rand_v,
+					     output vec3 rt) void : gde_cosine_sample_hemisphere;
+  function cosine_sample_hemisphere(vec3 N, float rand_u, float rand_v) vec3 {
+    vec3 rt;
+    __cosine_sample_hemisphere(N, rand_u, rand_v, rt);
+    return rt;
+  }
+
   /* Random Number Generation */
 
   extern function __random(scene s) float : gde_random;
@@ -102,10 +118,10 @@ module gideon {
   //Given two uniform random numbers in [0, 1], samples a position on the given light.
   //If the position's 'w' coordinate is 0, the light is directional.
   extern function __light_sample_position(light lt, output vec3 P, float rand_u, float rand_v,
-					  output vec4 P_out) void : gde_light_sample_position;
-  function light:sample_position(light lt, vec3 P, float rand_u, float rand_v) vec4 {
+					  output float pdf, output vec4 P_out) void : gde_light_sample_position;
+  function light:sample_position(light lt, vec3 P, float rand_u, float rand_v, output float pdf) vec4 {
     vec4 P_out;
-    __light_sample_position(lt, P, rand_u, rand_v, P_out);
+    __light_sample_position(lt, P, rand_u, rand_v, pdf, P_out);
     return P_out;
   }
   
@@ -125,14 +141,27 @@ module gideon {
 			       output vec4 L_in,
 			       output vec3 P_in, output vec3 w_in,
 			       output vec3 P_out, output vec3 w_out,
-			       output vec4 out) void : gde_dfunc_eval;
+			       output float pdf, output vec4 out) void : gde_dfunc_eval;
   function dfunc:evaluate(dfunc d,
 			  vec4 L_in,
 			  vec3 P_in, vec3 w_in,
-			  vec3 P_out, vec3 w_out) vec4 {
+			  vec3 P_out, vec3 w_out,
+			  output float pdf) vec4 {
     vec4 out;
-    __dfunc_eval(d, L_in, P_in, w_in, P_out, w_out, out);
+    __dfunc_eval(d, L_in, P_in, w_in, P_out, w_out, pdf, out);
     return out;
+  }
+
+  //Samples a distribution function.
+  extern function __dfunc_sample(output dfunc d,
+				 output vec3 P_out, output vec3 w_out,
+				 output vec2 rand_P, output vec2 rand_w,
+				 output vec3 P_in, output vec3 w_in) float : gde_dfunc_sample;
+  function dfunc:sample(dfunc d,
+			vec3 P_out, vec3 w_out,
+			vec2 rand_P, vec2 rand_w,
+			output vec3 P_in, output vec3 w_in) float {
+    return __dfunc_sample(d, P_out, w_out, rand_P, rand_w, P_in, w_in);
   }
 
   //Returns true if a shader handle references a valid shader function.
@@ -160,13 +189,33 @@ module gideon {
       k -- Reflectance Factor
       color -- Reflected Color
   */
-  distribution lambert(vec3 N, float k, vec4 color) {
+  distribution lambert(vec3 N, vec3 Ng, float k, vec4 color) {
+
+    function eval_pdf(float dot_N) float {
+      float pi = 3.14159265359; 
+      return abs(dot_N) / pi;
+    }
 
     function evaluate(vec4 L_in,
 		      vec3 P_in, vec3 w_in,
-		      vec3 P_out, vec3 w_out) vec4 {
-      float fac = k*dot(N, w_in);
+		      vec3 P_out, vec3 w_out,
+		      output float pdf) vec4 {
+      float z = dot(N, w_in);
+      pdf = eval_pdf(dot(Ng, w_in));
+
+      float fac = k*z;
       return fac * color * L_in;
+    }
+
+    function sample(vec3 P_out, vec3 w_out,
+		    vec2 rand_P, vec2 rand_w,
+		    output vec3 P_in, output vec3 w_in) float {
+      P_in = P_out;
+      w_in = cosine_sample_hemisphere(Ng, rand_w.x, rand_w.y);
+      
+      float z = dot(Ng, w_in);
+      if ((z * dot(Ng, w_out)) < 0.0) return 0.0; //directions are on different sides of the hemisphere
+      return eval_pdf(z);
     }
     
   }

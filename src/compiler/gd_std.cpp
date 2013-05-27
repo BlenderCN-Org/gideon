@@ -1,6 +1,7 @@
 #include "compiler/gd_std.hpp"
 #include "scene/scene.hpp"
 #include "geometry/triangle.hpp"
+#include "math/sampling.hpp"
 
 #include "engine/context.hpp"
 
@@ -93,15 +94,29 @@ extern "C" float gde_random(void *s) {
   return scn->rng();
 }
 
+extern "C" void gde_cosine_sample_hemisphere(float3 *N,
+					     float rand_u, float rand_v,
+					     /* out */ float3 *rt) {
+  *rt = cosine_sample_hemisphere(*N, rand_u, rand_v);
+}
+
 //Shade-Tree Evaluation
 
 extern "C" void gde_dfunc_eval(void *dfunc,
 			       float4 *L_in,
 			       float3 *P_in, float3 *w_in,
 			       float3 *P_out, float3 *w_out,
-			       /* out */ float4 *out) {
+			       /* out */ float *pdf, /* out */ float4 *out) {
   shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
-  shade_tree::evaluate(node, L_in, P_in, w_in, P_out, w_out, out);
+  shade_tree::evaluate(node, L_in, P_in, w_in, P_out, w_out, pdf, out);
+}
+
+extern "C" float gde_dfunc_sample(void *dfunc,
+				  float3 *P_out, float3 *w_out,
+				  float2 *rand_P, float2 *rand_w,
+				  /* out */ float3 *P_in, /* out */ float3 *w_in) {
+  shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
+  shade_tree::sample(node, P_out, w_out, rand_P, rand_w, P_in, w_in);
 }
 
 extern "C" bool gde_shader_handle_is_valid(void *shader) {
@@ -121,8 +136,8 @@ extern "C" void gde_scene_get_light(render_context::scene_data *sdata, int id, l
 //Lights
 
 extern "C" void gde_light_sample_position(light *lt, float3 *P, float rand_u, float rand_v,
-					  float4 *P_out) {
-  *P_out = lt->sample_position(*P, rand_u, rand_v);
+					  float *pdf, float4 *P_out) {
+  *P_out = lt->sample_position(*P, rand_u, rand_v, *pdf);
 }
 
 extern "C" void gde_light_eval_radiance(light *lt, float3 *P, float3 *I, /* out */ float4 *R) {

@@ -23,7 +23,8 @@ namespace raytrace {
       Samples a random position on the surface of a light. If the w component is zero, a direction is specified (in case of a directional light). 
       Point to be illuminated is provided to do view-dependent sampling.
     */
-    float4 sample_position(const float3 &P, float rand_u, float rand_v) const;
+    float4 sample_position(const float3 &P, float rand_u, float rand_v,
+			   /* out */ float &pdf) const;
     
     /* Evaluates the light emitted from a point on a light in a given direction. */
     float4 eval_radiance(const float3 &P, const float3 &I) const;

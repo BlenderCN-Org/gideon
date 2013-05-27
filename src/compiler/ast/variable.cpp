@@ -36,7 +36,6 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
   if (initializer) {
     init_value = initializer->codegen(module, builder);
     make_copy = initializer->bound();
-    cout << "Typename: " << type->name << " | Copy: " << make_copy << endl;
   }
   else init_value = initialize_from_type(module, builder);
   
@@ -57,8 +56,6 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
 
     Value *ptr = type->allocate(module, builder);
     if (val) {
-      val->dump(); cout << endl;
-      cout << "Storing!" << endl;
       type->store(val, ptr, module, builder);
     }
     
