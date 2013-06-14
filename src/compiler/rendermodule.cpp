@@ -193,7 +193,7 @@ vector<string> render_program::generate_compile_order() {
       dep_list.push_back(make_pair(src_id, dst_id));
     }
   }
-  dep_list.clear();
+
   dep_graph_type dep_graph(dep_list.begin(), dep_list.end(), id_object_map.size());
 
   //generate an ID list in topological order (boost docs say it's in reverse, but that doesn't appear to be the case...)
@@ -202,7 +202,7 @@ vector<string> render_program::generate_compile_order() {
 
   //compile the final list of names
   vector<string> order;
-  for (auto it = id_order.begin(); it != id_order.end(); ++it) {
+  for (auto it = id_order.rbegin(); it != id_order.rend(); ++it) {
     order.push_back(id_object_map[*it]);
   }
 
@@ -226,7 +226,7 @@ Module *render_program::compile() {
   
   //perform code generation and linking
   Linker linker(name, name, getGlobalContext());
-
+  
   for (auto name_it = order.begin(); name_it != order.end(); ++name_it) {
     cout << "Compiling Object: " << *name_it << endl;
     std::shared_ptr<object_entry> &object = objects[*name_it];

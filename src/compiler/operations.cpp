@@ -73,6 +73,8 @@ void binop_table::initialize_standard_ops(binop_table &table, type_table &types)
   table.add_operation("+", types["int"], types["int"], types["int"], llvm_add_i_i());
   table.add_operation("-", types["int"], types["int"], types["int"], llvm_sub_i_i());
   table.add_operation("*", types["int"], types["int"], types["int"], llvm_mul_i_i());
+  table.add_operation("/", types["int"], types["int"], types["int"], llvm_div_i_i());
+
   table.add_operation("<", types["int"], types["int"], types["bool"], llvm_lt_i_i());
   table.add_operation(">", types["int"], types["int"], types["bool"], llvm_gt_i_i());
 
@@ -96,6 +98,10 @@ void binop_table::initialize_standard_ops(binop_table &table, type_table &types)
   table.add_operation("-", types["vec3"], types["vec3"], types["vec3"], llvm_sub_vec_vec(3, types));
   table.add_operation("-", types["vec4"], types["vec4"], types["vec4"], llvm_sub_vec_vec(4, types));
 
+  table.add_operation("/", types["vec2"], types["vec2"], types["vec2"], llvm_div_vec_vec(2, types));
+  table.add_operation("/", types["vec3"], types["vec3"], types["vec3"], llvm_div_vec_vec(3, types));
+  table.add_operation("/", types["vec4"], types["vec4"], types["vec4"], llvm_div_vec_vec(4, types));
+
   table.add_operation("*", types["float"], types["vec2"], types["vec2"], llvm_scale_vec(2, false, types));
   table.add_operation("*", types["vec2"], types["float"], types["vec2"], llvm_scale_vec(2, true, types));
 
@@ -105,11 +111,19 @@ void binop_table::initialize_standard_ops(binop_table &table, type_table &types)
   table.add_operation("*", types["float"], types["vec4"], types["vec4"], llvm_scale_vec(4, false, types));
   table.add_operation("*", types["vec4"], types["float"], types["vec4"], llvm_scale_vec(4, true, types));
 
+  table.add_operation("/", types["vec2"], types["float"], types["vec2"], llvm_inv_scale_vec(2, types));
+  table.add_operation("/", types["vec3"], types["float"], types["vec3"], llvm_inv_scale_vec(3, types));
+  table.add_operation("/", types["vec4"], types["float"], types["vec4"], llvm_inv_scale_vec(4, types));
+
   table.add_operation("+", types["string"], types["string"], types["string"],
   		      llvm_add_str_str(types["string"]->llvm_type()));
 
   table.add_operation("+", types["dfunc"], types["dfunc"], types["dfunc"],
 		      llvm_add_dfunc_dfunc(types["dfunc"]->llvm_type()));
+  table.add_operation("*", types["vec4"], types["dfunc"], types["dfunc"],
+		      llvm_scale_dfunc(types["dfunc"]->llvm_type(), false, types));
+  table.add_operation("*", types["dfunc"], types["vec4"], types["dfunc"],
+		      llvm_scale_dfunc(types["dfunc"]->llvm_type(), false, types));
 }
 
 /* LLVM Code Generation Functions */
@@ -132,6 +146,13 @@ binop_table::op_codegen raytrace::llvm_mul_i_i() {
   return [] (Value *lhs, Value *rhs,
 	     Module *module, IRBuilder<> &builder) -> Value *{
     return builder.CreateMul(lhs, rhs, "i_mul_tmp");
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_div_i_i() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    return builder.CreateSDiv(lhs, rhs, "i_div_tmp");
   };
 }
 
@@ -223,6 +244,22 @@ binop_table::op_codegen raytrace::llvm_mul_vec_vec(unsigned int N, type_table &t
   };
 }
 
+binop_table::op_codegen raytrace::llvm_div_vec_vec(unsigned int N, type_table &types) {
+  stringstream tname;
+  tname << "vec" << N;
+  Type *llvm_type = types[tname.str()]->llvm_type();
+
+  return [N, llvm_type] (Value *lhs, Value *rhs,
+	     Module *module, IRBuilder<> &builder) -> Value *{
+    stringstream op_ss;
+    op_ss << "gd_builtin_div_v" << N << "_v" << N;
+    string op_func = op_ss.str();
+
+    return llvm_builtin_binop(op_func, llvm_type, llvm_type, llvm_type,
+			      lhs, rhs, module, builder);
+  };
+}
+
 binop_table::op_codegen raytrace::llvm_sub_vec_vec(unsigned int N, type_table &types) {
   stringstream tname;
   tname << "vec" << N;
@@ -254,10 +291,28 @@ binop_table::op_codegen raytrace::llvm_scale_vec(unsigned int N, bool swap_order
     Type *lhs_ty = f_type;
     Type *rhs_ty = llvm_type;
 
-    if (swap_order) {
-      swap(lhs, rhs);
-      swap(lhs_ty, rhs_ty);
-    }
+    if (swap_order) swap(lhs, rhs);
+    return llvm_builtin_binop(op_func,
+			      lhs_ty, rhs_ty, llvm_type,
+			      lhs, rhs, module, builder);
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_inv_scale_vec(unsigned int N, type_table &types) {
+  stringstream tname;
+  tname << "vec" << N;
+  Type *llvm_type = types[tname.str()]->llvm_type();
+  Type *f_type = types["float"]->llvm_type();
+  
+  return [N, f_type, llvm_type] (Value *lhs, Value *rhs,
+				 Module *module, IRBuilder<> &builder) -> Value *{
+    stringstream op_ss;
+    op_ss << "gd_builtin_inv_scale_v" << N;
+    string op_func = op_ss.str();
+
+    Type *lhs_ty = llvm_type;
+    Type *rhs_ty = f_type;
+
     return llvm_builtin_binop(op_func,
 			      lhs_ty, rhs_ty, llvm_type,
 			      lhs, rhs, module, builder);
@@ -302,6 +357,30 @@ binop_table::op_codegen raytrace::llvm_add_dfunc_dfunc(Type *dfunc_type) {
   };
 }
 
+binop_table::op_codegen raytrace::llvm_scale_dfunc(Type *dfunc_type, bool swap_order, type_table &types) {
+  return [dfunc_type, swap_order, &types] (Value *lhs, Value *rhs,
+					   Module *module, IRBuilder<> &builder) -> Value* {
+    if (swap_order) swap(lhs, rhs);
+    Type *v4_type = types["vec4"]->llvm_type();
+    Type *v4_ptr_type = v4_type->getPointerTo();
+    Type *pointer_type = dfunc_type->getPointerTo();
+
+    vector<Type*> arg_type({v4_ptr_type, pointer_type, pointer_type});
+    FunctionType *ty = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_type, false);
+    Function *add_f = cast<Function>(module->getOrInsertFunction("gd_builtin_dfunc_scale", ty));
+    
+    Value *lhs_ptr = CreateEntryBlockAlloca(builder, v4_type, "dfunc_k");
+    builder.CreateStore(lhs, lhs_ptr, false);
+    
+    Value *rhs_ptr = CreateEntryBlockAlloca(builder, dfunc_type, "dfunc_node");
+    builder.CreateStore(rhs, rhs_ptr, false);
+
+    Value *prod = CreateEntryBlockAlloca(builder, dfunc_type, "dfunc_scale");
+    builder.CreateCall3(add_f, lhs_ptr, rhs_ptr, prod);
+    return builder.CreateLoad(prod);
+  };
+}
+
 /* Helpers */
 
 Value *raytrace::llvm_builtin_binop(const string &func_name, 
@@ -315,6 +394,7 @@ Value *raytrace::llvm_builtin_binop(const string &func_name,
   vector<Type*> arg_ty{out_ptr_ty, l_ptr_ty, r_ptr_ty};
   FunctionType *ft = FunctionType::get(Type::getVoidTy(getGlobalContext()),
 				       ArrayRef<Type*>(arg_ty), false);
+  
   Function *op_func = cast<Function>(module->getOrInsertFunction(func_name.c_str(), ft));
   
   Value *l_ptr = CreateEntryBlockAlloca(builder, lhs_type, "tmp_lhs");

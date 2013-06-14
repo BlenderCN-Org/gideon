@@ -129,7 +129,10 @@ ast::load_declaration::load_declaration(parser_state *st, const string &source_n
 }
 
 codegen_value ast::load_declaration::codegen(Module *module, IRBuilder<> &builder) {
-  if (is_loaded()) return nullptr; //only load a module once
+  if (is_loaded()) {
+    return nullptr; //only load a module once
+  }
+  
   if (!has_export_table()) {
     stringstream err_ss;
     err_ss << "Unable to load file '" << source_name << "'";

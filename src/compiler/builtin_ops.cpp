@@ -21,6 +21,10 @@ extern "C" void gd_builtin_mul_v2_v2(float2 *result, float2 *lhs, float2 *rhs) {
   *result = *lhs * *rhs;
 }
 
+extern "C" void gd_builtin_div_v2_v2(float2 *result, float2 *lhs, float2 *rhs) {
+  *result = *lhs / *rhs;
+}
+
 extern "C" void gd_builtin_sub_v2_v2(float2 *result, float2 *lhs, float2 *rhs) {
   *result = *lhs - *rhs;
 }
@@ -34,6 +38,10 @@ extern "C" void gd_builtin_mul_v3_v3(float3 *result, float3 *lhs, float3 *rhs) {
   *result = *lhs * *rhs;
 }
 
+extern "C" void gd_builtin_div_v3_v3(float3 *result, float3 *lhs, float3 *rhs) {
+  *result = *lhs / *rhs;
+}
+
 extern "C" void gd_builtin_sub_v3_v3(float3 *result, float3 *lhs, float3 *rhs) {
   *result = *lhs - *rhs;
 }
@@ -45,6 +53,10 @@ extern "C" void gd_builtin_add_v4_v4(float4 *result, float4 *lhs, float4 *rhs) {
 
 extern "C" void gd_builtin_mul_v4_v4(float4 *result, float4 *lhs, float4 *rhs) {
   *result = *lhs * *rhs;
+}
+
+extern "C" void gd_builtin_div_v4_v4(float4 *result, float4 *lhs, float4 *rhs) {
+  *result = *lhs / *rhs;
 }
 
 extern "C" void gd_builtin_sub_v4_v4(float4 *result, float4 *lhs, float4 *rhs) {
@@ -62,6 +74,18 @@ extern "C" void gd_builtin_scale_v3(float3 *result, float *k, float3 *rhs) {
 
 extern "C" void gd_builtin_scale_v4(float4 *result, float *k, float4 *rhs) {
   *result = *k * (*rhs);
+}
+
+extern "C" void gd_builtin_inv_scale_v2(float2 *result, float *k, float2 *rhs) {
+  *result = (*rhs) / *k;
+}
+
+extern "C" void gd_builtin_inv_scale_v3(float3 *result, float *k, float3 *rhs) {
+  *result = (*rhs) / *k;
+}
+
+extern "C" void gd_builtin_inv_scale_v4(float4 *result, float *k, float4 *rhs) {
+  *result = (*rhs) / *k;
 }
 
 /* String Functions */
@@ -139,8 +163,13 @@ extern "C" void gd_builtin_destroy_dfunc(void *out) {
 }
 
 extern "C" void gd_builtin_dfunc_add(void *lhs, void *rhs, /* out */ void *out) {
-    shade_tree::node_ptr *left = reinterpret_cast<shade_tree::node_ptr*>(lhs);
-    shade_tree::node_ptr *right = reinterpret_cast<shade_tree::node_ptr*>(rhs);
+  shade_tree::node_ptr *left = reinterpret_cast<shade_tree::node_ptr*>(lhs);
+  shade_tree::node_ptr *right = reinterpret_cast<shade_tree::node_ptr*>(rhs);
+  
+  new (out) shade_tree::node_ptr(shade_tree::sum_ptr(new shade_tree::sum(*left, *right)));
+}
 
-    new (out) shade_tree::node_ptr(shade_tree::sum_ptr(new shade_tree::sum{*left, *right}));
+extern "C" void gd_builtin_dfunc_scale(float4 *k, void *d, /* out */ void *out) {
+  shade_tree::node_ptr *node = reinterpret_cast<shade_tree::node_ptr*>(d);
+  new (out) shade_tree::node_ptr(shade_tree::scale_ptr(new shade_tree::scale(*k, *node)));
 }

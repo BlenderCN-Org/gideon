@@ -37,6 +37,10 @@ extern "C" void gde_camera_shoot_ray(int x, int y, render_context::scene_data *s
   *r = camera_shoot_ray(sdata->s->main_camera, x, y);
 }
 
+extern "C" void gde_camera_shoot_ray_f(float x, float y, render_context::scene_data *sdata, ray *r) {
+  *r = camera_shoot_ray(sdata->s->main_camera, x, y);
+}
+
 //Primitive Functions
 
 extern "C" void *gde_primitive_shader(render_context::scene_data *sdata, int prim_id) {
@@ -88,6 +92,7 @@ extern "C" float gde_length_v3(float3 *v) { return length(*v); }
 
 //Misc Math
 extern "C" float gde_exp_f(float x) { return expf(x); }
+extern "C" float gde_pow_f(float x, float y) { return powf(x, y); }
 
 extern "C" float gde_random(void *s) { 
   render_context::scene_data *scn = reinterpret_cast<render_context::scene_data*>(s);
@@ -100,23 +105,33 @@ extern "C" void gde_cosine_sample_hemisphere(float3 *N,
   *rt = cosine_sample_hemisphere(*N, rand_u, rand_v);
 }
 
+extern "C" void gde_make_orthonormals(float3 *N,
+				      /* out */ float3 *T, /* out */ float3 *B) {
+  make_orthonormals(*N, *T, *B);
+}
+
+extern "C" void gde_spherical_direction(float3 *N, float3 *T, float3 *B,
+					float sin_theta, float cos_theta, float phi,
+					/* out */ float3 *rt) {
+  *rt = spherical_direction(*N, *T, *B, sin_theta, cos_theta, phi);
+}
+
 //Shade-Tree Evaluation
 
 extern "C" void gde_dfunc_eval(void *dfunc,
-			       float4 *L_in,
 			       float3 *P_in, float3 *w_in,
 			       float3 *P_out, float3 *w_out,
 			       /* out */ float *pdf, /* out */ float4 *out) {
   shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
-  shade_tree::evaluate(node, L_in, P_in, w_in, P_out, w_out, pdf, out);
+  shade_tree::evaluate(node, P_in, w_in, P_out, w_out, pdf, out);
 }
 
 extern "C" float gde_dfunc_sample(void *dfunc,
 				  float3 *P_out, float3 *w_out,
-				  float2 *rand_P, float2 *rand_w,
+				  float rand_D, float2 *rand_P, float2 *rand_w,
 				  /* out */ float3 *P_in, /* out */ float3 *w_in) {
   shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
-  shade_tree::sample(node, P_out, w_out, rand_P, rand_w, P_in, w_in);
+  shade_tree::sample(node, P_out, w_out, rand_D, rand_P, rand_w, P_in, w_in);
 }
 
 extern "C" bool gde_shader_handle_is_valid(void *shader) {

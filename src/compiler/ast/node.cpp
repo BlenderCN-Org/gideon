@@ -164,8 +164,7 @@ typecheck_value ast::ast_node::variable_type_lookup(const string &name) {
   stringstream err_ss;
   err_ss << "No such variable or module named '" << name << "'";
 
-  throw errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);  
-  //return 
+  return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);  
 }
 
 typed_value_container ast::ast_node::variable_lookup(const string &name) {

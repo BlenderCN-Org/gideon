@@ -20,8 +20,8 @@ module render {
 		       vec3 P, vec3 w_out) vec4 {
     vec4 L = vec4(0.0, 0.0, 0.0, 0.0);
     
-    int num_samples = 8;
-    float fN = 8.0;
+    int num_samples = 3;
+    float fN = 3.0;
     float inv_N = 1.0 / fN;
 
     for (int i = 0; i < gideon.scene:num_lights(); i += 1) {
@@ -42,7 +42,7 @@ module render {
 	  
 	  //shade this point
 	  float pdf;
-	  vec4 refl = gideon.dfunc:evaluate(surface, R, P, I, P, w_out, pdf);
+	  vec4 refl = gideon.dfunc:evaluate(surface, P, I, P, w_out, pdf) * R;
 	  L = L + (inv_N / light_pdf) * refl;
 	}
       }
@@ -79,12 +79,12 @@ module render {
 			     P_shade,
 			     w_in);
 	float tmp;
-	vec4 refl = gideon.dfunc:evaluate(surface, R, P_in, w_in, P, w_out, tmp);
+	vec4 refl = gideon.dfunc:evaluate(surface, P_in, w_in, P, w_out, tmp) * R;
 
 	if (depth > 0) {
-	  refl += gideon.dfunc:evaluate(surface,
-					eval_indirect(s, P_shade, -1.0*w_in, depth - 1),
-					P_in, w_in, P, w_out, tmp);
+	  vec4 fac = gideon.dfunc:evaluate(surface, P_in, w_in, P, w_out, tmp);
+	  vec4 R = eval_indirect(s, P_shade, -1.0*w_in, depth - 1);
+	  refl += fac * R;
 	}
 	
 	L = L + (inv_N / pdf) * refl;
@@ -105,42 +105,14 @@ module render {
       vec3 w_out = gideon.normalize(O - P);
       vec4 L = eval_direct(surface, O,
 			   P, w_out);
-      L += eval_indirect(surface, P, w_out, 2);
-
+      L += eval_indirect(surface, P, w_out, 1);
+      
       return vec4(L.x, L.y, L.z, 1.0);
     }
 
     //hit nothing, draw black
     return vec4(0.0, 0.0, 0.0, 1.0);
   }
-}
-
-module shaders {
-  
-  function dummy(ray r, vec2 coords, isect hit) dfunc {
-    vec3 N = gideon.isect:smooth_normal(hit);
-    vec3 Ng = gideon.isect:normal(hit);
-    return gideon.lambert(N, Ng, 0.8, vec4(1.0, 1.0, 1.0, 1.0));
-  }
-
-  function dummy_blue(ray r, vec2 coords, isect hit) dfunc {
-    vec3 N = gideon.isect:smooth_normal(hit);
-    vec3 Ng = gideon.isect:normal(hit);
-    return gideon.lambert(N, Ng, 0.8, vec4(0.2, 0.2, 1.0, 1.0));
-  }
-
-  function dummy_dark(ray r, vec2 coords, isect hit) dfunc {
-    vec3 N = gideon.isect:smooth_normal(hit);
-    vec3 Ng = gideon.isect:normal(hit);
-    return gideon.lambert(N, Ng, 0.2, vec4(0.5, 0.5, 0.5, 1.0));
-  }
-
-  function dummy_dark_green(ray r, vec2 coords, isect hit) dfunc {
-    vec3 N = gideon.isect:smooth_normal(hit);
-    vec3 Ng = gideon.isect:normal(hit);
-    return gideon.lambert(N, Ng, 0.2, vec4(0.2, 1.0, 0.2, 1.0));
-  }
-  
 }
 
 //Renderer Entry Point

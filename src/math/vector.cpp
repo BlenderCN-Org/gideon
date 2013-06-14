@@ -34,4 +34,9 @@ namespace raytrace {
     B = cross(N, T);
   }
 
+  float3 spherical_direction(const float3 &N, const float3 &T, const float3 &B,
+			     float sin_theta, float cos_theta, float phi) {
+    return sin_theta * cosf(phi) * T + sin_theta * sinf(phi) * B + cos_theta * N;
+  }
+
 };

@@ -1,0 +1,46 @@
+load "/home/curtis/Projects/relatively-crazy/src/standard/gideon.gdl";
+
+module shaders {
+  
+  function dummy(ray r, vec2 coords, isect hit) dfunc {
+    vec3 N = gideon.isect:smooth_normal(hit);
+    vec3 Ng = gideon.isect:normal(hit);
+    return gideon.lambert(N, Ng, 0.8, vec4(1.0, 1.0, 1.0, 1.0));    
+  }
+
+  function dummy_mix(ray r, vec2 coords, isect hit) dfunc {
+    vec3 N = gideon.isect:smooth_normal(hit);
+    vec3 Ng = gideon.isect:normal(hit);
+
+    dfunc left = gideon.lambert(N, Ng, 0.8, vec4(1.0, 1.0, 1.0, 1.0));
+    left = vec4(0.1, 0.05, 0.02, 1.0) * left;
+
+    dfunc right = gideon.blinn(N, Ng, 100.0, 0.370, 2.82);
+
+    vec4 half = vec4(0.5, 0.5, 0.5, 1.0);
+    return (half * left) + (half * right);
+    //dfunc left = gideon.lambert(N, Ng, 0.8, vec4(0.1, 0.05, 0.02, 1.0));
+    
+    //return left + right;
+  }
+
+  function dummy_blue(ray r, vec2 coords, isect hit) dfunc {
+    vec3 N = gideon.isect:smooth_normal(hit);
+    vec3 Ng = gideon.isect:normal(hit);
+    //return gideon.lambert(N, Ng, 0.8, vec4(0.2, 0.2, 1.0, 1.0));
+    return gideon.blinn(N, Ng, 500.0, 0.370, 2.82);
+  }
+
+  function dummy_dark(ray r, vec2 coords, isect hit) dfunc {
+    vec3 N = gideon.isect:smooth_normal(hit);
+    vec3 Ng = gideon.isect:normal(hit);
+    return gideon.lambert(N, Ng, 0.2, vec4(0.5, 0.5, 0.5, 1.0));
+  }
+
+  function dummy_dark_green(ray r, vec2 coords, isect hit) dfunc {
+    vec3 N = gideon.isect:smooth_normal(hit);
+    vec3 Ng = gideon.isect:normal(hit);
+    return gideon.lambert(N, Ng, 0.2, vec4(0.2, 1.0, 0.2, 1.0));
+  }
+  
+}

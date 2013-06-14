@@ -73,6 +73,16 @@ namespace raytrace {
   template<typename T>
   gen_vec4<T> operator*(const T &k, const gen_vec4<T> &v) { return {k*v.x, k*v.y, k*v.z, k*v.w}; }
 
+  //Scalar Division
+  template<typename T>
+  gen_vec2<T> operator/(const gen_vec2<T> &v, const T &k) { return {v.x/k, v.y/k}; }
+
+  template<typename T>
+  gen_vec3<T> operator/(const gen_vec3<T> &v, const T &k) { return {v.x/k, v.y/k, v.z/k}; }
+
+  template<typename T>
+  gen_vec4<T> operator/(const gen_vec4<T> &v, const T &k) { return {v.x/k, v.y/k, v.z/k, v.w/k}; }
+
   //Element-wise Multiplication
   template<typename T>
   gen_vec2<T> operator*(const gen_vec2<T> &a, const gen_vec2<T> &b) { return {a.x*b.x, a.y*b.y}; }
@@ -82,6 +92,16 @@ namespace raytrace {
 
   template<typename T>
   gen_vec4<T> operator*(const gen_vec4<T> &a, const gen_vec4<T> &b) { return {a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w}; }
+
+  //Element-wise Division
+  template<typename T>
+  gen_vec2<T> operator/(const gen_vec2<T> &a, const gen_vec2<T> &b) { return {a.x/b.x, a.y/b.y}; }
+
+  template<typename T>
+  gen_vec3<T> operator/(const gen_vec3<T> &a, const gen_vec3<T> &b) { return {a.x/b.x, a.y/b.y, a.z/b.z}; }
+
+  template<typename T>
+  gen_vec4<T> operator/(const gen_vec4<T> &a, const gen_vec4<T> &b) { return {a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w}; }
   
   //Dot Product
   template<typename T>
@@ -107,6 +127,8 @@ namespace raytrace {
 
   void make_orthonormals(const float3 &N,
 			 /* out */ float3 &T, /* out */ float3 &B);
+  float3 spherical_direction(const float3 &N, const float3 &T, const float3 &B,
+			     float sin_theta, float cos_theta, float phi);
   
 };
 

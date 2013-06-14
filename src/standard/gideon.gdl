@@ -5,6 +5,7 @@ module gideon {
   /* Math */
 
   extern function exp(float x) float : gde_exp_f;
+  extern function pow(float x, float y) float : gde_pow_f;
 
   function min(float x, float y) float {
     if (x < y) return x;
@@ -52,11 +53,35 @@ module gideon {
   extern function __length_v3(output vec3 V) float : gde_length_v3;
   function length(vec3 V) float { return __length_v3(V); }
 
+  extern function __make_orthonormals(output vec3 N,
+				      output vec3 T, output vec3 B) void : gde_make_orthonormals;
+  function make_orthonormals(vec3 N,
+			     output vec3 T, output vec3 B) void {
+    __make_orthonormals(N, T, B);
+  }
+
+  extern function __spherical_direction(output vec3 N, output vec3 T, output vec3 B,
+					float sin_theta, float cos_theta, float phi,
+					output vec3 V) void : gde_spherical_direction;
+  function spherical_direction(vec3 N, vec3 T, vec3 B,
+			       float sin_theta, float cos_theta, float phi) vec3 {
+    vec3 V;
+    __spherical_direction(N, T, B, sin_theta, cos_theta, phi, V);
+    return V;
+  }
+
   /* Camera */
 
   //Generates a ray from the camera in the direction of the given pixel.
   extern function __camera_shoot_ray(int x, int y, scene s, output ray r) void : gde_camera_shoot_ray;
   function camera:shoot_ray(int x, int y) ray {
+    ray r;
+    __camera_shoot_ray(x, y, __gd_scene, r);
+    return r;
+  }
+
+  extern function __camera_shoot_ray(float x, float y, scene s, output ray r) void : gde_camera_shoot_ray_f;
+  function camera:shoot_ray(float x, float y) ray {
     ray r;
     __camera_shoot_ray(x, y, __gd_scene, r);
     return r;
@@ -138,30 +163,28 @@ module gideon {
 
   //Evaluates a distribution function.
   extern function __dfunc_eval(output dfunc d,
-			       output vec4 L_in,
 			       output vec3 P_in, output vec3 w_in,
 			       output vec3 P_out, output vec3 w_out,
 			       output float pdf, output vec4 out) void : gde_dfunc_eval;
   function dfunc:evaluate(dfunc d,
-			  vec4 L_in,
 			  vec3 P_in, vec3 w_in,
 			  vec3 P_out, vec3 w_out,
 			  output float pdf) vec4 {
     vec4 out;
-    __dfunc_eval(d, L_in, P_in, w_in, P_out, w_out, pdf, out);
+    __dfunc_eval(d, P_in, w_in, P_out, w_out, pdf, out);
     return out;
   }
 
   //Samples a distribution function.
   extern function __dfunc_sample(output dfunc d,
 				 output vec3 P_out, output vec3 w_out,
-				 output vec2 rand_P, output vec2 rand_w,
+				 float rand_D, output vec2 rand_P, output vec2 rand_w,
 				 output vec3 P_in, output vec3 w_in) float : gde_dfunc_sample;
   function dfunc:sample(dfunc d,
 			vec3 P_out, vec3 w_out,
-			vec2 rand_P, vec2 rand_w,
+			float rand_D, vec2 rand_P, vec2 rand_w,
 			output vec3 P_in, output vec3 w_in) float {
-    return __dfunc_sample(d, P_out, w_out, rand_P, rand_w, P_in, w_in);
+    return __dfunc_sample(d, P_out, w_out, rand_D, rand_P, rand_w, P_in, w_in);
   }
 
   //Returns true if a shader handle references a valid shader function.
@@ -185,38 +208,124 @@ module gideon {
   /*
     Simple Lambertian Reflectance.
     Parameters:
-      N -- Shading Normal
-      k -- Reflectance Factor
+      N     -- Shading Normal
+      Ng    -- Geometry Normal
+      k     -- Reflectance Factor
       color -- Reflected Color
   */
   distribution lambert(vec3 N, vec3 Ng, float k, vec4 color) {
 
     function eval_pdf(float dot_N) float {
       float pi = 3.14159265359; 
-      return abs(dot_N) / pi;
+      return dot_N / pi;
     }
 
-    function evaluate(vec4 L_in,
-		      vec3 P_in, vec3 w_in,
+    function evaluate(vec3 P_in, vec3 w_in,
 		      vec3 P_out, vec3 w_out,
 		      output float pdf) vec4 {
-      float z = dot(N, w_in);
-      pdf = eval_pdf(dot(Ng, w_in));
+      float z = abs(dot(N, w_in));
+      pdf = eval_pdf(z);
 
       float fac = k*z;
-      return fac * color * L_in;
+      return fac * color;
     }
 
     function sample(vec3 P_out, vec3 w_out,
 		    vec2 rand_P, vec2 rand_w,
 		    output vec3 P_in, output vec3 w_in) float {
       P_in = P_out;
-      w_in = cosine_sample_hemisphere(Ng, rand_w.x, rand_w.y);
+      w_in = cosine_sample_hemisphere(N, rand_w.x, rand_w.y);
       
       float z = dot(Ng, w_in);
       if ((z * dot(Ng, w_out)) < 0.0) return 0.0; //directions are on different sides of the hemisphere
-      return eval_pdf(z);
+      return eval_pdf(abs(dot(N, w_in)));
     }
+
+  }
+
+  /*
+    Microfacet Model using Blinn Distribution.
+   */
+  distribution blinn(vec3 N, vec3 Ng, float e, float eta, float k) {
     
+    function eval_pdf(float cos_theta, vec3 w_out, vec3 w_h) float {
+      float pi = 3.14159265359; 
+      float p_h = (e + 2.0) * pow(cos_theta, e) / (2.0 * pi);
+      return p_h / (4.0 * dot(w_out, w_h));
+    }
+
+    function D(float cos_wh) float {
+      float pi = 3.14159265359; 
+      float c = (e + 2.0) / (2.0 * pi);
+      return c * pow(cos_wh, e);
+    }
+
+    function G(float cos_wh, float cos_wi, float cos_wo,
+	       vec3 w_in, vec3 w_out) float {
+      float dot_Nh = abs(cos_wh);
+      float dot_Ni = abs(cos_wi);
+      float dot_No = abs(cos_wo);
+      float dot_io = abs(dot(w_in, w_out));
+      
+      return min(1.0, min((2.0 * dot_Nh * dot_No) / dot_io,
+			  (2.0 * dot_Nh * dot_Ni) / dot_io));
+    }
+
+    function F(float cos_wh) float {
+      float dot_Nh = abs(cos_wh);
+
+      float tmp = (eta*eta + k*k) * (dot_Nh * dot_Nh);
+      float rpar2 = (tmp - (2.0 * eta * dot_Nh) + 1.0) /
+	(tmp + (2.0 * eta * dot_Nh) + 1.0);
+      
+      float tmp_f = eta*eta + k*k;
+      float dot2 = dot_Nh * dot_Nh;
+
+      float rperp2 = (tmp_f - (2.0 * eta * dot_Nh) + dot2) /
+	(tmp_f + (2.0 * eta * dot_Nh) + dot2);
+
+      return (rpar2 + rperp2) / 2.0;
+    }
+
+    function evaluate(vec3 P_in, vec3 w_in,
+		      vec3 P_out, vec3 w_out,
+		      output float pdf) vec4 {
+      vec3 w_h = normalize(w_in + w_out);
+      float cos_wh = dot(w_h, N);
+      float cos_wo = dot(w_out, N);
+      float cos_wi = dot(w_in, N);
+
+      pdf = eval_pdf(dot(w_h, N), w_out, w_h);
+
+      //float denom = 4.0 * cos_wo * cos_wi;
+      float denom = 4.0 * cos_wo; //the cos_wi term was removed because we multiply by the dot product in the distribution
+      float val =  D(cos_wh) * G(cos_wh, cos_wi, cos_wo, w_in, w_out) * F(cos_wh) / denom;
+      return vec4(val, val, val, 1.0);
+    }
+
+    function sample(vec3 P_out, vec3 w_out,
+		    vec2 rand_P, vec2 rand_w,
+		    output vec3 P_in, output vec3 w_in) float {
+      float pi = 3.14159265359; 
+      P_in = P_out;
+
+      //sample half vector
+      float cos_theta = pow(rand_w.x, 1.0 / (e + 1.0));
+      float sin_theta = pow(max(0.0, 1.0 - cos_theta*cos_theta), 0.5);
+      float phi = rand_w.y * 2.0 * pi;
+
+      vec3 T;
+      vec3 B;
+      make_orthonormals(N, T, B);
+      vec3 H = spherical_direction(N, T, B, sin_theta, cos_theta, phi);
+      if (dot(w_out, H) < 0.0) H = -1.0 * H;
+
+      //compute incident direction by reflecting about half vector
+      w_in = (2.0 * dot(w_out, H) * H) - w_out;
+
+      //compute pdf
+      return eval_pdf(cos_theta, w_out, H);
+    }
+
   }
 }

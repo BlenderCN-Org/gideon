@@ -55,7 +55,6 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
   //find the 'evaluate' function (error if not declared)
   function_key eval_key;
   eval_key.name = "evaluate";
-  eval_key.arguments.push_back(state->types["vec4"]); /* L_in */
   eval_key.arguments.push_back(state->types["vec3"]); /* P_in */
   eval_key.arguments.push_back(state->types["vec3"]); /* w_in */
   eval_key.arguments.push_back(state->types["vec3"]); /* P_out */
@@ -213,11 +212,11 @@ Function *ast::distribution::createEvaluator(Function *eval, Module *module, IRB
   Type *vec4_ptr = state->types["vec4"]->llvm_type()->getPointerTo();
   Type *float_ptr = state->types["float"]->llvm_ptr_type();
 
-  const unsigned int num_args = 5;
+  const unsigned int num_args = 4;
   Type *int_ptr_ty = Type::getInt32PtrTy(getGlobalContext());
   Type *param_ptr_ty = param_type->getPointerTo();
 
-  vector<Type*> arg_types({int_ptr_ty, vec4_ptr, vec3_ptr, vec3_ptr, vec3_ptr, vec3_ptr, /* out */ float_ptr, /* out */ vec4_ptr});
+  vector<Type*> arg_types({int_ptr_ty, vec3_ptr, vec3_ptr, vec3_ptr, vec3_ptr, /* out */ float_ptr, /* out */ vec4_ptr});
   FunctionType *eval_type = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_types, false);
   Function *f = Function::Create(eval_type, Function::ExternalLinkage, evaluator_name("eval"), module);
   

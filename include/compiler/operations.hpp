@@ -50,6 +50,7 @@ namespace raytrace {
   binop_table::op_codegen llvm_add_i_i();
   binop_table::op_codegen llvm_sub_i_i();
   binop_table::op_codegen llvm_mul_i_i();
+  binop_table::op_codegen llvm_div_i_i();
   binop_table::op_codegen llvm_lt_i_i();
   binop_table::op_codegen llvm_gt_i_i();
 
@@ -63,12 +64,15 @@ namespace raytrace {
 
   binop_table::op_codegen llvm_add_vec_vec(unsigned int N, type_table &types);
   binop_table::op_codegen llvm_mul_vec_vec(unsigned int N, type_table &types);
+  binop_table::op_codegen llvm_div_vec_vec(unsigned int N, type_table &types);
   binop_table::op_codegen llvm_sub_vec_vec(unsigned int N, type_table &types);
   binop_table::op_codegen llvm_scale_vec(unsigned int N, bool swap_order, type_table &types);
+  binop_table::op_codegen llvm_inv_scale_vec(unsigned int N, type_table &types);
   
   binop_table::op_codegen llvm_add_str_str(llvm::Type *str_type);
  
   binop_table::op_codegen llvm_add_dfunc_dfunc(llvm::Type *dfunc_type);
+  binop_table::op_codegen llvm_scale_dfunc(llvm::Type *dfunc_type, bool swap_order, type_table &types);
 
   /* Unary Operations */
 

@@ -14,7 +14,6 @@ namespace raytrace {
   namespace shade_tree {
     struct leaf {
       typedef void (*eval_func_type)(const void*,
-				     float4*,
 				     float3*, float3*, float3*, float3*,
 				     float*, float4*);
       typedef float (*sample_func_type)(const void *,
@@ -44,24 +43,31 @@ namespace raytrace {
 			   scale_ptr,
 			   sum_ptr> node_ptr;
     
+    float get_weight(const node_ptr &node);
+    
     struct scale {
       float4 k;
       node_ptr node;
+      float weight;
+
+      scale(const float4 &k, const node_ptr &node);
     };
     
     struct sum {
       node_ptr lhs, rhs;
+      float weight;
+
+      sum(const node_ptr &lhs, const node_ptr &rhs);
     };
 
     void evaluate(node_ptr &node,
-		  float4 *L_in,
 		  float3 *P_in, float3 *w_in,
 		  float3 *P_out, float3 *w_out,
 		  /* out */ float *pdf, /* out */ float4 *out);
 
     float sample(node_ptr &node,
 		 float3 *P_out, float3 *w_out,
-		 float2 *rand_P, float2 *rand_w,
+		 float rand_D, float2 *rand_P, float2 *rand_w,
 		 /* out */ float3 *P_in, /* out */ float3 *w_in);
   };
 };
