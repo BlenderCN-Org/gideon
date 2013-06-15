@@ -427,7 +427,8 @@ unary_op_table::op_candidate_vector unary_op_table::find_operation(const string 
   return candidates;
 }
 
-unary_op_table::op_candidate_value unary_op_table::find_best_operation(const std::string &op, const type_spec &type) const {
+unary_op_table::op_candidate_value unary_op_table::find_best_operation(const std::string &op, const type_spec &type,
+								       const type_conversion_table &conversions) const {
   auto table_it = operations.find(op);
   if (table_it == operations.end()) return errors::make_error<errors::error_message>(string("Unsupported operation: ") + op, 0, 0);
   
@@ -438,7 +439,7 @@ unary_op_table::op_candidate_value unary_op_table::find_best_operation(const std
   op_candidate_vector best_list;
   
   for (auto it = candidates.begin(); it != candidates.end(); ++it) {
-    int score = candidate_score(it->first, type);
+    int score = candidate_score(it->first, type, conversions);
     if (score >= max_score) continue;
     
     if (score < best_score) {
@@ -463,10 +464,12 @@ void unary_op_table::add_operation(const string &op, const type_spec &type,
 }
 
 int unary_op_table::candidate_score(const type_spec &expected_type,
-				    const type_spec &type) const {
-  int cost;
-  type->can_cast_to(*expected_type, cost);
-  return cost;  
+				    const type_spec &type,
+				    const type_conversion_table &conversions) const {
+  int arg_cost, op_cost;
+  
+  if (!conversions.can_convert(type, expected_type, arg_cost, op_cost)) return std::numeric_limits<int>::max();
+  return op_cost;
 }
 
 void unary_op_table::initialize_standard_ops(unary_op_table &table, type_table &types) {

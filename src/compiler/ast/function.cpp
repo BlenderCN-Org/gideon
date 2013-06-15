@@ -18,7 +18,7 @@ raytrace::ast::func_call::func_call(parser_state *st,
   
 }
 
-ast::func_call::entry_or_error ast::func_call::lookup_function() {
+ast::ast_node::entry_or_error ast::func_call::lookup_function() {
   //determine the type of each argument
   typecheck_vector arg_types;
   for (vector<expression_ptr>::iterator arg_it = args.begin(); arg_it != args.end(); ++arg_it) {
@@ -33,25 +33,14 @@ ast::func_call::entry_or_error ast::func_call::lookup_function() {
     for (auto it = args.begin(); it != args.end(); ++it) fkey.arguments.push_back(*it);
     
     if (path_expr == nullptr) {
-      try { return &functions().get(fkey); }
-      catch (compile_error &e) {  } //ignore and look up the module stack
-
-      for (auto mod_it = state->modules.scope_begin(); mod_it != state->modules.scope_end(); ++mod_it) {
-	function_scope &fscope = mod_it->get_module()->functions;
-	auto func_it = fscope.find(fkey);
-	if (func_it != fscope.end()) return &(*func_it);
-      }
-
-      stringstream err_ss;
-      err_ss << "Undeclared function '" << fname << "'";
-      return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
+      return function_lookup(fkey);
     }
     else {
       code_value module_path = path_expr->codegen_module();
       return errors::codegen_call<code_value, entry_or_error>(module_path, [this, &fkey] (value &val) -> entry_or_error {
 	  module_ptr m = val.extract_module();
 	  function_scope &fscope = m->functions;
-	  auto func_it = fscope.find(fkey);
+	  auto func_it = fscope.find_best(fkey, state->type_conversions);
 	  if (func_it != fscope.end()) return &(*func_it);
 
 	  stringstream err_ss;
@@ -62,7 +51,6 @@ ast::func_call::entry_or_error ast::func_call::lookup_function() {
   };
   
   return errors::codegen_call<typecheck_vector, entry_or_error>(arg_types, lookup);
-  
 }
 
 typecheck_value ast::func_call::typecheck() {
@@ -116,25 +104,13 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
   //evaluate all arguments
   vector<typed_value_container> to_destroy;
   typed_value_vector arg_eval = codegen_all_args(func, module, builder, to_destroy);
-
-  typedef errors::argument_value_join<entry_or_error, typed_value_vector>::result_value_type arg_val_type;
-  boost::function<typed_value_container (arg_val_type &)> call_func = [this, module, &builder] (arg_val_type &call_args) -> typed_value_container {
-    function_symbol_table::entry_type *entry = errors::get<0>(call_args);
-    vector<typed_value> &args = errors::get<1>(call_args);
-
+  
+  boost::function<typed_value_container (function_symbol_table::entry_type *&,
+					 vector<typed_value> &)> call_func = [this, module, &builder] (function_symbol_table::entry_type *&entry,
+												       vector<typed_value> &args) -> typed_value_container {
     Function *f = entry->func;
     bool is_member_function = entry->member_function;
     
-    size_t expected_size = entry->arguments.size();
-    size_t found_args = args.size();
-    if (is_member_function) found_args--;
-
-    if (found_args != expected_size) {
-      stringstream err_str;
-      err_str << "Expected " << expected_size << " arguments, found " << found_args << ".";
-      return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
-    }
-
     vector<Value*> arg_vals;
     unsigned int arg_idx = 0;
 
@@ -148,13 +124,19 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
       typed_value &arg = (*arg_it);
       type_spec arg_ts = arg.get<1>();
 
-      if (*arg_ts != *entry->arguments[arg_idx].type) {
-	stringstream err_str;
-	err_str << "Error in " << arg_idx << "-th argument: Expected type '" << entry->arguments[arg_idx].type->name << "' but found type '" << arg_ts->name << "'.";
-	return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
+      if (entry->arguments[arg_idx].output) arg_vals.push_back(arg.get<0>().extract_value());
+      else {
+	code_value cast_arg_val = typecast(arg.get<0>().extract_value(),
+					   arg_ts, entry->arguments[arg_idx].type,
+					   false, false,
+					   module, builder);
+	
+	errors::codegen_call<code_value, codegen_void>(cast_arg_val,
+						       [&] (value &v) -> codegen_void {
+							 arg_vals.push_back(v.extract_value());
+							 return empty_type();
+						       });
       }
-
-      arg_vals.push_back(arg.get<0>().extract_value());
       
       ++arg_it;
       ++arg_idx;
@@ -166,7 +148,7 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
     return typed_value(builder.CreateCall(f, arg_vals, tmp_name.c_str()), entry->return_type);
   };
   
-  typed_value_container result = errors::codegen_call_args(call_func, func, arg_eval);
+  typed_value_container result = errors::codegen_apply(call_func, func, arg_eval);
 
   //delete any expressions used to call this function
   for (auto it = to_destroy.begin(); it != to_destroy.end(); ++it) {
@@ -393,20 +375,14 @@ codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<
   //make sure the expression type matches this function's return type
   boost::function<codegen_void (typed_value &)> check = [this, &expected_rt, module, &builder] (typed_value &result) -> codegen_void {
     type_spec t = result.get<1>();
-    if (expected_rt != t) {
-      stringstream err_str;
-      err_str << "Invalid return type '" << result.get<1>()->name << "', expected '" << expected_rt->name << "'";
-      return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
-    }
+    code_value rt_val = typecast(result.get<0>().extract_value(), t, expected_rt,
+				 expr->bound(), true, module, builder);
     
-    //some values have destructors, so make a copy to ensure that we don't have invalid data (for most types this won't make a difference).
-    Value *rt_val = result.get<0>().extract_value();
-    Value *copy = (expr->bound() ? t->copy(rt_val, module, builder) : rt_val);
-
-    exit_function(module, builder);
-    builder.CreateRet(copy);
-
-    return empty_type();
+    return errors::codegen_call<code_value, codegen_void>(rt_val, [this, module, &builder] (value &v) -> codegen_void {
+	exit_function(module, builder);
+	builder.CreateRet(v.extract_value());
+	return empty_type();
+      });
   };
   
   return errors::codegen_call<typed_value_container, codegen_void>(rt_val, check);

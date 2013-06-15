@@ -1,4 +1,5 @@
 #include "compiler/symboltable.hpp"
+#include "compiler/type_conversion.hpp"
 
 #include <stdexcept>
 
@@ -105,11 +106,34 @@ namespace raytrace {
 
     versions[entry.full_name] = entry;
   }
-  
+
   function_overload_set::iterator function_overload_set::find(const function_key &key) {
+    for (auto it = versions.begin(); it != versions.end(); ++it) {
+      function_entry &entry = it->second;
+      bool equivalent = (key.arguments.size() == entry.arguments.size());
+      if (equivalent) {
+	for (unsigned int idx = 0; idx < entry.arguments.size(); ++idx) {
+	  const function_argument &arg = entry.arguments[idx];
+	  const type_spec &param_ts = key.arguments[idx];
+	  
+	  if (*arg.type != *param_ts) {
+	    equivalent = false;
+	    break;
+	  }
+	}
+      }
+
+      if (equivalent) return it;
+    }
+
+    return end();
+  }
+  
+  function_overload_set::iterator function_overload_set::find_best(const function_key &key,
+								   const type_conversion_table &conversions) {
     vector<iterator> candidates;
     for (auto it = versions.begin(); it != versions.end(); it++) {
-      if (is_viable(key, it->second)) candidates.push_back(it);
+      if (is_viable(key, it->second, conversions)) candidates.push_back(it);
     }
     
     if (candidates.size() == 0) return end();
@@ -120,7 +144,7 @@ namespace raytrace {
     iterator best_it = end();
 
     for (auto it = candidates.begin(); it != candidates.end(); it++) {
-      int score = candidate_score(key, (*it)->second);
+      int score = candidate_score(key, (*it)->second, conversions);
       if (score < min_score) {
 	min_score = score;
 	score_count = 1;
@@ -137,26 +161,33 @@ namespace raytrace {
   function_overload_set::iterator function_overload_set::begin() { return versions.begin(); }
   function_overload_set::iterator function_overload_set::end() { return versions.end(); }
 
-  bool function_overload_set::is_viable(const function_key &key, const function_entry &entry) {
+  bool function_overload_set::is_viable(const function_key &key, const function_entry &entry,
+					const type_conversion_table &conversions) {
+    int unused;
+    
     if (entry.arguments.size() != key.arguments.size()) return false;
     for (unsigned int idx = 0; idx < entry.arguments.size(); idx++) {
       const function_argument &arg = entry.arguments[idx];
       const type_spec &param_ts = key.arguments[idx];
-      
-      if (*arg.type != *param_ts) return false;
+
+      if (!conversions.can_convert(param_ts, arg.type, unused, unused)) return false;
     }
     
     return true;
   }
 
-  int function_overload_set::candidate_score(const function_key &key, const function_entry &entry) {
+  int function_overload_set::candidate_score(const function_key &key, const function_entry &entry,
+					     const type_conversion_table &conversions) {
+    int unused;
     int score = 0;
+
     for (unsigned int idx = 0; idx < entry.arguments.size(); idx++) {
       const function_argument &arg = entry.arguments[idx];
       const type_spec &param_ts = key.arguments[idx];
       int cast_cost = 0;
-      
-      param_ts->can_cast_to(*arg.type, cast_cost);
+
+      if (arg.output && (*param_ts != *arg.type)) return numeric_limits<int>::max();
+      if (!conversions.can_convert(param_ts, arg.type, cast_cost, unused)) return numeric_limits<int>::max();
       score += cast_cost;
     }
     
@@ -227,6 +258,21 @@ namespace raytrace {
     table_type::iterator name_it = table.find(f.name);
     if (name_it == table.end()) return end();
     function_overload_set::iterator version = name_it->second.find(f);
+    if (version == name_it->second.end()) return end();
+    
+    result.name_it = name_it;
+    result.end = table.end();
+    result.version_it = version;
+
+    return result;
+  }
+
+  function_scope::iterator function_scope::find_best(const key_type &f,
+						     const type_conversion_table &conversions) {
+    iterator result = end();
+    table_type::iterator name_it = table.find(f.name);
+    if (name_it == table.end()) return end();
+    function_overload_set::iterator version = name_it->second.find_best(f, conversions);
     if (version == name_it->second.end()) return end();
     
     result.name_it = name_it;

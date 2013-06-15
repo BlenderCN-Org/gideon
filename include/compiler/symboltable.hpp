@@ -222,6 +222,8 @@ namespace raytrace {
     function_key to_key() const;
   };
   
+  class type_conversion_table;
+
   /* A list of all the overloaded versions of a function. */
   class function_overload_set {
   public:
@@ -234,13 +236,18 @@ namespace raytrace {
     void insert(const function_entry &entry);
     
     iterator find(const function_key &key);
+    iterator find_best(const function_key &key,
+		       const type_conversion_table &conversions);
+    
     iterator begin();
     iterator end();
 
   private:
 
-    bool is_viable(const function_key &key, const function_entry &entry);
-    int candidate_score(const function_key &key, const function_entry &entry);
+    bool is_viable(const function_key &key, const function_entry &entry,
+		   const type_conversion_table &conversions);
+    int candidate_score(const function_key &key, const function_entry &entry,
+			const type_conversion_table &conversions);
 
     boost::unordered_map<std::string, function_entry> versions;
   };
@@ -273,6 +280,10 @@ namespace raytrace {
     typedef function_key key_type;
 
     iterator find(const key_type &f);
+
+    //finds the entry closest to the given key, throwing an error if ambiguous
+    iterator find_best(const key_type &f, const type_conversion_table &conversions);
+
     iterator begin();
     iterator end();
 

@@ -16,16 +16,17 @@ namespace raytrace {
     
     /* Stores the state of the language parser. */
     struct parser_state {
-      variable_symbol_table variables;
-      function_symbol_table functions;
-      module_symbol_table modules;
-      
-      export_table exports;
       type_table &types;
       
       type_conversion_table type_conversions;
       binop_table binary_operations;
       unary_op_table unary_operations;
+
+      variable_symbol_table variables;
+      function_symbol_table functions;
+      module_symbol_table modules;
+      
+      export_table exports;
       
       control_state control;
 
@@ -41,6 +42,8 @@ namespace raytrace {
       ast_node(parser_state *st,
 	       unsigned int line_no = 0, unsigned int column_no = 0) : state(st), line_no(line_no), column_no(column_no) { }
       virtual ~ast_node() { }
+
+      typedef raytrace::codegen<function_symbol_table::entry_type*, compile_error>::value entry_or_error;
       
     protected:
 
@@ -74,6 +77,8 @@ namespace raytrace {
 
       typecheck_value variable_type_lookup(const std::string &name);
       typed_value_container variable_lookup(const std::string &name);
+
+      entry_or_error function_lookup(const function_key &fkey);
       
       code_value typecast(typed_value_container &src, const type_spec &dst_type,
 			  bool make_copy, bool destroy_original,

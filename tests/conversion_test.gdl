@@ -1,11 +1,37 @@
 
-function bar(float y) float {
+distribution test(int z) {
+  function evaluate(vec3 P_in, vec3 w_in,
+		    vec3 P_out, vec3 w_out,
+		    output float pdf) vec4 {
+    float fz = z;
+    pdf = 1.0;
+    return vec4(fz, fz, fz, 1.0);
+  }
+  
+  function sample(vec3 P_out, vec3 w_out,
+		  vec2 rand_P, vec2 rand_w,
+		  output vec3 P_in, output vec3 w_in) float {
+    P_in = P_out;
+    w_in = w_out;
+    
+    return z;
+  }
+}
+
+function bar(float y, output float z) float {
+  z = -0.5;
   return 2.0 * y;
 }
 
 function foo(int x) float {
   float f_x = (3 + x);
-  f_x = f_x + 7;
+  f_x = -(f_x + 7);
   
-  return f_x;// + bar(x);
+  int i_x = f_x;
+  float z = 3;
+  float w = bar(x, z);
+  
+  dfunc d = test(567 + x);
+
+  return i_x + w + z;
 }

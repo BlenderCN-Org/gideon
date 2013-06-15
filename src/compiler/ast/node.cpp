@@ -198,6 +198,31 @@ typed_value_container ast::ast_node::variable_lookup(const string &name) {
   return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
 }
 
+ast::ast_node::entry_or_error ast::ast_node::function_lookup(const function_key &fkey) {
+  try {
+    //search each scope in this module (starting at the closest, working backwards)
+    for (auto fscope = functions().scope_begin(); fscope != functions().scope_end(); ++fscope) {
+      auto f_it = fscope->find_best(fkey, state->type_conversions);
+      if (f_it != fscope->end()) return &(*f_it);
+    }
+    
+    //look up the module stack
+    for (auto mod_scope = state->modules.scope_begin(); mod_scope != state->modules.scope_end(); ++mod_scope) {
+      function_scope &fscope = mod_scope->get_module()->functions;
+      auto f_it = fscope.find_best(fkey, state->type_conversions);
+      if (f_it != fscope.end()) return &(*f_it);
+    }
+  }
+  catch (runtime_error &e) {
+    //ambiguous function call case
+    return errors::make_error<errors::error_message>(e.what(), line_no, column_no);
+  }
+
+  stringstream err_ss;
+  err_ss << "Undeclared function '" << fkey.name << "'";
+  return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
+}
+
 code_value ast::ast_node::typecast(typed_value_container &src, const type_spec &dst_type,
 				   bool make_copy, bool destroy_on_convert,
 				   Module *module, IRBuilder<> &builder) {

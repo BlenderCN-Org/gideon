@@ -31,12 +31,11 @@ namespace raytrace {
       expression_ptr path_expr;
       std::string fname;
       std::vector<expression_ptr> args;
-
-      typedef raytrace::codegen<function_symbol_table::entry_type*, compile_error>::value entry_or_error;
+      
       typed_value_vector codegen_all_args(entry_or_error &entry,
 					  llvm::Module *module, llvm::IRBuilder<> &builder,
 					  /* out */ std::vector<typed_value_container> &to_destroy);
-      entry_or_error lookup_function();
+      ast_node::entry_or_error lookup_function();
     };
 
     /* 

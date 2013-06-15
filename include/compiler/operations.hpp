@@ -98,7 +98,8 @@ namespace raytrace {
     op_candidate_vector find_operation(const std::string &op, const type_spec &type) const;
 
     //Accounting for cast operations, finds the most appropriate version of the given operation to use.
-    op_candidate_value find_best_operation(const std::string &op, const type_spec &type) const;
+    op_candidate_value find_best_operation(const std::string &op, const type_spec &type,
+					   const type_conversion_table &conversions) const;
     
     //Inserts a new operation into the table.
     void add_operation(const std::string &op, const type_spec &ty,
@@ -112,7 +113,8 @@ namespace raytrace {
     boost::unordered_map<std::string, op_codegen_table> operations;
 
     int candidate_score(const type_spec &expected_type,
-			const type_spec &type) const;
+			const type_spec &type,
+			const type_conversion_table &conversions) const;
     
   };
 

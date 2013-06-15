@@ -89,7 +89,7 @@ namespace raytrace {
       
       typed_value_container execute_op(unary_op_table::op_candidate_value &op_func,
 				       llvm::Module *module, llvm::IRBuilder<> &builder,
-				       llvm::Value* arg_val);
+				       llvm::Value* arg_val, type_spec &arg_type);
     };
   
   };
