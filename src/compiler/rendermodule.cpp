@@ -101,6 +101,7 @@ render_program::object_entry::object_entry(render_program *prog, const render_ob
   obj(obj),
   parser(prog->types)
 {
+  type_conversion_table::initialize_standard_conversions(parser.type_conversions, parser.types);
   binop_table::initialize_standard_ops(parser.binary_operations,
 				       parser.types);
   unary_op_table::initialize_standard_ops(parser.unary_operations,

@@ -1,4 +1,5 @@
-
+#SET (CMAKE_C_COMPILER             "/usr/bin/clang")
+#SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
 
 set(RT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 
@@ -32,6 +33,7 @@ set(RT_SOURCE_FILES
   compiler/errors.cpp
   compiler/symboltable.cpp
   compiler/operations.cpp
+  compiler/type_conversion.cpp
   compiler/llvm_helper.cpp
   compiler/gen_state.cpp
   compiler/lookup.cpp

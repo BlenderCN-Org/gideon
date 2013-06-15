@@ -10,11 +10,16 @@
 #include <boost/tuple/tuple.hpp>
 #include <tuple>
 
+#include <boost/fusion/container/list/cons.hpp>
+#include <boost/fusion/include/cons.hpp>
+
 #include "llvm/Module.h"
 
 #include <vector>
 #include <stdexcept>
 #include <boost/type_traits.hpp>
+
+#include <boost/fusion/functional/invocation/invoke.hpp>
 
 namespace raytrace {
 
@@ -393,6 +398,19 @@ namespace raytrace {
       value_container_operation<arg_type, ResultType> op(func);
       return boost::apply_visitor(op, arg_list);
     }
+
+
+    template<typename ResultType, typename... ArgTypes>
+    ResultType codegen_apply(const boost::function<ResultType (typename errors::value_helper<ArgTypes>::value_type &...)> &func,
+			     ArgTypes&... args) {
+      typedef typename errors::argument_value_join<ArgTypes...>::result_value_type arg_val_type;
+      boost::function<ResultType (arg_val_type &)> joined_func = [&func] (arg_val_type &arg) -> ResultType {
+	//return boost::fusion::invoke(func, arg);
+      };
+      
+      return errors::codegen_call_args(joined_func, args...);
+    }
+
 
     //Merges two void values.
     codegen_void merge_void_values(codegen_void &v0, codegen_void &v1);

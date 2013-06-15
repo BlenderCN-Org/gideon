@@ -197,3 +197,34 @@ typed_value_container ast::ast_node::variable_lookup(const string &name) {
   err_ss << "No such variable or module named '" << name << "'";
   return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
 }
+
+code_value ast::ast_node::typecast(typed_value_container &src, const type_spec &dst_type,
+				   bool make_copy, bool destroy_on_convert,
+				   Module *module, IRBuilder<> &builder) {
+  boost::function<code_value (typed_value &)> cast_op = [this, &dst_type,
+							 make_copy, destroy_on_convert,
+							 module, &builder] (typed_value &args) -> code_value {
+    type_spec src_type = args.get<1>();
+    
+    Value *src = args.get<0>().extract_value();
+    if (make_copy) src = src_type->copy(src, module, builder);
+    
+    code_value result = state->type_conversions.convert(src_type, src, dst_type, module, builder);
+    if ((*src_type != *dst_type) && destroy_on_convert) src_type->destroy(src, module, builder);
+
+    return result;
+  };
+
+  return errors::codegen_call<typed_value_container, code_value>(src, cast_op);
+}
+
+code_value ast::ast_node::typecast(Value *src, 
+				   const type_spec &src_type, const type_spec &dst_type,
+				   bool make_copy, bool destroy_on_convert,
+				   Module *module, IRBuilder<> &builder) {
+  if (make_copy) src = src_type->copy(src, module, builder);    
+  code_value result = state->type_conversions.convert(src_type, src, dst_type, module, builder);
+  
+  if ((*src_type != *dst_type) && destroy_on_convert) src_type->destroy(src, module, builder);
+  return result;
+}

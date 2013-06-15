@@ -6,6 +6,8 @@
 
 namespace raytrace {
 
+  class type_conversion_table;
+
   /* A table containing all valid binary operations. */
   class binop_table {
   public:
@@ -27,7 +29,8 @@ namespace raytrace {
     op_candidate_vector find_operation(const std::string &op, const type_spec &lhs, const type_spec &rhs) const;
 
     //Accounting for cast operations, finds the most appropriate version of the given operation to use.
-    op_result_value find_best_operation(const std::string &op, const type_spec &lhs, const type_spec &rhs) const;
+    op_result_value find_best_operation(const std::string &op, const type_spec &lhs, const type_spec &rhs,
+					const type_conversion_table &conversions) const;
     
     //Inserts a new operation into the table.
     void add_operation(const std::string &op, const type_spec &lhs, const type_spec &rhs,
@@ -40,7 +43,7 @@ namespace raytrace {
     typedef boost::unordered_map<op_type, op_info> op_codegen_table;    
     boost::unordered_map<std::string, op_codegen_table> operations;
 
-    int candidate_score(const op_type &types,
+    int candidate_score(const op_type &types, const type_conversion_table &conversions,
 			const type_spec &lhs, const type_spec &rhs) const;
     
   };

@@ -20,23 +20,20 @@ typecheck_value ast::assignment::typecheck() {
 pair<typed_value_container, typed_value_container> ast::assignment::get_value_and_pointer(Module *module, IRBuilder<> &builder) {
   typed_value_container ptr = lhs->codegen_ptr(module, builder);
   typed_value_container value = rhs->codegen(module, builder);
-  
-  typedef raytrace::errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type arg_val_type;  
-  boost::function<typed_value_container (arg_val_type &)> op = [this, module, &builder] (arg_val_type &args) -> typed_value_container {
-    type_spec lt = args.get<0>().get<1>();
-    type_spec rt = args.get<1>().get<1>();
-    int cost;
-    if (!rt->can_cast_to(*lt, cost)) {
-      stringstream err;
-      err << "Cannot convert value of type '" << rt->name << "' to variable of type '" << lt->name << "' in assignment.";
-      return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
-    }
-    
-    Value *new_val = args.get<1>().get<0>().extract_value();
-    
-    //if the rhs is already bound to a variable, make a copy
-    if (rhs->bound()) new_val = rt->copy(new_val, module, builder);
 
+  typedef raytrace::errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type arg_val_type;  
+  boost::function<code_value (arg_val_type&)> cast_rhs = [this, &value, module, &builder] (arg_val_type &args) -> code_value {
+    type_spec lt = args.get<0>().get<1>();
+    return typecast(value, lt, rhs->bound(), true, module, builder);
+  };
+  
+  code_value cast_value = errors::codegen_call_args(cast_rhs, ptr, value);
+  
+  typedef raytrace::errors::argument_value_join<typed_value_container, code_value>::result_value_type assign_arg_type;  
+  boost::function<typed_value_container (assign_arg_type &)> op = [this, module, &builder] (assign_arg_type &args) -> typed_value_container {
+    type_spec lt = args.get<0>().get<1>();
+    Value *new_val = args.get<1>().extract_value();
+    
     //now destroy the old value
     Value *ptr = args.get<0>().get<0>().extract_value();
     lt->destroy(ptr, module, builder);
@@ -45,7 +42,7 @@ pair<typed_value_container, typed_value_container> ast::assignment::get_value_an
     return typed_value(new_val, lt);
   };
   
-  return make_pair(errors::codegen_call_args(op, ptr, value), ptr);
+  return make_pair(errors::codegen_call_args(op, ptr, cast_value), ptr);
 }
 
 typed_value_container ast::assignment::codegen(Module *module, IRBuilder<> &builder) {
@@ -104,7 +101,8 @@ pair<typed_value_container, typed_value_container> ast::assignment_operator::get
     type_spec lhs_type = args.get<0>().get<1>();
     type_spec rhs_type = args.get<1>().get<1>();
     
-    binop_table::op_result_value op_func = state->binary_operations.find_best_operation(op, lhs_type, rhs_type);
+    binop_table::op_result_value op_func = state->binary_operations.find_best_operation(op, lhs_type, rhs_type,
+											state->type_conversions);
     
     Value *lhs_ptr = args.get<0>().get<0>().extract_value();
     Value *rhs = args.get<1>().get<0>().extract_value();

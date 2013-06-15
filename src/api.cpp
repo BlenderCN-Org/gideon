@@ -401,8 +401,11 @@ extern "C" {
     
     float3 light_pt{position[0], position[1], position[2]};
     
-    light lamp{light::POINT, {light_pt, radius},
-	energy, float3{r, g, b}};
+    light lamp{
+      light::POINT,
+	{{light_pt, radius}},
+	energy, float3{r, g, b}
+    };
     s->lights.push_back(lamp);
   }
 

@@ -1,4 +1,5 @@
 #include "compiler/operations.hpp"
+#include "compiler/type_conversion.hpp"
 #include "compiler/llvm_helper.hpp"
 
 #include <stdexcept>
@@ -24,7 +25,8 @@ binop_table::op_candidate_vector binop_table::find_operation(const string &op, c
   return candidates;
 }
 
-binop_table::op_result_value binop_table::find_best_operation(const std::string &op, const type_spec &lhs, const type_spec &rhs) const {
+binop_table::op_result_value binop_table::find_best_operation(const std::string &op, const type_spec &lhs, const type_spec &rhs,
+							      const type_conversion_table &conversions) const {
   auto table_it = operations.find(op);
   if (table_it == operations.end()) return errors::make_error<errors::error_message>(string("Unsupported operation: ") + op, 0, 0);
   
@@ -35,7 +37,7 @@ binop_table::op_result_value binop_table::find_best_operation(const std::string 
   op_candidate_vector best_list;
   
   for (auto it = candidates.begin(); it != candidates.end(); ++it) {
-    int score = candidate_score(it->first, lhs, rhs);
+    int score = candidate_score(it->first, conversions, lhs, rhs);
     if (score >= max_score) continue;
     
     if (score < best_score) {
@@ -60,11 +62,12 @@ void binop_table::add_operation(const string &op, const type_spec &lhs, const ty
   table[args] = info;
 }
 
-int binop_table::candidate_score(const op_type &types,
+int binop_table::candidate_score(const op_type &types, const type_conversion_table &conversions,
 				 const type_spec &lhs, const type_spec &rhs) const {
+  int arg_tmp;
   int l_cost, r_cost;
-  if (!lhs->can_cast_to(*types.first, l_cost)) return l_cost;
-  if (!rhs->can_cast_to(*types.second, r_cost)) return r_cost;
+  if (!conversions.can_convert(lhs, types.first, arg_tmp, l_cost)) return std::numeric_limits<int>::max();
+  if (!conversions.can_convert(rhs, types.second, arg_tmp, r_cost)) return std::numeric_limits<int>::max();
 
   return l_cost + r_cost;
 }

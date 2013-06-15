@@ -67,7 +67,8 @@ namespace raytrace {
       
       typed_value_container execute_op(binop_table::op_result_value &op_func,
 				       llvm::Module *module, llvm::IRBuilder<> &builder,
-				       llvm::Value* lhs_val, llvm::Value *rhs_val);
+				       llvm::Value* lhs_val, llvm::Value *rhs_val,
+				       const type_spec &lhs_type, const type_spec &rhs_type);
     };
 
     /* A unary arithmetic operation */

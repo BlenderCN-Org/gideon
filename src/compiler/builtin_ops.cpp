@@ -158,8 +158,10 @@ extern "C" void gd_builtin_copy_dfunc(void *in, /* out */ void *out) {
 }
 
 extern "C" void gd_builtin_destroy_dfunc(void *out) {
-  shade_tree::node_ptr *node = reinterpret_cast<shade_tree::node_ptr*>(out);
-  node->shade_tree::node_ptr::~node_ptr();
+  typedef shade_tree::node_ptr node_type;
+  
+  node_type *node = reinterpret_cast<shade_tree::node_ptr*>(out);
+  node->~node_type();
 }
 
 extern "C" void gd_builtin_dfunc_add(void *lhs, void *rhs, /* out */ void *out) {

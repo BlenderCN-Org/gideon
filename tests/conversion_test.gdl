@@ -1,0 +1,11 @@
+
+function bar(float y) float {
+  return 2.0 * y;
+}
+
+function foo(int x) float {
+  float f_x = (3 + x);
+  f_x = f_x + 7;
+  
+  return f_x;// + bar(x);
+}

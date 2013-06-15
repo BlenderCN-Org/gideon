@@ -4,6 +4,7 @@
 #include "compiler/errors.hpp"
 #include "compiler/symboltable.hpp"
 #include "compiler/gen_state.hpp"
+#include "compiler/type_conversion.hpp"
 #include "compiler/operations.hpp"
 #include "compiler/lookup.hpp"
 
@@ -21,8 +22,11 @@ namespace raytrace {
       
       export_table exports;
       type_table &types;
+      
+      type_conversion_table type_conversions;
       binop_table binary_operations;
       unary_op_table unary_operations;
+      
       control_state control;
 
       render_program *objects;
@@ -70,6 +74,15 @@ namespace raytrace {
 
       typecheck_value variable_type_lookup(const std::string &name);
       typed_value_container variable_lookup(const std::string &name);
+      
+      code_value typecast(typed_value_container &src, const type_spec &dst_type,
+			  bool make_copy, bool destroy_original,
+			  llvm::Module *module, llvm::IRBuilder<> &builder);
+      
+      code_value typecast(llvm::Value *src, 
+			  const type_spec &src_type, const type_spec &dst_type,
+			  bool make_copy, bool destroy_on_convert,
+			  llvm::Module *module, llvm::IRBuilder<> &builder);
     };
 
   };

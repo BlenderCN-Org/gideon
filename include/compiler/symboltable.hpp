@@ -190,7 +190,7 @@ namespace raytrace {
 
     //compares two arguments by type (ignores names)
     bool operator==(const function_argument &rhs) const;
-    bool operator!=(const function_argument &rhs) const { *this != rhs; }
+    bool operator!=(const function_argument &rhs) const { return *this != rhs; }
   };
 
   //Generates a function name based on the argument signature.

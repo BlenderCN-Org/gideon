@@ -39,21 +39,9 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
   }
   else init_value = initialize_from_type(module, builder);
   
-  boost::function<codegen_void (typed_value &)> op = [this, make_copy, module, &builder] (typed_value &args) -> codegen_void {
-    type_spec val_type = args.get<1>();
-    
-    if (*val_type != *type) {
-      stringstream err_ss;
-      err_ss << "Initializer of invalid type";
-      return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
-    }
-
-    Value *val = args.get<0>().extract_value();
-    if (make_copy) {
-      //initializer is already bound to another variable, make a copy
-      val = val_type->copy(val, module, builder);
-    }
-
+  code_value converted_init = typecast(init_value, type, make_copy, true, module, builder);
+  boost::function<codegen_void (value &)> op = [this, module, &builder] (value &arg) -> codegen_void {
+    Value *val = arg.extract_value();
     Value *ptr = type->allocate(module, builder);
     if (val) {
       type->store(val, ptr, module, builder);
@@ -65,7 +53,7 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
     return empty_type();
   };
   
-  return errors::codegen_call<typed_value_container, codegen_void>(init_value, op);
+  return errors::codegen_call<code_value, codegen_void>(converted_init, op);
 }
 
 /** Global Variable Declaration **/
@@ -88,7 +76,7 @@ raytrace::codegen_value raytrace::ast::global_variable_decl::codegen(llvm::Modul
     return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
   }
   
-  GlobalVariable *gv = new GlobalVariable(type->llvm_type(), NULL, GlobalValue::ExternalLinkage, NULL, full_name());
+  GlobalVariable *gv = new GlobalVariable(type->llvm_type(), false, GlobalValue::ExternalLinkage, NULL, full_name());
   module->getGlobalList().push_back(gv);
 
   variable_symbol_table::entry_type entry(gv, type);

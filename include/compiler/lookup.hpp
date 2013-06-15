@@ -35,7 +35,7 @@ namespace raytrace {
     entry_type &extract_entry(iterator it);
     
     void set(const key_type &name, const entry_type &entry);
-    codegen_void destroy(llvm::Module *module, llvm::IRBuilder<> &builder) { }
+    codegen_void destroy(llvm::Module *module, llvm::IRBuilder<> &builder) { return empty_type(); }
 
     module_ptr &get_module() { return module; }
 
