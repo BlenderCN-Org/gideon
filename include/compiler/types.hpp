@@ -22,14 +22,10 @@ namespace raytrace {
   typedef codegen<type_spec, compile_error>::value typecheck_value;
   typedef codegen<type_spec, compile_error>::vector typecheck_vector;
   
-
-  //typedef errors::argument_value_join<codegen_value, typecheck_value>::result_value_type typed_value;
-  //typedef errors::argument_value_join<codegen_value, typecheck_value>::result_type typed_value_container;
-  //typedef codegen<typed_value, compile_error>::vector typed_value_vector;
-
   typedef codegen<value, compile_error>::value code_value;
-  typedef errors::argument_value_join<code_value, typecheck_value>::result_value_type typed_value;
-  typedef errors::argument_value_join<code_value, typecheck_value>::result_type typed_value_container;
+  typedef boost::tuple<value, type_spec> typed_value;
+  typedef codegen<typed_value, compile_error>::value typed_value_container;
+
   typedef codegen<typed_value, compile_error>::vector typed_value_vector;
 
   typedef codegen<empty_type, compile_error>::vector void_vector;

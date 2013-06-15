@@ -101,8 +101,8 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
   //then define an externally visible function to instantiate this distribution
   typedef errors::argument_value_join<codegen_value, codegen_value>::result_value_type dist_functions_type;
   boost::function<codegen_value (dist_functions_type &)> check_funcs = [this, module, &builder] (dist_functions_type &args) -> codegen_value {
-    Function *eval_f = createEvaluator(cast<Function>(args.get<0>()), module, builder);
-    Function *sample_f = createSampler(cast<Function>(args.get<1>()), module, builder);
+    Function *eval_f = createEvaluator(cast<Function>(errors::get<0>(args)), module, builder);
+    Function *sample_f = createSampler(cast<Function>(errors::get<1>(args)), module, builder);
     Function *dtor_f = createDestructor(module, builder);
     
     return createConstructor(module, builder, eval_f, sample_f, dtor_f);
@@ -112,7 +112,7 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
   //final error checking, add the constructor to the function symtab
   typedef errors::argument_value_join<codegen_vector, codegen_value, codegen_value>::result_value_type arg_val_type;
   boost::function<codegen_value (arg_val_type &)> op = [this, module, &builder] (arg_val_type &args) -> codegen_value {
-    Function *ctor = cast<Function>(args.get<2>());
+    Function *ctor = cast<Function>(errors::get<2>(args));
     function_entry entry = function_entry::make_entry(name, function_scope_name(),
 						      state->types["dfunc"], params);
     entry.func = ctor;

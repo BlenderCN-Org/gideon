@@ -272,7 +272,7 @@ namespace raytrace {
     };
 
     template<typename T0, typename T1>
-    class join : public boost::static_visitor< boost::variant< boost::tuples::cons< typename joined_types<T0, T1>::value0_type,
+    class join : public boost::static_visitor< boost::variant< boost::fusion::cons< typename joined_types<T0, T1>::value0_type,
 										    typename joined_types<T0, T1>::value1_type >,
 							       typename joined_types<T0, T1>::error0_type > > {
     public:
@@ -282,7 +282,7 @@ namespace raytrace {
       typedef typename joined_type::value0_type type0;
       typedef typename joined_type::value1_type type1;
 
-      typedef boost::tuples::cons< type0, type1 > result_val_type;
+      typedef boost::fusion::cons< type0, type1 > result_val_type;
       typedef boost::variant< result_val_type, error_type > result_type;
 
       result_type operator()(type0 &, error_type &e) const { return e; }
@@ -302,11 +302,12 @@ namespace raytrace {
 
       typedef typename boost::mpl::at< typename T0::types, boost::mpl::int_<0> >::type value_type;
       typedef typename boost::mpl::at< typename T0::types, boost::mpl::int_<1> >::type error_type;
-      typedef boost::tuples::cons<value_type, boost::tuples::null_type> result_value_type;
+      //typedef boost::fusion::cons<value_type, boost::tuples::null_type> result_value_type;
+      typedef boost::fusion::cons<value_type> result_value_type;
       typedef boost::variant<result_value_type, error_type> result_type;
 
       static result_type build(T0 &t) {
-	auto op = [] (value_type &v) -> result_type { return v; };
+	auto op = [] (value_type &v) -> result_type { return result_value_type(v); };
 	value_container_operation<T0, result_type> promote(op);
 	return boost::apply_visitor(promote, t);
       }
@@ -331,6 +332,11 @@ namespace raytrace {
     template<typename... ArgTypes>
     typename argument_value_join<ArgTypes...>::result_type combine_arg_list(ArgTypes &... args) {
       return argument_value_join<ArgTypes...>::build(args...);
+    }
+
+    template<int N, typename JoinedType>
+    auto get(JoinedType &arg) -> decltype(boost::fusion::at_c<N>(arg)) {
+      return boost::fusion::at_c<N>(arg);
     }
     
     /* If the two codegen_void values are empty, does nothing. Merges their errors if in an error state. */
@@ -399,13 +405,12 @@ namespace raytrace {
       return boost::apply_visitor(op, arg_list);
     }
 
-
     template<typename ResultType, typename... ArgTypes>
     ResultType codegen_apply(const boost::function<ResultType (typename errors::value_helper<ArgTypes>::value_type &...)> &func,
 			     ArgTypes&... args) {
       typedef typename errors::argument_value_join<ArgTypes...>::result_value_type arg_val_type;
       boost::function<ResultType (arg_val_type &)> joined_func = [&func] (arg_val_type &arg) -> ResultType {
-	//return boost::fusion::invoke(func, arg);
+	return boost::fusion::invoke(func, arg);
       };
       
       return errors::codegen_call_args(joined_func, args...);

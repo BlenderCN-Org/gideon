@@ -332,15 +332,15 @@ typed_value_container ast::element_selection::codegen(Module *module, IRBuilder<
     
     typedef errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type typed_value_pair;
     boost::function<typed_value_container (typed_value_pair &)> access = [this, &expr_val, &idx, module, &builder] (typed_value_pair &args) -> typed_value_container {
-      type_spec expr_type = args.get<0>().get<1>();
-      type_spec idx_type = args.get<1>().get<1>();
+      type_spec expr_type = errors::get<0>(args).get<1>();
+      type_spec idx_type = errors::get<1>(args).get<1>();
       
       if (*idx_type != *state->types["int"]) {
 	return errors::make_error<errors::error_message>("Array index must be an integer.", line_no, column_no);
       }
       
-      Value *arr_val = args.get<0>().get<0>().extract_value();
-      Value *idx_val = args.get<1>().get<0>().extract_value();
+      Value *arr_val = errors::get<0>(args).get<0>().extract_value();
+      Value *idx_val = errors::get<1>(args).get<0>().extract_value();
       
       typed_value_container result = expr_type->access_element(arr_val, idx_val, module, builder);
       
@@ -359,15 +359,15 @@ typed_value_container ast::element_selection::codegen_ptr(Module *module, IRBuil
 
   typedef errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type typed_value_pair;
   boost::function<typed_value_container (typed_value_pair &)> access = [this, &idx, module, &builder] (typed_value_pair &args) -> typed_value_container {
-    type_spec ptr_type = args.get<0>().get<1>();
-    type_spec idx_type = args.get<1>().get<1>();
+    type_spec ptr_type = errors::get<0>(args).get<1>();
+    type_spec idx_type = errors::get<1>(args).get<1>();
     
     if (*idx_type != *state->types["int"]) {
       return errors::make_error<errors::error_message>("Array index must be an integer.", line_no, column_no);
     }
 
-    Value *ptr_val = args.get<0>().get<0>().extract_value();
-    Value *idx_val = args.get<1>().get<0>().extract_value();
+    Value *ptr_val = errors::get<0>(args).get<0>().extract_value();
+    Value *idx_val = errors::get<1>(args).get<0>().extract_value();
 
     typed_value_container result = ptr_type->access_element_ptr(ptr_val, idx_val, module, builder);
     

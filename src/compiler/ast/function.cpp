@@ -95,8 +95,8 @@ typed_value_vector ast::func_call::codegen_all_args(entry_or_error &entry,
 
       typedef errors::argument_value_join<typed_value_vector, typed_value_container>::result_value_type add_ctx_arg_type;
       boost::function<typed_value_vector (add_ctx_arg_type&)> add_ctx_func = [&arg_eval] (add_ctx_arg_type &arg) -> typed_value_vector {
-	vector<typed_value> &result = arg.get<0>();
-	result.insert(result.begin(), arg.get<1>());
+	vector<typed_value> &result = errors::get<0>(arg);
+	result.insert(result.begin(), errors::get<1>(arg));
 	return result;
       };
 
@@ -119,8 +119,8 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
 
   typedef errors::argument_value_join<entry_or_error, typed_value_vector>::result_value_type arg_val_type;
   boost::function<typed_value_container (arg_val_type &)> call_func = [this, module, &builder] (arg_val_type &call_args) -> typed_value_container {
-    function_symbol_table::entry_type *entry = call_args.get<0>();
-    vector<typed_value> &args = call_args.get<1>();
+    function_symbol_table::entry_type *entry = errors::get<0>(call_args);
+    vector<typed_value> &args = errors::get<1>(call_args);
 
     Function *f = entry->func;
     bool is_member_function = entry->member_function;

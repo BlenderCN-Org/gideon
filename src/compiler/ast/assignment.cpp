@@ -23,7 +23,7 @@ pair<typed_value_container, typed_value_container> ast::assignment::get_value_an
 
   typedef raytrace::errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type arg_val_type;  
   boost::function<code_value (arg_val_type&)> cast_rhs = [this, &value, module, &builder] (arg_val_type &args) -> code_value {
-    type_spec lt = args.get<0>().get<1>();
+    type_spec lt = errors::get<0>(args).get<1>();
     return typecast(value, lt, rhs->bound(), true, module, builder);
   };
   
@@ -31,11 +31,11 @@ pair<typed_value_container, typed_value_container> ast::assignment::get_value_an
   
   typedef raytrace::errors::argument_value_join<typed_value_container, code_value>::result_value_type assign_arg_type;  
   boost::function<typed_value_container (assign_arg_type &)> op = [this, module, &builder] (assign_arg_type &args) -> typed_value_container {
-    type_spec lt = args.get<0>().get<1>();
-    Value *new_val = args.get<1>().extract_value();
+    type_spec lt = errors::get<0>(args).get<1>();
+    Value *new_val = errors::get<1>(args).extract_value();
     
     //now destroy the old value
-    Value *ptr = args.get<0>().get<0>().extract_value();
+    Value *ptr = errors::get<0>(args).get<0>().extract_value();
     lt->destroy(ptr, module, builder);
     
     lt->store(new_val, ptr, module, builder);
@@ -98,14 +98,14 @@ pair<typed_value_container, typed_value_container> ast::assignment_operator::get
   //lookup and evaluate the operation
   typedef errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type arg_pair;
   boost::function<typed_value_container (arg_pair&)> lookup = [this, module, &builder] (arg_pair &args) -> typed_value_container {
-    type_spec lhs_type = args.get<0>().get<1>();
-    type_spec rhs_type = args.get<1>().get<1>();
+    type_spec lhs_type = errors::get<0>(args).get<1>();
+    type_spec rhs_type = errors::get<1>(args).get<1>();
     
     binop_table::op_result_value op_func = state->binary_operations.find_best_operation(op, lhs_type, rhs_type,
 											state->type_conversions);
     
-    Value *lhs_ptr = args.get<0>().get<0>().extract_value();
-    Value *rhs = args.get<1>().get<0>().extract_value();
+    Value *lhs_ptr = errors::get<0>(args).get<0>().extract_value();
+    Value *rhs = errors::get<1>(args).get<0>().extract_value();
     return execute_assignment(op_func, module, builder, lhs_type, lhs_ptr, rhs);    
   };
 

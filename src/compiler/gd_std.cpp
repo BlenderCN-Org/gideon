@@ -131,7 +131,7 @@ extern "C" float gde_dfunc_sample(void *dfunc,
 				  float rand_D, float2 *rand_P, float2 *rand_w,
 				  /* out */ float3 *P_in, /* out */ float3 *w_in) {
   shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
-  shade_tree::sample(node, P_out, w_out, rand_D, rand_P, rand_w, P_in, w_in);
+  return shade_tree::sample(node, P_out, w_out, rand_D, rand_P, rand_w, P_in, w_in);
 }
 
 extern "C" bool gde_shader_handle_is_valid(void *shader) {

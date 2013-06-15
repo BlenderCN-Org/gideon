@@ -50,12 +50,12 @@ typecheck_value ast::binary_expression::typecheck() {
   typecheck_value ltype = lhs->typecheck();
   typecheck_value rtype = rhs->typecheck();
 
-  typedef errors::argument_value_join<typecheck_value, typecheck_value>::result_value_type typecheck_pair;
-  boost::function<binop_table::op_result_value (typecheck_pair&)> lookup = [this] (typecheck_pair &args) -> binop_table::op_result_value {
-    return state->binary_operations.find_best_operation(op, args.get<0>(), args.get<1>(), state->type_conversions);
+  boost::function<binop_table::op_result_value (type_spec &, type_spec &)> lookup = [this] (type_spec &left,
+											    type_spec &right) -> binop_table::op_result_value {
+    return state->binary_operations.find_best_operation(op, left, right, state->type_conversions);
   };
 
-  binop_table::op_result_value op_func = errors::codegen_call_args(lookup, ltype, rtype);
+  binop_table::op_result_value op_func = errors::codegen_apply(lookup, ltype, rtype);
   
   return errors::codegen_call<binop_table::op_result_value, typecheck_value>(op_func,
 									     [] (binop_table::op_result &op_func) -> typecheck_value {
@@ -67,8 +67,6 @@ typed_value_container ast::binary_expression::execute_op(binop_table::op_result_
 							 Module *module, IRBuilder<> &builder,
 							 Value* lhs_val, Value *rhs_val,
 							 const type_spec &lhs_type, const type_spec &rhs_type) {
-  typedef errors::argument_value_join<code_value, code_value>::result_value_type value_pair;
-  
   boost::function<typed_value_container (binop_table::op_result&)> exec_op = [this, module, &builder,
 									      lhs_val, rhs_val,
 									      &lhs_type, &rhs_type] 
@@ -77,15 +75,15 @@ typed_value_container ast::binary_expression::execute_op(binop_table::op_result_
     code_value lhs_arg = typecast(lhs_val, lhs_type, op_func.first.first, false, false, module, builder);
     code_value rhs_arg = typecast(rhs_val, rhs_type, op_func.first.second, false, false, module, builder);
 
-    boost::function<typed_value_container (value_pair &)> check_args = [module, &builder, &op_func] (value_pair &arg) {
+    boost::function<typed_value_container (value &, value &)> check_args = [module, &builder, &op_func] (value &lval, value &rval) {
       type_spec rt = op_func.second.result_type;
-      Value *result = op_func.second.codegen(arg.get<0>().extract_value(),
-					     arg.get<1>().extract_value(),
+      Value *result = op_func.second.codegen(lval.extract_value(),
+					     rval.extract_value(),
 					     module, builder);
       return typed_value(result, rt);
     };
 
-    return errors::codegen_call_args(check_args, lhs_arg, rhs_arg);
+    return errors::codegen_apply(check_args, lhs_arg, rhs_arg);
   };
 
   return errors::codegen_call<binop_table::op_result_value, typed_value_container>(op_func, exec_op);
@@ -94,17 +92,18 @@ typed_value_container ast::binary_expression::execute_op(binop_table::op_result_
 typed_value_container ast::binary_expression::codegen(Module *module, IRBuilder<> &builder) {
   typed_value_container lhs_val = lhs->codegen(module, builder);
   typed_value_container rhs_val = rhs->codegen(module, builder);
-  
-  typedef errors::argument_value_join<typed_value_container, typed_value_container>::result_value_type binary_op_args;
-  boost::function<typed_value_container (binary_op_args &)> exec_op = [this, module, &builder] (binary_op_args &args) -> typed_value_container {
+
+  boost::function<typed_value_container (typed_value &, typed_value &)> exec_op = [this, module, &builder] (typed_value &left,
+													    typed_value &right) -> typed_value_container {
     binop_table::op_result_value op_func = state->binary_operations.find_best_operation(op,
-											args.get<0>().get<1>(), args.get<1>().get<1>(),
+											left.get<1>(), right.get<1>(),
 											state->type_conversions);
     return execute_op(op_func, module, builder,
-		      args.get<0>().get<0>().extract_value(), args.get<1>().get<0>().extract_value(),
-		      args.get<0>().get<1>(), args.get<1>().get<1>());
+		      left.get<0>().extract_value(), right.get<0>().extract_value(),
+		      left.get<1>(), right.get<1>());
   };
-  return errors::codegen_call_args(exec_op, lhs_val, rhs_val);
+  
+  return errors::codegen_apply(exec_op, lhs_val, rhs_val);
 }
 
 /** Unary Op Expression **/
