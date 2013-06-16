@@ -1,15 +1,21 @@
 #include "compiler/types/vector.hpp"
 #include "compiler/operations.hpp"
 
+#include "compiler/type_conversion.hpp"
+
 using namespace raytrace;
 using namespace llvm;
 using namespace std;
 
 /* Vector Helper Functions */
 
-typed_value_container make_llvm_vec_N(IRBuilder<> &builder, const string &vname, unsigned int N,
-				      Type *vec_type, type_spec result_type, type_spec elem_type, typed_value_vector &args) {
-  boost::function<typed_value_container (vector<typed_value> &)> op = [vec_type, result_type, elem_type, &vname, N, &builder] (vector<typed_value> &args) -> typed_value_container {
+typed_value_container make_llvm_vec_N(Module *module, IRBuilder<> &builder, const string &vname, unsigned int N,
+				      Type *vec_type, type_spec result_type, type_spec elem_type, typed_value_vector &args,
+				      const type_conversion_table &conversions) {
+  boost::function<typed_value_container (vector<typed_value> &)> op = [vec_type, result_type,
+								       elem_type, &vname, N,
+								       &conversions,
+								       module, &builder] (vector<typed_value> &args) -> typed_value_container {
     //check argument count
     if (args.size() != N) {
       stringstream err_ss;
@@ -18,20 +24,38 @@ typed_value_container make_llvm_vec_N(IRBuilder<> &builder, const string &vname,
     }
     
     //check argument types
+    int unused;
+
     for (unsigned int i = 0; i < N; ++i) {
-      if (elem_type != args[i].get<1>()) {
+      //      if (elem_type != args[i].get<1>()) {
+      if (!conversions.can_convert(args[i].get<1>(), elem_type, unused, unused)) {
 	stringstream ss;
-	ss << "Error in " << vname << " constructor argument " << i << ": Expected '" << elem_type->name << "' found '" << args[i].get<1>()->name << "'.";
+	ss << "Error in " << vname << " constructor argument " << i << ": Cannot convert to '" << elem_type->name << "' from '" << args[i].get<1>()->name << "'.";
 	return errors::make_error<errors::error_message>(ss.str(), 0, 0);
       }
     }
 
     //build the vector
     string val_name = string("new_") + vname;
-    Value *v = builder.CreateInsertValue(UndefValue::get(vec_type),
-					 args[0].get<0>().extract_value(), ArrayRef<unsigned int>(0), val_name);
-    for (unsigned int i = 1; i < N; ++i) {
-      v = builder.CreateInsertValue(v, args[i].get<0>().extract_value(), ArrayRef<unsigned int>(i));
+    code_value conv_v = conversions.convert(args[0].get<1>(), args[0].get<0>().extract_value(),
+					    elem_type,
+					    module, builder);
+
+    Value *v = UndefValue::get(vec_type);
+    unsigned int i = 0;
+
+    auto insert_elem = [&] (value &arg_v) -> codegen_void {
+      v = builder.CreateInsertValue(v, arg_v.extract_value(), ArrayRef<unsigned int>(i));
+      return empty_type();
+    };
+    
+    errors::codegen_call<code_value, codegen_void>(conv_v, insert_elem);
+    
+    for (i = 1; i < N; ++i) {
+      conv_v = conversions.convert(args[i].get<1>(), args[i].get<0>().extract_value(),
+				   elem_type,
+				   module, builder);
+      errors::codegen_call<code_value, codegen_void>(conv_v, insert_elem);
     }
 
     return typed_value(v, result_type);
@@ -126,6 +150,7 @@ typed_value_container floatN_type::access_field_ptr(const string &field, Value *
   return typed_value(builder.CreateStructGEP(value_ptr, idx, "vec_elem"), types->at("float"));
 }
 
-typed_value_container floatN_type::create(Module *, llvm::IRBuilder<> &builder, typed_value_vector &args) const {
-  return make_llvm_vec_N(builder, type_name(N), N, type_value, types->at(type_name(N)), types->at("float"), args);
+typed_value_container floatN_type::create(Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args,
+					  const type_conversion_table &conversions) const {
+  return make_llvm_vec_N(module, builder, type_name(N), N, type_value, types->at(type_name(N)), types->at("float"), args, conversions);
 }

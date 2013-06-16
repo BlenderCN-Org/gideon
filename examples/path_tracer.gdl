@@ -114,8 +114,9 @@ module render {
 //Renderer Entry Point
 function main(int x0, int y0, int width, int height, scene output_buffer) void {
   int samples_per_pixel = 4;
-  float samples_f = render.demo.int_to_float(samples_per_pixel);
-  float inv_samples = 1.0 / samples_f;
+  //float samples_f = render.demo.int_to_float(samples_per_pixel);
+  //float inv_samples = 1.0 / samples_f;
+  float inv_samples = 1.0 / samples_per_pixel;
 
   for (int y = 0; y < height; y += 1) {
     for (int x = 0; x < width; x += 1) {

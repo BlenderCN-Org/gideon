@@ -69,7 +69,8 @@ codegen_void dfunc_type::destroy(Value *value, Module *module, IRBuilder<> &buil
 }
 
 typed_value_container dfunc_type::create(Module *module, IRBuilder<> &builder,
-					 typed_value_vector &args) const {
+					 typed_value_vector &args,
+					 const type_conversion_table &conversions) const {
   boost::function<typed_value_container (vector<typed_value>&)> ctor = [this, module, &builder] (vector<typed_value> &args) -> typed_value_container {
     vector<Value*> shader_args;
     

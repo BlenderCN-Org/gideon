@@ -3,9 +3,8 @@ distribution test(int z) {
   function evaluate(vec3 P_in, vec3 w_in,
 		    vec3 P_out, vec3 w_out,
 		    output float pdf) vec4 {
-    float fz = z;
     pdf = 1.0;
-    return vec4(fz, fz, fz, 1.0);
+    return vec4(z, z, z, 1.0);
   }
   
   function sample(vec3 P_out, vec3 w_out,

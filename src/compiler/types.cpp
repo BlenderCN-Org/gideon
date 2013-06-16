@@ -7,6 +7,8 @@
 #include "compiler/types/special.hpp"
 #include "compiler/types/array.hpp"
 
+#include "compiler/type_conversion.hpp"
+
 #include "compiler/llvm_helper.hpp"
 
 #include "llvm/LLVMContext.h"
@@ -90,7 +92,8 @@ void type::store(llvm::Value *value, llvm::Value *ptr, Module *, IRBuilder<> &bu
 
 Type *type::llvm_ptr_type() const { return llvm_type()->getPointerTo(); }
 
-typed_value_container type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args) const {
+typed_value_container type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args,
+				   const type_conversion_table &conversions) const {
   stringstream ss;
   ss << "Type '" << name << "' has no constructor.";
   return errors::make_error<errors::error_message>(ss.str(), 0, 0);

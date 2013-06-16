@@ -159,7 +159,7 @@ typed_value_container ast::type_constructor::codegen(Module *module, IRBuilder<>
     if (!args[i]->bound()) to_destroy.push_back(val);
   }
 
-  typed_value_container result = type->create(module, builder, arg_values);
+  typed_value_container result = type->create(module, builder, arg_values, state->type_conversions);
 
   for (auto it = to_destroy.begin(); it != to_destroy.end(); ++it) {
     expression::destroy_unbound(*it, module, builder);

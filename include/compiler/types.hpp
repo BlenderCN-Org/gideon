@@ -48,6 +48,8 @@ namespace raytrace {
   };
 
   void initialize_types(type_table &tt);
+
+  class type_conversion_table;
   
   /* Describes a type in the Gideon Render Language. */
   class type {
@@ -93,7 +95,8 @@ namespace raytrace {
     
     virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return value; }
     
-    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
+    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args,
+					 const type_conversion_table &conversions) const;
 
     virtual llvm::Type *llvm_type() const = 0;
     

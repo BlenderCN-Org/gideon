@@ -17,7 +17,8 @@ namespace raytrace {
     virtual typed_value_container access_field_ptr(const std::string &field, llvm::Value *value_ptr,
 						   llvm::Module *module, llvm::IRBuilder<> &builder) const;
     
-    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args) const;
+    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args,
+					 const type_conversion_table &conversions) const;
     
     static std::string type_name(unsigned int N);
     static std::string type_code(unsigned int N);
