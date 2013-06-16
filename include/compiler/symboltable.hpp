@@ -305,6 +305,7 @@ namespace raytrace {
   
   template<typename T>
   codegen_void destroy_entry(T &entry, llvm::Module *module, llvm::IRBuilder<> &builder);
+
   
 };
 

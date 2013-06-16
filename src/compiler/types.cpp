@@ -23,55 +23,51 @@ using namespace llvm;
 
 /** Type Table **/
 
-type_spec type_table::get_array(const type_spec &base, unsigned int N) {
+type *type_table::get_array(const type_spec &base, unsigned int N) {
   string arr_ty_name = array_type::type_name(base, N);
 
   auto it = array_types.find(arr_ty_name);
-  if (it != array_types.end()) return it->second;
+  if (it != array_types.end()) return it->second.get();
 
-  type_spec arr_type(new array_type(this, base, N));
-  array_types.insert(make_pair(arr_ty_name, arr_type));
-  return arr_type;
+  array_types[arr_ty_name] = type_table::type_ptr(new array_type(this, base, N));
+  return array_types[arr_ty_name].get();
 }
 
-type_spec type_table::get_array_ref(const type_spec &base) {
+type *type_table::get_array_ref(const type_spec &base) {
   string arr_ty_name = array_reference_type::type_name(base);
 
   auto it = array_types.find(arr_ty_name);
-  if (it != array_types.end()) return it->second;
+  if (it != array_types.end()) return it->second.get();
 
-  type_spec arr_type(new array_reference_type(this, base));
-  array_types.insert(make_pair(arr_ty_name, arr_type));
-  return arr_type;
+  array_types[arr_ty_name] = type_table::type_ptr(new array_reference_type(this, base));
+  return array_types[arr_ty_name].get();
 }
 
 size_t raytrace::hash_value(const type_spec &ts) {
-  return boost::hash<type*>()(ts.get());
+  return boost::hash<type*>()(ts);
 }
 
 void raytrace::initialize_types(type_table &tt) {
-  typedef shared_ptr<type> type_ptr;
+  tt.entry("void") = type_table::type_ptr(new void_type(&tt));
+  tt.entry("bool") = type_table::type_ptr(new bool_type(&tt));
+  tt.entry("int") = type_table::type_ptr(new int_type(&tt));
+  tt.entry("float") = type_table::type_ptr(new float_type(&tt));
+  tt.entry("string") = type_table::type_ptr(new string_type(&tt));
   
-  tt["void"] = type_ptr(new void_type(&tt));
-  tt["bool"] = type_ptr(new bool_type(&tt));
-  tt["int"] = type_ptr(new int_type(&tt));
-  tt["float"] = type_ptr(new float_type(&tt));
-  tt["string"] = type_ptr(new string_type(&tt));
+  tt.entry("vec2") = type_table::type_ptr(new floatN_type(&tt, 2));
+  tt.entry("vec3") = type_table::type_ptr(new floatN_type(&tt, 3));
+  tt.entry("vec4") = type_table::type_ptr(new floatN_type(&tt, 4));
   
-  tt["vec2"] = type_ptr(new floatN_type(&tt, 2));
-  tt["vec3"] = type_ptr(new floatN_type(&tt, 3));
-  tt["vec4"] = type_ptr(new floatN_type(&tt, 4));
-  
-  tt["scene_ptr"] = type_ptr(new scene_ptr_type(&tt));
-  tt["ray"] = type_ptr(new ray_type(&tt));
-  tt["isect"] = type_ptr(new intersection_type(&tt));
-  tt["light"] = type_ptr(new light_type(&tt));
+  tt.entry("scene_ptr") = type_table::type_ptr(new scene_ptr_type(&tt));
+  tt.entry("ray") = type_table::type_ptr(new ray_type(&tt));
+  tt.entry("isect") = type_table::type_ptr(new intersection_type(&tt));
+  tt.entry("light") = type_table::type_ptr(new light_type(&tt));
 
-  tt["dfunc"] = type_ptr(new dfunc_type(&tt));
-  tt["shader_handle"] = type_ptr(new shader_handle_type(&tt));
-  tt["context_ptr"] = type_ptr(new context_ptr_type(&tt));
+  tt.entry("dfunc") = type_table::type_ptr(new dfunc_type(&tt));
+  tt.entry("shader_handle") = type_table::type_ptr(new shader_handle_type(&tt));
+  tt.entry("context_ptr") = type_table::type_ptr(new context_ptr_type(&tt));
   
-  tt["module"] = type_ptr(new module_type(&tt));
+  tt.entry("module") = type_table::type_ptr(new module_type(&tt));
 }
 
 /** Type Base Class **/

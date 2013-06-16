@@ -16,7 +16,9 @@ namespace raytrace {
   
   /* Describes an instance of a type. */
   class type;
-  typedef std::shared_ptr<type> type_spec;
+  //typedef std::shared_ptr<type> type_spec;
+  typedef type* type_spec;
+
   std::size_t hash_value(const type_spec &ts);
 
   typedef codegen<type_spec, compile_error>::value typecheck_value;
@@ -34,16 +36,20 @@ namespace raytrace {
   class type_table {
   public:
 
-    type_spec &operator[](const std::string &key) { return entries[key]; }
-    type_spec &at(const std::string &key) { return entries.at(key); }
+    typedef std::unique_ptr<type> type_ptr;
+    
+    type *operator[](const std::string &key) { return entries[key].get(); }
+    type *at(const std::string &key) { return entries.at(key).get(); }
 
-    type_spec get_array(const type_spec &base, unsigned int N);
-    type_spec get_array_ref(const type_spec &base);
+    type_ptr &entry(const std::string &key) { return entries[key]; }
+    
+    type *get_array(const type_spec &base, unsigned int N);
+    type *get_array_ref(const type_spec &base);
 
   private:
-
-    boost::unordered_map< std::string, type_spec > entries;
-    boost::unordered_map< std::string, type_spec > array_types;
+    
+    boost::unordered_map< std::string, std::unique_ptr<type> > entries;
+    boost::unordered_map< std::string, std::unique_ptr<type> > array_types;
     
   };
 
