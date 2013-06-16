@@ -19,6 +19,8 @@ namespace raytrace {
       int cost_for_operations;
     };
 
+    type_conversion_table(type_table &types);
+
     //Adds a new conversion to the table.
     void add_conversion(const type_spec &src_type, const type_spec &dst_type,
 			const conversion_codegen &codegen,
@@ -42,6 +44,7 @@ namespace raytrace {
     typedef std::pair<type_spec, type_spec> conversion_key;
     typedef boost::unordered_map<conversion_key, conversion_op> conversion_table;
 
+    type_table &types;
     conversion_table valid_conversions;
 
   };
@@ -50,6 +53,10 @@ namespace raytrace {
     
     type_conversion_table::conversion_codegen i_to_f(type_table &types);
     type_conversion_table::conversion_codegen f_to_i(type_table &types);
+
+    code_value array_to_array_ref(llvm::Value *arr_ptr, llvm::Type *arr_type,
+				  const type_spec &ref_type,
+				  llvm::Module *module, llvm::IRBuilder<> &builder);
 
   };
 

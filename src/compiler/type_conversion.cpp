@@ -8,6 +8,12 @@ using namespace raytrace;
 using namespace std;
 using namespace llvm;
 
+type_conversion_table::type_conversion_table(type_table &types) :
+  types(types)
+{
+
+}
+
 void type_conversion_table::add_conversion(const type_spec &src_type, const type_spec &dst_type,
 					   const conversion_codegen &codegen,
 					   int cost_for_arguments, int cost_for_operations) {
@@ -35,7 +41,7 @@ bool type_conversion_table::can_convert(const type_spec &src_type, const type_sp
     cost_for_operations = entry->second.cost_for_operations;
     return true;
   }
-
+  
   return false;
 }
 
@@ -61,6 +67,22 @@ type_conversion_table::initialize_standard_conversions(type_conversion_table &ta
 }
 
 /** LLVM Conversion Functions **/
+
+code_value conversion_llvm::array_to_array_ref(Value *arr_ptr, Type *arr_type,
+					       const type_spec &ref_type,
+					       Module *module, IRBuilder<> &builder) {
+  Type *elem_type = cast<ArrayType>(arr_type)->getElementType();
+  unsigned int N = cast<ArrayType>(arr_type)->getNumElements();
+
+  Value *v = UndefValue::get(ref_type->llvm_type());
+  v = builder.CreateInsertValue(v,
+				ConstantInt::get(getGlobalContext(),
+						 APInt(8*sizeof(int), N, true)),
+				ArrayRef<unsigned int>(0));
+  v = builder.CreateInsertValue(v, builder.CreateConstGEP1_32(arr_ptr, 0),
+				ArrayRef<unsigned int>(1));
+  return v;
+}
 
 type_conversion_table::conversion_codegen conversion_llvm::i_to_f(type_table &types) {
   Type *f_type = types["float"]->llvm_type();

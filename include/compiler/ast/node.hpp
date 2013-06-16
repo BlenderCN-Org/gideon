@@ -33,7 +33,7 @@ namespace raytrace {
       render_program *objects;
       boost::unordered_set<std::string> object_is_loaded;
       
-      parser_state(type_table &t) : types(t) { }
+      parser_state(type_table &t) : types(t), type_conversions(t) { }
     };
     
     class ast_node { 
