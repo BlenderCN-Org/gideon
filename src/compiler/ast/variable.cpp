@@ -11,7 +11,7 @@ using namespace llvm;
 /** Variable Declaration **/
 
 raytrace::ast::variable_decl::variable_decl(parser_state *st, const string &name,
-					    const type_spec &type, const expression_ptr &init,
+					    const type_expr_ptr &type, const expression_ptr &init,
 					    unsigned int line_no, unsigned int column_no) :
   statement(st, line_no, column_no),
   name(name), type(type), initializer(init)
@@ -19,35 +19,29 @@ raytrace::ast::variable_decl::variable_decl(parser_state *st, const string &name
   
 }
 
-typed_value_container ast::variable_decl::initialize_from_type(Module *module, IRBuilder<> &builder) {
-  return type->initialize(module, builder);
+typed_value_container ast::variable_decl::initialize_from_type(type_spec t, Module *module, IRBuilder<> &builder) {
+  return t->initialize(module, builder);
 }
 
-codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
-  if (variables().has_local(name)) {
-    stringstream err;
-    err << "Redeclaration of variable '" << name << "'.";
-    return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
-  }
-  
-  typed_value_container init_value = typed_value(nullptr, type);
+codegen_void ast::variable_decl::declare_with_type(type_spec t, Module *module, IRBuilder<> &builder) {
+  typed_value_container init_value = typed_value(nullptr, t);
   bool make_copy = false;
-
+  
   if (initializer) {
     init_value = initializer->codegen(module, builder);
     make_copy = initializer->bound();
   }
-  else init_value = initialize_from_type(module, builder);
+  else init_value = initialize_from_type(t, module, builder);
   
-  code_value converted_init = typecast(init_value, type, make_copy, true, module, builder);
-  boost::function<codegen_void (value &)> op = [this, module, &builder] (value &arg) -> codegen_void {
+  code_value converted_init = typecast(init_value, t, make_copy, true, module, builder);
+  boost::function<codegen_void (value &)> op = [this, t, module, &builder] (value &arg) -> codegen_void {
     Value *val = arg.extract_value();
-    Value *ptr = type->allocate(module, builder);
+    Value *ptr = t->allocate(module, builder);
     if (val) {
-      type->store(val, ptr, module, builder);
+      t->store(val, ptr, module, builder);
     }
     
-    variable_symbol_table::entry_type entry(ptr, type);
+    variable_symbol_table::entry_type entry(ptr, t);
     variables().set(name, entry);
 
     return empty_type();
@@ -56,10 +50,23 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
   return errors::codegen_call<code_value, codegen_void>(converted_init, op);
 }
 
+codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
+  if (variables().has_local(name)) {
+    stringstream err;
+    err << "Redeclaration of variable '" << name << "'.";
+    return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
+  }
+
+  typecheck_value type_val = type->codegen_type();
+  return errors::codegen_call<typecheck_value, codegen_void>(type_val, [&] (type_spec &t) -> codegen_void {
+      return declare_with_type(t, module, builder);
+    });
+}
+
 /** Global Variable Declaration **/
 
 raytrace::ast::global_variable_decl::global_variable_decl(parser_state *st,
-							  const string &name, const type_spec &type) :
+							  const string &name, const type_expr_ptr &type) :
   global_declaration(st),
   name(name), type(type)
 {
@@ -75,20 +82,24 @@ raytrace::codegen_value raytrace::ast::global_variable_decl::codegen(llvm::Modul
     err << "Redeclaration of variable '" << name << "'.";
     return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
   }
-  
-  GlobalVariable *gv = new GlobalVariable(type->llvm_type(), false, GlobalValue::ExternalLinkage, NULL, full_name());
-  module->getGlobalList().push_back(gv);
 
-  variable_symbol_table::entry_type entry(gv, type);
-  global_scope.set(name, entry);
-
-  exports::variable_export exp;
-  exp.name = name;
-  exp.full_name = full_name();
-  exp.type = type;
-  state->exports.add_variable(exp);
+  typecheck_value t = type->codegen_type();
   
-  return gv;
+  return errors::codegen_call<typecheck_value, codegen_value>(t, [&] (type_spec &ty) -> codegen_value {
+      GlobalVariable *gv = new GlobalVariable(ty->llvm_type(), false, GlobalValue::ExternalLinkage, NULL, full_name());
+      module->getGlobalList().push_back(gv);
+      
+      variable_symbol_table::entry_type entry(gv, ty);
+      global_scope.set(name, entry);
+      
+      exports::variable_export exp;
+      exp.name = name;
+      exp.full_name = full_name();
+      exp.type = ty;
+      state->exports.add_variable(exp);
+      
+      return gv;
+    });
 }
 
 string ast::global_variable_decl::full_name() {
@@ -143,29 +154,33 @@ code_value ast::variable_ref::codegen_module() {
 
 /** Type Constructors **/
 
-raytrace::ast::type_constructor::type_constructor(parser_state *st, const type_spec &type, const vector<expression_ptr> &args) :
+raytrace::ast::type_constructor::type_constructor(parser_state *st, const type_expr_ptr &type, const vector<expression_ptr> &args) :
   expression(st), type(type), args(args)
 {
 
 }
 
 typed_value_container ast::type_constructor::codegen(Module *module, IRBuilder<> &builder) {
-  typed_value_vector arg_values;
-  vector< typed_value_container > to_destroy;
-  
-  for (unsigned int i = 0; i < args.size(); i++) {
-    typed_value_container val = get_arg(i, module, builder);
-    arg_values = errors::codegen_vector_push_back(arg_values, val);
-    if (!args[i]->bound()) to_destroy.push_back(val);
-  }
+  typecheck_value ty_val = type->codegen_type();
 
-  typed_value_container result = type->create(module, builder, arg_values, state->type_conversions);
-
-  for (auto it = to_destroy.begin(); it != to_destroy.end(); ++it) {
-    expression::destroy_unbound(*it, module, builder);
-  }
-  
-  return result;
+  return errors::codegen_call<typecheck_value, typed_value_container>(ty_val, [this, module, &builder] (type_spec &ty) -> typed_value_container {
+      typed_value_vector arg_values;
+      vector< typed_value_container > to_destroy;
+      
+      for (unsigned int i = 0; i < args.size(); i++) {
+	typed_value_container val = get_arg(i, module, builder);
+	arg_values = errors::codegen_vector_push_back(arg_values, val);
+	if (!args[i]->bound()) to_destroy.push_back(val);
+      }
+      
+      typed_value_container result = ty->create(module, builder, arg_values, state->type_conversions);
+      
+      for (auto it = to_destroy.begin(); it != to_destroy.end(); ++it) {
+	expression::destroy_unbound(*it, module, builder);
+      }
+      
+      return result;
+    });
 }
 
 typed_value_container ast::type_constructor::get_arg(int i, Module *module, IRBuilder<> &builder) {
@@ -221,7 +236,7 @@ typed_value_container ast::field_selection::codegen(Module *module, IRBuilder<> 
   boost::function<typed_value_container (typed_value &)> access = [this, module, &builder] (typed_value &arg) -> typed_value_container {
     type_spec ts = arg.get<1>();
     if (*ts != *state->types["module"]) {
-      Value *val = arg.get<0>().extract_value();;
+      Value *val = arg.get<0>().extract_value();
       return ts->access_field(field, val, module, builder);
     }
 

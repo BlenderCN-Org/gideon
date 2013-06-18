@@ -90,7 +90,7 @@ typed_value_vector ast::func_call::codegen_all_args(entry_or_error &entry,
 
       arg_eval = errors::codegen_call_args(add_ctx_func, arg_eval, ctx_val);
     }
-    
+
     return arg_eval;
   };
 
@@ -160,8 +160,8 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
 
 /* Function Prototype */
 
-raytrace::ast::prototype::prototype(parser_state *st, const string &name, const type_spec &return_type,
-				    const vector<function_argument> &args) :
+raytrace::ast::prototype::prototype(parser_state *st, const string &name, const type_expr_ptr &return_type,
+				    const vector<function_parameter> &args) :
   global_declaration(st),
   name(name), extern_name(name), return_type(return_type),
   args(args), external(false), member_function(false)
@@ -170,7 +170,7 @@ raytrace::ast::prototype::prototype(parser_state *st, const string &name, const 
 }
 
 raytrace::ast::prototype::prototype(parser_state *st, const string &name, const string &extern_name,
-				    const type_spec &return_type, const vector<function_argument> &args) :
+				    const type_expr_ptr &return_type, const vector<function_parameter> &args) :
   global_declaration(st),
   name(name), extern_name(extern_name),
   return_type(return_type), args(args),
@@ -185,59 +185,21 @@ void raytrace::ast::prototype::set_external(const string &extern_name) {
 }
 
 codegen_value raytrace::ast::prototype::codegen(Module *module, IRBuilder<> &builder) {
-  codegen_value f = check_for_entry();
-
-  auto gen_func = [this, module, &builder] (Value *&f_val) -> codegen_value {
-    if (f_val) return cast<Function>(f_val);
-    
-    //no previous definition, define now
-    member_function = state->control.has_context();
-    vector<Type*> arg_types;
-    
-    if (member_function) arg_types.push_back(state->control.get_context_type()); //add an extra argument if this function has an associated context
-    
-    for (vector<function_argument>::iterator it = args.begin(); it != args.end(); it++) {
-      Type *arg_type = it->type->llvm_type();
-      if (it->output) arg_types.push_back(it->type->llvm_ptr_type());
-      else arg_types.push_back(arg_type);
-    }
-    
-    function_symbol_table::entry_type entry = function_entry::make_entry(name, function_scope_name(), return_type, args);
-    string name_to_use = (external ? extern_name : entry.full_name);
-    
-    FunctionType *ft = FunctionType::get(return_type->llvm_type(), arg_types, false);
-    Function *f = Function::Create(ft, Function::ExternalLinkage, name_to_use, module);
-    
-    entry.func = f;
-    entry.external = external;
-    entry.member_function = member_function;
-    
-    function_table().set(entry.to_key(), entry);
-
-    if (!member_function) {
-      exports::function_export exp;
-      exp.name = entry.name;
-      exp.full_name = name_to_use;
-      exp.return_type = entry.return_type;
-      exp.arguments = entry.arguments;
-      state->exports.add_function(exp);
-    }
-
-    return f;
-  };
-
-  return errors::codegen_call(f, gen_func);
+  function_gen_value func = codegen_entry(module, builder);
+  return errors::codegen_call<function_gen_value, codegen_value>(func, [] (function_symbol_table::entry_type &entry) -> codegen_value {
+      return entry.func;
+    });
 }
 
-function_key ast::prototype::get_key() const {
+function_key ast::prototype::get_key(const vector<type_spec> &arg_types) const {
   function_key fkey;
   fkey.name = name;
-  for (auto it = args.begin(); it != args.end(); it++) fkey.arguments.push_back(it->type);
+  for (auto it = arg_types.begin(); it != arg_types.end(); ++it) fkey.arguments.push_back(*it);
   return fkey;
 }
 
-codegen_value raytrace::ast::prototype::check_for_entry() {
-  function_key fkey = get_key();
+ast::ast_node::entry_or_error raytrace::ast::prototype::check_for_entry(const vector<type_spec> &arg_types, const type_spec &return_ty) {
+  function_key fkey = get_key(arg_types);
   auto func_it = function_table().find(fkey);
 
   if (func_it == function_table().end()) return nullptr; //function has not been defined
@@ -254,19 +216,85 @@ codegen_value raytrace::ast::prototype::check_for_entry() {
     err_str << "Function " << name << " was previously declared as local";
     return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
   }
-
-  vector<type_spec> arg_types;
-  for (auto it = args.begin(); it != args.end(); it++) {
-    arg_types.push_back(it->type);
-  }
-
-  if (!entry.compare(return_type, arg_types)) {
+  
+  if (!entry.compare(return_ty, arg_types)) {
     stringstream err_str;
     err_str << "Invalid redeclaration of function: " << name;
     return errors::make_error<errors::error_message>(err_str.str(), line_no, column_no);
   }
 
-  return entry.func;
+  return &entry;
+}
+
+ast::prototype::function_gen_value ast::prototype::codegen_entry(Module *module, IRBuilder<> &builder) {
+  typecheck_vector arg_types = get_arg_types();
+  typecheck_value return_ty = return_type->codegen_type();
+
+  boost::function<function_gen_value (vector<type_spec> &, type_spec &)> gen_op = [this, module, &builder] (vector<type_spec> &arg_types, type_spec &return_ty) -> function_gen_value {
+    entry_or_error f = check_for_entry(arg_types, return_ty);
+    
+    auto gen_func = [this, &arg_types, &return_ty, module, &builder] (function_symbol_table::entry_type *&f_entry) -> function_gen_value {
+      if (f_entry) return *f_entry;
+      
+      //no previous definition, define now
+      member_function = state->control.has_context();
+      vector<Type*> arg_llvm_types;
+      
+      if (member_function) arg_llvm_types.push_back(state->control.get_context_type()); //add an extra argument if this function has an associated context
+      
+      vector<function_argument> key_args;
+      unsigned int arg_idx = 0;
+      for (vector<function_parameter>::iterator it = args.begin(); it != args.end(); ++it, ++arg_idx) {
+	function_argument arg;
+	arg.name = it->name;
+	arg.type = arg_types[arg_idx];
+	arg.output = it->output;
+	
+	Type *arg_type = arg.type->llvm_type();
+	if (arg.output) arg_llvm_types.push_back(arg.type->llvm_ptr_type());
+	else arg_llvm_types.push_back(arg_type);
+	
+	key_args.push_back(arg);
+      }
+      
+      function_symbol_table::entry_type entry = function_entry::make_entry(name, function_scope_name(), return_ty, key_args);
+      string name_to_use = (external ? extern_name : entry.full_name);
+      
+      FunctionType *ft = FunctionType::get(return_ty->llvm_type(), arg_llvm_types, false);
+      Function *f = Function::Create(ft, Function::ExternalLinkage, name_to_use, module);
+      
+      entry.func = f;
+      entry.external = external;
+      entry.member_function = member_function;
+      
+      function_table().set(entry.to_key(), entry);
+      
+      if (!member_function) {
+	exports::function_export exp;
+	exp.name = entry.name;
+	exp.full_name = name_to_use;
+	exp.return_type = entry.return_type;
+	exp.arguments = entry.arguments;
+	state->exports.add_function(exp);
+      }
+      
+      return entry;
+    };
+    
+    return errors::codegen_call<entry_or_error, function_gen_value>(f, gen_func);
+  };
+  
+  return errors::codegen_apply(gen_op, arg_types, return_ty);
+}
+
+typecheck_vector ast::prototype::get_arg_types() {
+  typecheck_vector arg_types;
+  for (auto arg_it = args.begin(); arg_it != args.end(); ++arg_it) {
+    typecheck_value ty = arg_it->type->codegen_type();
+    arg_types = errors::codegen_vector_push_back(arg_types, ty);
+  }
+
+  return arg_types;
 }
 
 /* Function */
@@ -279,40 +307,39 @@ raytrace::ast::function::function(parser_state *st, const prototype_ptr &defn, c
 }
 
 codegen_value raytrace::ast::function::codegen(Module *module, IRBuilder<> &builder) {
-  codegen_value ptype = defn->codegen(module, builder);
-  auto op = [this, module, &builder] (Value *&val) -> codegen_value {
-    return create_function(val, module, builder);
-  };
-  return errors::codegen_call(ptype, op);
+  ast::prototype::function_gen_value ptype = defn->codegen_entry(module, builder);
+  return errors::codegen_call<ast::prototype::function_gen_value, codegen_value>(ptype, [this, module, &builder] (function_symbol_table::entry_type &entry) -> codegen_value {
+      return create_function(entry, module, builder);
+    });
 }
 
-codegen_value raytrace::ast::function::create_function(Value *& val, Module *module, IRBuilder<> &builder) {
-  Function *f = cast<Function>(val);
+codegen_value raytrace::ast::function::create_function(function_entry &entry, Module *module, IRBuilder<> &builder) {
+  Function *f = entry.func;
   
   if (!f->empty()) {
-    string err = string("Redefinition of function: ") + defn->function_name();
+    string err = string("Redefinition of function: ") + entry.name;
     return errors::make_error<errors::error_message>(err, line_no, column_no);
   }
   
-  bool is_member_function = defn->is_member_function();
+  bool is_member_function = entry.member_function;
   BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "func_entry", f);
   builder.SetInsertPoint(bb);
   
   //define the body, first name and load up all arguments
-  push_function(defn->get_return_type());
-
+  push_function(entry.return_type);
+  
   auto arg_it = f->arg_begin();
   if (is_member_function) {
     //load the context into the symbol table
     state->control.set_context(arg_it);
     state->control.load_context(module, builder);
-    arg_it++;
+    ++arg_it;
   }
-
-  for (unsigned int i = 0; i < defn->num_args(); ++i, ++arg_it) {
-    const function_argument &arg = defn->get_arg(i);
+  
+  for (unsigned int i = 0; i < entry.arguments.size(); ++i, ++arg_it) {
+    const function_argument &arg = entry.arguments[i];
     variable_symbol_table::entry_type arg_var;
-
+    
     if (arg.output) {
       //output parameter, so we don't need to allocate anything
       arg_var = variable_symbol_table::entry_type(arg_it, arg.type, false);

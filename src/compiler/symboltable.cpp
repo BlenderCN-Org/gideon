@@ -103,7 +103,7 @@ namespace raytrace {
   void function_overload_set::insert(const function_entry &entry) {
     iterator it = versions.find(entry.full_name);
     if (it != versions.end()) throw runtime_error("Equivalent function already exists");
-
+    
     versions[entry.full_name] = entry;
   }
 
@@ -293,4 +293,21 @@ bool raytrace::function_entry::compare(const type_spec &rt, const vector<type_sp
   }
   
   return true;
+}
+
+/* Type Symbol Table */
+
+namespace raytrace {
+  template<>
+  string symbol_name<type*>() { return "type"; }
+};
+
+type_scope::iterator type_scope::find(const key_type &name) { return table.find(name); }
+type_scope::iterator type_scope::begin() { return table.begin(); }
+type_scope::iterator type_scope::end() { return table.end(); }
+
+type_scope::entry_type &type_scope::extract_entry(iterator it) { return it->second; }
+    
+void type_scope::set(const key_type &name, const entry_type &entry) {
+  table[name] = entry;
 }

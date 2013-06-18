@@ -23,7 +23,11 @@ namespace raytrace {
   template<typename SymType>
   std::string symbol_name();
   
+  template<typename T>
+  codegen_void destroy_entry(T &entry, llvm::Module *module, llvm::IRBuilder<> &builder);
+  
   /* A structure of nested symbol scopes. */
+  /* NOTE: Iterators to entries in the symbol table are invalided by added/removed scopes. */
   template<typename Scope>
   class scoped_symbol_table {
   public:
@@ -190,7 +194,7 @@ namespace raytrace {
 
     //compares two arguments by type (ignores names)
     bool operator==(const function_argument &rhs) const;
-    bool operator!=(const function_argument &rhs) const { return *this != rhs; }
+    bool operator!=(const function_argument &rhs) const { return !(*this == rhs); }
   };
 
   //Generates a function name based on the argument signature.
@@ -273,7 +277,7 @@ namespace raytrace {
       function_entry &operator*();
       bool operator==(const iterator &rhs) const;
       bool operator!=(const iterator &rhs) const { return !(*this == rhs); }
-      function_overload_set::iterator operator->() const { return version_it; }
+      //const function_overload_set::iterator &operator->() const { return version_it; }
     };
     
     typedef function_entry entry_type;
@@ -302,11 +306,37 @@ namespace raytrace {
   };
 
   typedef scoped_symbol_table<function_scope> function_symbol_table;
-  
-  template<typename T>
-  codegen_void destroy_entry(T &entry, llvm::Module *module, llvm::IRBuilder<> &builder);
 
+  /* Type Symbol Table for User-Defined Types */
+
+  class type_scope {
+  public:
+
+    type_scope(const std::string &) { }
+    
+    typedef type * entry_type;
+    typedef std::string key_type;
+    typedef boost::unordered_map<std::string, type*>::iterator iterator;
+
+    iterator find(const key_type &name);
+    iterator begin();
+    iterator end();
+    
+    entry_type &extract_entry(iterator it);
+    
+    void set(const key_type &name, const entry_type &entry);
+    codegen_void destroy(llvm::Module *module, llvm::IRBuilder<> &builder) { return empty_type(); }
+    
+    static std::string key_to_string(const key_type &key) { return key; }
+
+  private:
+
+    boost::unordered_map<std::string, type*> table;
+
+  };
   
+  typedef scoped_symbol_table<type_scope> type_symbol_table;
+
 };
 
 #endif

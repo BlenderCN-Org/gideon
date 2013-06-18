@@ -2,17 +2,24 @@
 #define GD_RL_AST_DISTRIBUTION_HPP
 
 #include "compiler/ast/global.hpp"
+#include "compiler/ast/typename.hpp"
 
 namespace raytrace {
 
   namespace ast {
+
+    //A parameter to a distribution.
+    struct distribution_parameter {
+      std::string name;
+      type_expr_ptr type;
+    };
     
     /* Defines a new distribution function. */
     class distribution : public global_declaration {
     public:
 
       distribution(parser_state *st, const std::string &name,
-		   const std::vector<function_argument> &params,
+		   const std::vector<distribution_parameter> &params,
 		   const std::vector<global_declaration_ptr> &internal_decl,
 		   unsigned int line_no, unsigned int column_no);
       virtual ~distribution() {}
@@ -24,17 +31,24 @@ namespace raytrace {
     private:
 
       std::string name;
-      std::vector<function_argument> params;
+      std::vector<distribution_parameter> params;
       std::vector<global_declaration_ptr> internal_decl;
-      llvm::Type *param_type;
+      
+      typecheck_vector get_parameter_types();
 
-      llvm::StructType *getParameterType();
+      llvm::StructType *getParameterType(const std::vector<type_spec> &param_types);
       llvm::Function *createConstructor(llvm::Module *module, llvm::IRBuilder<> &builder,
+					const std::string &ctor_name,
+					llvm::Type *parameter_type, const std::vector<type_spec> &param_type_list,
 					llvm::Function *eval, llvm::Function *sample, llvm::Function *dtor);
-      llvm::Function *createDestructor(llvm::Module *module, llvm::IRBuilder<> &builder);
+      
+      llvm::Function *createDestructor(llvm::Module *module, llvm::IRBuilder<> &builder,
+				       llvm::Type *param_ty, const std::vector<type_spec> &param_type_list);
 
-      llvm::Function *createEvaluator(llvm::Function *eval, llvm::Module *module, llvm::IRBuilder<> &builder);
-      llvm::Function *createSampler(llvm::Function *sample, llvm::Module *module, llvm::IRBuilder<> &builder);
+      llvm::Function *createEvaluator(llvm::Function *eval, llvm::Type *parameter_type,
+				      llvm::Module *module, llvm::IRBuilder<> &builder);
+      llvm::Function *createSampler(llvm::Function *sample, llvm::Type *parameter_type,
+				    llvm::Module *module, llvm::IRBuilder<> &builder);
     };
 
   };

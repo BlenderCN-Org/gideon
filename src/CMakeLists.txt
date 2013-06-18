@@ -59,6 +59,7 @@ set(RT_SOURCE_FILES
   compiler/ast/distribution.cpp
   compiler/ast/module.cpp
   compiler/ast/alias.cpp
+  compiler/ast/typename.cpp
   )
 
 find_package(BISON)
@@ -88,10 +89,10 @@ target_link_libraries(gideon_compiler raytrace)
 
 set_target_properties(raytrace
   PROPERTIES
-  COMPILE_FLAGS "-std=c++0x"
+  COMPILE_FLAGS "-std=c++11"
   )
 
 set_target_properties(gideon_compiler
   PROPERTIES
-  COMPILE_FLAGS "-std=c++0x"
+  COMPILE_FLAGS "-std=c++11"
   )

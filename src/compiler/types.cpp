@@ -23,6 +23,12 @@ using namespace llvm;
 
 /** Type Table **/
 
+type *type_table::add_nameless(std::unique_ptr<type> &&ptr) {
+  size_t idx = nameless_types.size();
+  nameless_types.push_back(move(ptr));
+  return nameless_types[idx].get();
+}
+
 type *type_table::get_array(const type_spec &base, unsigned int N) {
   string arr_ty_name = array_type::type_name(base, N);
 

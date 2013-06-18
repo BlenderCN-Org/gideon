@@ -48,7 +48,7 @@ namespace raytrace {
     };
 
     typedef std::shared_ptr<expression> expression_ptr;
-
+    
     /* A binary operation */
     class binary_expression : public expression {
     public:

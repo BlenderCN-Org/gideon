@@ -49,7 +49,8 @@ void render_object::parse(ast::parser_state *parser,
   yylex_destroy(scanner);
 
   //add a global scene pointer declaration
-  syntax_tree.insert(syntax_tree.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(parser, "__gd_scene", parser->types["scene_ptr"])));
+  ast::type_expr_ptr scene_type = ast::type_expr_ptr(new ast::typename_expression(parser, "scene_ptr", 0, 0));
+  syntax_tree.insert(syntax_tree.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(parser, "__gd_scene", scene_type)));
 }
 
 Module *render_object::compile(const string &name, ast::parser_state *parser,
@@ -292,7 +293,8 @@ void render_module::parse_source() {
   yylex_destroy(scanner);
 
   //add a global scene pointer declaration
-  top.insert(top.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(&parser, "__gd_scene", parser.types["scene_ptr"])));
+  ast::type_expr_ptr scene_type = ast::type_expr_ptr(new ast::typename_expression(&parser, "scene_ptr", 0, 0));
+  top.insert(top.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(&parser, "__gd_scene", scene_type)));
 }
 
 Module *render_module::compile() {

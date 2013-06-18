@@ -253,3 +253,28 @@ code_value ast::ast_node::typecast(Value *src,
   if ((*src_type != *dst_type) && destroy_on_convert) src_type->destroy(src, module, builder);
   return result;
 }
+
+typecheck_value ast::ast_node::typename_lookup(const string &name) {
+  //lookup the name in the local variable table
+  try {
+    return state->user_types.get(name);
+  }
+  catch (compile_error &e) { } //ignore and move on 
+
+  //check defined in the modules
+  for (auto scope_it = state->modules.scope_begin(); scope_it != state->modules.scope_end(); ++scope_it) {
+    module_ptr &module = scope_it->get_module();
+
+    auto type_it = module->types.find(name);
+    if (type_it != module->types.end()) {
+      return type_it->second;
+    }
+  }
+
+  //check built-in types
+  if (state->types.has_type(name)) return state->types[name];
+
+  stringstream err_ss;
+  err_ss << "No such type named '" << name << "'";
+  return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
+}

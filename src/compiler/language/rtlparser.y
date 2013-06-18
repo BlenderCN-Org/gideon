@@ -46,7 +46,7 @@
     int i;
     float f;
     std::string s;
-    raytrace::type_spec tspec;
+    raytrace::ast::type_expr_ptr ty_expr;
 
     std::vector<std::string> id_list;
     
@@ -56,8 +56,11 @@
     raytrace::ast::statement_ptr stmt;
     std::vector<raytrace::ast::statement_ptr> stmt_list;
     
-    raytrace::function_argument arg;
-    std::vector<raytrace::function_argument> arg_list;
+    raytrace::ast::distribution_parameter dfunc_param;
+    std::vector<raytrace::ast::distribution_parameter> dfunc_param_list;
+
+    raytrace::ast::function_parameter param;
+    std::vector<raytrace::ast::function_parameter> param_list;
     raytrace::ast::prototype_ptr ptype;
     
     raytrace::ast::function_ptr func;
@@ -70,16 +73,16 @@
  }
 
 //Define terminal symbols
+%token<s> TYPE_NAME
 %token <s> IDENTIFIER STRING_LITERAL
 %token <i> INTEGER_LITERAL BOOL_LITERAL
 %token <f> FLOAT_LITERAL
-%token <tspec> FLOAT_TYPE INT_TYPE BOOL_TYPE VOID_TYPE STRING_TYPE
 
-%token <tspec> RAY_TYPE INTERSECTION_TYPE
-%token <tspec> LIGHT_TYPE SCENE_PTR_TYPE DISTRIBUTION_FUNC_TYPE
-%token <tspec> SHADER_HANDLE_TYPE
-
-%token <tspec> FLOAT2_TYPE FLOAT3_TYPE FLOAT4_TYPE
+%token <s> FLOAT_TYPE INT_TYPE BOOL_TYPE VOID_TYPE STRING_TYPE
+%token <s> RAY_TYPE INTERSECTION_TYPE
+%token <s> LIGHT_TYPE SCENE_PTR_TYPE DISTRIBUTION_FUNC_TYPE
+%token <s> SHADER_HANDLE_TYPE
+%token <s> FLOAT2_TYPE FLOAT3_TYPE FLOAT4_TYPE
 
 %token <i> DISTRIBUTION FUNCTION
 
@@ -124,20 +127,22 @@ token <i> OUTPUT
 %type <func> function_definition
 %type <ptype> function_prototype external_function_declaration
 
-%type <arg_list> function_formal_params function_formal_params_opt
+%type <param_list> function_formal_params function_formal_params_opt
 
-%type <tspec> function_parameter_typespec
-%type <arg> function_formal_param
+%type <ty_expr> function_parameter_typespec
+%type <param> function_formal_param
 
 %type <global> distribution_declaration
 
-%type <arg> distribution_param
-%type <arg_list> distribution_params distribution_params_opt
+%type <dfunc_param> distribution_param
+%type <dfunc_param_list> distribution_params distribution_params_opt
 %type <global_list> distribution_content_opt
 
 %type <i> outputspec
-%type <tspec> typespec
-%type <tspec> simple_typename
+
+%type <s> simple_typename
+%type <ty_expr> typespec_basic
+%type <ty_expr> typespec
 
  //statement non-terminals
 
@@ -247,18 +252,18 @@ function_definition
 
 function_formal_params_opt
  : function_formal_params
- | { $$ = std::vector<raytrace::function_argument>(); } //empty
+ | { $$ = std::vector<raytrace::ast::function_parameter>(); } //empty
  ;
 
 function_formal_params
- : function_formal_param { $$ = std::vector<function_argument>(1, $1); }
+ : function_formal_param { $$ = std::vector<raytrace::ast::function_parameter>(1, $1); }
  | function_formal_params ',' function_formal_param { $$ = $1; $$.push_back($3); }
  ;
 
 function_parameter_typespec
- : simple_typename
- | simple_typename '[' INTEGER_LITERAL ']' { $$ = gd_data->state->types.get_array($1, $3); }
- | simple_typename '[' ']' { $$ = gd_data->state->types.get_array_ref($1); } //array reference type (only available as a function parameter)
+ : typespec
+ | typespec_basic '[' ']' { $$ = ast::type_expr_ptr(new ast::array_ref_expression(gd_data->state, $1,
+										    yylloc.first_line, yylloc.first_column)); }
  ;
 
 function_formal_param
@@ -270,45 +275,55 @@ outputspec
  | { $$ = 0; }
  ;
 
+/* Types */
+
+typespec_basic
+ : simple_typename { $$ = ast::type_expr_ptr(new ast::typename_expression(gd_data->state, $1,
+									  yylloc.first_line, yylloc.first_column)); }
+ | TYPE_NAME { $$ = ast::type_expr_ptr(new ast::typename_expression(gd_data->state, $1,
+								    yylloc.first_line, yylloc.first_column)); }
+ ;
+
 simple_typename
- : FLOAT_TYPE { $$ = gd_data->state->types["float"]; }
- | FLOAT2_TYPE { $$ = gd_data->state->types["vec2"]; }
- | FLOAT3_TYPE { $$ = gd_data->state->types["vec3"]; }
- | FLOAT4_TYPE { $$ = gd_data->state->types["vec4"]; }
+ : FLOAT_TYPE { $$ = "float"; }
+ | FLOAT2_TYPE { $$ = "vec2"; }
+ | FLOAT3_TYPE { $$ = "vec3"; }
+ | FLOAT4_TYPE { $$ = "vec4"; }
 
- | LIGHT_TYPE { $$ = gd_data->state->types["light"]; }
- | SCENE_PTR_TYPE { $$ = gd_data->state->types["scene_ptr"]; }
- | DISTRIBUTION_FUNC_TYPE { $$ = gd_data->state->types["dfunc"]; }
- | SHADER_HANDLE_TYPE { $$ = gd_data->state->types["shader_handle"]; }
+ | LIGHT_TYPE { $$ = "light"; }
+ | SCENE_PTR_TYPE { $$ = "scene_ptr"; }
+ | DISTRIBUTION_FUNC_TYPE { $$ = "dfunc"; }
+ | SHADER_HANDLE_TYPE { $$ = "shader_handle"; }
  
- | RAY_TYPE { $$ = gd_data->state->types["ray"]; }
- | INTERSECTION_TYPE { $$ = gd_data->state->types["isect"]; }
+ | RAY_TYPE { $$ = "ray"; }
+ | INTERSECTION_TYPE { $$ = "isect"; }
 
- | INT_TYPE { $$ = gd_data->state->types["int"]; }
- | BOOL_TYPE { $$ = gd_data->state->types["bool"]; }
- | STRING_TYPE { $$ = gd_data->state->types["string"]; }
- | VOID_TYPE { $$ = gd_data->state->types["void"]; }
+ | INT_TYPE { $$ = "int"; }
+ | BOOL_TYPE { $$ = "bool"; }
+ | STRING_TYPE { $$ = "string"; }
+ | VOID_TYPE { $$ = "void"; }
 ;
 
 typespec
- : simple_typename
- | simple_typename '[' INTEGER_LITERAL ']' { $$ = gd_data->state->types.get_array($1, $3); }
+ : typespec_basic
+ | typespec_basic '[' INTEGER_LITERAL ']'  { $$ = ast::type_expr_ptr(new ast::array_type_expression(gd_data->state, $1, $3,
+												    yylloc.first_line, yylloc.first_column)); }
  ;
 
 /* Distributions */
 
 distribution_param
- : typespec IDENTIFIER { $$ = {$2, $1, false}; }
+ : typespec IDENTIFIER { $$ = {$2, $1}; }
  ;
 
 distribution_params
- : distribution_param { $$ = std::vector<function_argument>(1, $1); }
+ : distribution_param { $$ = std::vector<ast::distribution_parameter>(1, $1); }
  | distribution_params ',' distribution_param { $$ = $1; $$.push_back($3); }
 ;
 
 distribution_params_opt
  : distribution_params
- | { $$ = std::vector<function_argument>(); } //empty
+ | { $$ = std::vector<ast::distribution_parameter>(); } //empty
  ;
 
 distribution_content_opt
@@ -416,10 +431,12 @@ postfix_expression
 ;
 
 type_constructor
- : simple_typename '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::type_constructor(gd_data->state, $1, $3)); }
- | simple_typename '[' ']' '(' function_args_opt ')' {
+ : typespec_basic '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::type_constructor(gd_data->state, $1, $3)); }
+ | typespec_basic '[' ']' '(' function_args_opt ')' {
    $$ = ast::expression_ptr(new ast::type_constructor(gd_data->state,
-						      gd_data->state->types.get_array($1, $5.size()),
+						      //gd_data->state->types.get_array($1, $5.size()),
+						      ast::type_expr_ptr(new ast::array_type_expression(gd_data->state, $1, $5.size(),
+													yylloc.first_line, yylloc.first_column)),
 						      $5));
    }
  ;

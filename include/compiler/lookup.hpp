@@ -13,9 +13,11 @@ namespace raytrace {
     std::string name;
     variable_scope variables;
     function_scope functions;
+    type_scope types;
+    
     boost::unordered_map<std::string, module_ptr> modules;
 
-    module_object(const std::string &name = "") : name(name), variables(name), functions(name) { }
+    module_object(const std::string &name = "") : name(name), variables(name), functions(name), types(name) { }
   };
 
   /* Used to maintained a scoped list of modules. */

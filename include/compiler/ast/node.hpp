@@ -24,6 +24,7 @@ namespace raytrace {
 
       variable_symbol_table variables;
       function_symbol_table functions;
+      type_symbol_table user_types;
       module_symbol_table modules;
       
       export_table exports;
@@ -74,11 +75,6 @@ namespace raytrace {
       variable_scope &global_variables();
       function_scope &function_table();
       std::string function_scope_name();
-
-      typecheck_value variable_type_lookup(const std::string &name);
-      typed_value_container variable_lookup(const std::string &name);
-
-      entry_or_error function_lookup(const function_key &fkey);
       
       code_value typecast(typed_value_container &src, const type_spec &dst_type,
 			  bool make_copy, bool destroy_original,
@@ -88,6 +84,15 @@ namespace raytrace {
 			  const type_spec &src_type, const type_spec &dst_type,
 			  bool make_copy, bool destroy_on_convert,
 			  llvm::Module *module, llvm::IRBuilder<> &builder);
+
+      //Lookup Functions
+
+      typecheck_value variable_type_lookup(const std::string &name);
+      typed_value_container variable_lookup(const std::string &name);
+
+      entry_or_error function_lookup(const function_key &fkey);
+
+      typecheck_value typename_lookup(const std::string &name);
     };
 
   };

@@ -1,0 +1,30 @@
+
+distribution test(int z) {
+  function evaluate(vec3 P_in, vec3 w_in,
+		    vec3 P_out, vec3 w_out,
+		    output float pdf) vec4 {
+    pdf = 1.0;
+    return vec4(z, z, z, 1.0);
+  }
+  
+  function sample(vec3 P_out, vec3 w_out,
+		  vec2 rand_P, vec2 rand_w,
+		  output vec3 P_in, output vec3 w_in) float {
+    P_in = P_out;
+    w_in = w_out;
+    
+    return z;
+  }
+}
+
+float x;
+
+function bar(int a, int[] b) int {
+  return a+b[2];
+}
+
+function foo() int {
+  int f = 3.0;
+  
+  return f;
+}

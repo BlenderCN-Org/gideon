@@ -3,6 +3,7 @@
 
 #include "compiler/ast/statement.hpp"
 #include "compiler/ast/expression.hpp"
+#include "compiler/ast/typename.hpp"
 #include "compiler/ast/global.hpp"
 #include "compiler/symboltable.hpp"
 #include "compiler/gen_state.hpp"
@@ -38,6 +39,13 @@ namespace raytrace {
       ast_node::entry_or_error lookup_function();
     };
 
+    /* A type expression used in a function parameter. */
+    struct function_parameter {
+      std::string name;
+      type_expr_ptr type;
+      bool output;
+    };
+
     /* 
        Represents a function prototype, defining the return type, name and arguments of a function.
        A function may be declared multiple times, as long as the body is only defined once and all
@@ -47,12 +55,12 @@ namespace raytrace {
     public:
       
       //Locally defined functions.
-      prototype(parser_state *st, const std::string &name, const type_spec &return_type,
-		const std::vector<function_argument> &args);
+      prototype(parser_state *st, const std::string &name, const type_expr_ptr &return_type,
+		const std::vector<function_parameter> &args);
 
       //Externally defined functions.
       prototype(parser_state *st, const std::string &name, const std::string &extern_name,
-		const type_spec &return_type, const std::vector<function_argument> &args);
+		const type_expr_ptr &return_type, const std::vector<function_parameter> &args);
       
       virtual ~prototype() {}
 
@@ -61,25 +69,22 @@ namespace raytrace {
       const std::string &function_name() { return name; }
       void set_external(const std::string &extern_name);
       
-      size_t num_args() { return args.size(); }
-      const function_argument &get_arg(int i) { return args[i]; }
-      const type_spec &get_return_type() { return return_type; }
-
-      bool is_external() { return external; }
-      bool is_member_function() { return member_function; } //this will only be known after codegen
-            
+      typedef raytrace::codegen<function_symbol_table::entry_type, compile_error>::value function_gen_value;
+      function_gen_value codegen_entry(llvm::Module *module, llvm::IRBuilder<> &builder);
+      
     private:
 
       std::string name, extern_name;
-      type_spec return_type;
-      std::vector<function_argument> args;
+      type_expr_ptr return_type;
+      std::vector<function_parameter> args;
       bool external, member_function;
       
       //checks to see if this function has been previously defined (and if so, do the prototypes match).
-      codegen_value check_for_entry();
-
-      function_key get_key() const;
+      entry_or_error check_for_entry(const std::vector<type_spec> &arg_types, const type_spec &return_ty);
       
+      function_key get_key(const std::vector<type_spec> &arg_types) const;
+      
+      typecheck_vector get_arg_types();
     };
 
     typedef std::shared_ptr<prototype> prototype_ptr;
@@ -98,7 +103,7 @@ namespace raytrace {
       prototype_ptr defn;
       statement_list body;
       
-      codegen_value create_function(llvm::Value *& val, llvm::Module *module, llvm::IRBuilder<> &builder);
+      codegen_value create_function(function_entry &entry, llvm::Module *module, llvm::IRBuilder<> &builder);
 
     };
 

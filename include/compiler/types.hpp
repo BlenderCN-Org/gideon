@@ -40,17 +40,22 @@ namespace raytrace {
     
     type *operator[](const std::string &key) { return entries[key].get(); }
     type *at(const std::string &key) { return entries.at(key).get(); }
+    bool has_type(const std::string &key) { return entries.find(key) != entries.end(); }
 
     type_ptr &entry(const std::string &key) { return entries[key]; }
     
     type *get_array(const type_spec &base, unsigned int N);
     type *get_array_ref(const type_spec &base);
 
+    type *add_nameless(std::unique_ptr<type> &&ptr);
+
   private:
     
     boost::unordered_map< std::string, std::unique_ptr<type> > entries;
     boost::unordered_map< std::string, std::unique_ptr<type> > array_types;
-    
+
+    std::vector<std::unique_ptr<type>> nameless_types;
+
   };
 
   void initialize_types(type_table &tt);

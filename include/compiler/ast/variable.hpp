@@ -3,6 +3,7 @@
 
 #include "compiler/types.hpp"
 #include "compiler/ast/expression.hpp"
+#include "compiler/ast/typename.hpp"
 #include "compiler/ast/statement.hpp"
 #include "compiler/ast/global.hpp"
 #include "compiler/symboltable.hpp"
@@ -18,7 +19,7 @@ namespace raytrace {
     public:
 
       variable_decl(parser_state *st, const std::string &name,
-		    const type_spec &type, const expression_ptr &init,
+		    const type_expr_ptr &type, const expression_ptr &init,
 		    unsigned int line_no, unsigned int column_no);
       virtual ~variable_decl() {}
 
@@ -27,10 +28,12 @@ namespace raytrace {
     private:
       
       std::string name;
-      type_spec type;
+      type_expr_ptr type;
       expression_ptr initializer;
       
-      typed_value_container initialize_from_type(llvm::Module *module, llvm::IRBuilder<> &builder);
+      typed_value_container initialize_from_type(type_spec t, llvm::Module *module, llvm::IRBuilder<> &builder);
+      codegen_void declare_with_type(type_spec t, llvm::Module *module, llvm::IRBuilder<> &builder);
+
     };
     
     /* Declares a new global variable. */
@@ -39,7 +42,7 @@ namespace raytrace {
     public:
       
       global_variable_decl(parser_state *st,
-			   const std::string &name, const type_spec &type);
+			   const std::string &name, const type_expr_ptr &type);
       virtual ~global_variable_decl() { }
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder <> &builder);
@@ -47,7 +50,7 @@ namespace raytrace {
     private:
       
       std::string name;
-      type_spec type;
+      type_expr_ptr type;
 
       std::string full_name();
 
@@ -78,15 +81,15 @@ namespace raytrace {
     class type_constructor : public expression {
     public:
 
-      type_constructor(parser_state *st, const type_spec &type, const std::vector<expression_ptr> &args);
+      type_constructor(parser_state *st, const type_expr_ptr &type, const std::vector<expression_ptr> &args);
       ~type_constructor() {}
 
-      virtual typecheck_value typecheck() { return type; }
+      virtual typecheck_value typecheck() { return type->codegen_type(); }
       virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       
     private:
-
-      type_spec type;
+      
+      type_expr_ptr type;
       std::vector<expression_ptr> args;
       typed_value_container get_arg(int i, llvm::Module *module, llvm::IRBuilder<> &builder);
       
