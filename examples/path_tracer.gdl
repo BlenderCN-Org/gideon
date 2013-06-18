@@ -5,9 +5,6 @@ module render {
   module demo {
     extern function __gen_shadow_ray(output vec3 O, output vec3 D, float max_t, output ray r) void : gde_gen_ray;
     function shadow_ray(vec3 O, vec3 D, float max_t) ray { ray r; __gen_shadow_ray(O, D, max_t, r); return r; }
-
-    extern function int_to_float(int i) float : gde_int_to_float;
-    extern function floor_int(float f) int : gde_floor_int;
   }
 
   function in_shadow(vec3 P, vec3 P_lt) bool {
@@ -23,12 +20,11 @@ module render {
     vec4 L = vec4(0.0, 0.0, 0.0, 0.0);
 
     int num_lights = gideon.scene:num_lights();
-    float num_lights_f = demo.int_to_float(num_lights);
-    int light_idx = demo.floor_int(num_lights_f * gideon.random());
+    int light_idx = (num_lights * gideon.random());
     if (light_idx > (num_lights - 1)) light_idx = num_lights - 1;
 
     light lt = gideon.scene:get_light(light_idx);
-    float inv_N = 1.0 / demo.int_to_float(N);
+    float inv_N = 1.0 / N;
 
     for (int i = 0; i < N; i += 1) {
       float light_pdf;
@@ -47,7 +43,7 @@ module render {
       }
     }
 
-    return num_lights_f * L;
+    return num_lights * L;
   }
 
   function shade(ray r, int min_path, int path_length, int light_samples) vec4 {
@@ -114,14 +110,11 @@ module render {
 //Renderer Entry Point
 function main(int x0, int y0, int width, int height, scene output_buffer) void {
   int samples_per_pixel = 2;
-  //float samples_f = render.demo.int_to_float(samples_per_pixel);
-  //float inv_samples = 1.0 / samples_f;
   float inv_samples = 1.0 / samples_per_pixel;
 
   for (int y = 0; y < height; y += 1) {
     for (int x = 0; x < width; x += 1) {
-      vec2 pix = vec2(render.demo.int_to_float(x0 + x),
-		      render.demo.int_to_float(y0 + y));
+      vec2 pix = vec2(x0 + x, y0 + y);
       vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
 
       for (int i = 0; i < samples_per_pixel; i += 1) {
