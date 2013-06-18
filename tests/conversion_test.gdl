@@ -43,7 +43,7 @@ function foo(int x) float {
   dfunc d = test(567 + x);
 
   float[2] arr = float[](1.0, 3.0);
-  //z += array_sum(arr);
+  z += array_sum(arr);
 
   return i_x + w + z;
 }

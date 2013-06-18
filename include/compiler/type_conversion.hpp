@@ -28,6 +28,9 @@ namespace raytrace {
 
     //Returns whether or not the src type can be cast to the dst type,
     //setting the cost output arguments.
+
+    //SLIGHT HACK: This function will report that arrays can be converted to equivalent array references.
+    //             This is for lookup purposes only, the actual conversion does not support this.
     bool can_convert(const type_spec &src_type, const type_spec &dst_type,
 		     /* out */ int &cost_for_arguments,
 		     /* out */ int &cost_for_operations) const;

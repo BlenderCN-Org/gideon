@@ -53,6 +53,10 @@ ast::ast_node::entry_or_error ast::func_call::lookup_function() {
   return errors::codegen_call<typecheck_vector, entry_or_error>(arg_types, lookup);
 }
 
+bool ast::func_call::check_for_array_reference_cast(const function_argument &arg) const {
+  return (arg.type->is_array() && (arg.type == state->types.get_array_ref(arg.type->element_type())));
+}
+
 typecheck_value ast::func_call::typecheck() {
   entry_or_error entry = lookup_function();
   return errors::codegen_call<entry_or_error, typecheck_value>(entry, [] (function_symbol_table::entry_type *&func) -> typecheck_value {
@@ -70,7 +74,8 @@ typed_value_vector ast::func_call::codegen_all_args(entry_or_error &entry,
     unsigned int arg_idx = 0;
     
     for (vector<expression_ptr>::iterator arg_it = args.begin(); arg_it != args.end(); ++arg_it, ++arg_idx) {
-      typed_value_container arg = (entry->arguments[arg_idx].output ? 
+      bool need_pointer = (entry->arguments[arg_idx].output || check_for_array_reference_cast(entry->arguments[arg_idx]));
+      typed_value_container arg = (need_pointer ? 
 				   (*arg_it)->codegen_ptr(module, builder) :
 				   (*arg_it)->codegen(module, builder));
       if (!(*arg_it)->bound()) to_destroy.push_back(arg);
@@ -125,6 +130,16 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
       type_spec arg_ts = arg.get<1>();
 
       if (entry->arguments[arg_idx].output) arg_vals.push_back(arg.get<0>().extract_value());
+      else if (check_for_array_reference_cast(entry->arguments[arg_idx])) {
+	code_value array_ref = conversion_llvm::array_to_array_ref(arg.get<0>().extract_value(), arg_ts->llvm_type(),
+								   entry->arguments[arg_idx].type,
+								   module, builder);
+	errors::codegen_call<code_value, codegen_void>(array_ref,
+						       [&] (value &v) -> codegen_void {
+							 arg_vals.push_back(v.extract_value());
+							 return empty_type();
+						       });
+      }
       else {
 	code_value cast_arg_val = typecast(arg.get<0>().extract_value(),
 					   arg_ts, entry->arguments[arg_idx].type,
@@ -291,6 +306,17 @@ typecheck_vector ast::prototype::get_arg_types() {
   typecheck_vector arg_types;
   for (auto arg_it = args.begin(); arg_it != args.end(); ++arg_it) {
     typecheck_value ty = arg_it->type->codegen_type();
+    ty = errors::codegen_call(ty, [this, &arg_it] (type_spec &t) -> typecheck_value {
+	//disallow output array references
+	bool is_array_ref = (t->is_array() &&
+			     (t == state->types.get_array_ref(t->element_type())));
+	if (is_array_ref && arg_it->output) {
+	  return errors::make_error<errors::error_message>("Array references are already reference parameters.", line_no, column_no);
+	}
+
+	return t;
+      });
+
     arg_types = errors::codegen_vector_push_back(arg_types, ty);
   }
 

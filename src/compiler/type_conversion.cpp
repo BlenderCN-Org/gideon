@@ -41,6 +41,16 @@ bool type_conversion_table::can_convert(const type_spec &src_type, const type_sp
     cost_for_operations = entry->second.cost_for_operations;
     return true;
   }
+
+  //array -> array reference
+  if (src_type->is_array()) {
+    type_spec array_ref_type = types.get_array_ref(src_type->element_type());
+    if (array_ref_type == dst_type) {
+      cost_for_arguments = 1;
+      cost_for_operations = 1;
+      return true;
+    }
+  }
   
   return false;
 }
@@ -52,6 +62,12 @@ code_value type_conversion_table::convert(const type_spec &src_type, Value *src,
 
   auto entry = valid_conversions.find(make_pair(src_type, dst_type));
   if (entry == valid_conversions.end()) {
+
+    //do not allow array -> array reference conversions here
+    if (src_type->is_array()) {
+      assert(dst_type != types.get_array_ref(src_type->element_type()));
+    }
+
     stringstream err_ss;
     err_ss << "Invalid conversion from " << src_type->name << " to " << dst_type->name;
     return errors::make_error<errors::error_message>(err_ss.str(), 0, 0);
@@ -79,7 +95,7 @@ code_value conversion_llvm::array_to_array_ref(Value *arr_ptr, Type *arr_type,
 				ConstantInt::get(getGlobalContext(),
 						 APInt(8*sizeof(int), N, true)),
 				ArrayRef<unsigned int>(0));
-  v = builder.CreateInsertValue(v, builder.CreateConstGEP1_32(arr_ptr, 0),
+  v = builder.CreateInsertValue(v, builder.CreateConstGEP2_32(arr_ptr, 0, 0),
 				ArrayRef<unsigned int>(1));
   return v;
 }

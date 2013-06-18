@@ -37,6 +37,7 @@ namespace raytrace {
 					  llvm::Module *module, llvm::IRBuilder<> &builder,
 					  /* out */ std::vector<typed_value_container> &to_destroy);
       ast_node::entry_or_error lookup_function();
+      bool check_for_array_reference_cast(const function_argument &arg) const;
     };
 
     /* A type expression used in a function parameter. */
