@@ -255,11 +255,18 @@ extern "C" {
     prog->load_source_file(fname);
   }
 
-  void *gd_api_program_compile(void *p) {
-    render_program *prog = reinterpret_cast<render_program*>(p);
-    Module *module = prog->compile();
-    module->dump();
-    return reinterpret_cast<void*>(new compiled_renderer(module));
+  typedef void (*compiler_error_cb)(const char *);
+  void *gd_api_program_compile(void *p, compiler_error_cb error_cb) {
+    try {
+      render_program *prog = reinterpret_cast<render_program*>(p);
+      Module *module = prog->compile();
+      module->dump();
+      return reinterpret_cast<void*>(new compiled_renderer(module));
+    }
+    catch (runtime_error &e) {
+      error_cb(e.what());
+      return NULL;
+    }
   }
 
   void gd_api_destroy_renderer(void *r) {

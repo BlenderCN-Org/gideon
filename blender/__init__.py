@@ -1,11 +1,11 @@
 import bpy
 
 bl_info = {
-    "name" : "Extendible Raytracer",
+    "name" : "Gideon Render Engine",
     "description" : "Fully functional raytracer easily extendible for experimenting with new rendering features.",
     "author" : "Curtis Andrus",
     "version": (1, 0),  
-    "blender": (2, 6, 5),  
+    "blender": (2, 6, 6),  
     "category": "Render"
 }
 

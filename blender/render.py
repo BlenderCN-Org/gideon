@@ -5,8 +5,8 @@ from . import sync
 from . import engine
 import ctypes
 
-class DemoRaytraceEngine(bpy.types.RenderEngine):
-    bl_idname = "DEMO_RAYTRACE_ENGINE"
+class GideonRenderEngine(bpy.types.RenderEngine):
+    bl_idname = 'GIDEON_RENDER_ENGINE'
     bl_label = "Gideon"
     bl_use_shading_nodes = True
     use_highlight_tiles = True
@@ -14,23 +14,36 @@ class DemoRaytraceEngine(bpy.types.RenderEngine):
     def __init__(self):
         self.gideon = engine.load_gideon("/home/curtis/Projects/relatively-crazy/build/src/libraytrace.so")
         self.context = engine.create_context(self.gideon)
+        self.ready = False
 
     def __del__(self):
         engine.destroy_context(self.gideon, self.context)
     
     def update(self, data, scene):
         self.update_stats("", "Compiling render kernel")
-        kernel = self.rebuild_kernel(scene)
 
-        #sync this scene with gideon
-        self.update_stats("", "Syncing scene data")
-        gd_scene = sync.GideonScene(self.gideon, kernel)
-        sync.convert_scene(scene, gd_scene)
-        engine.context_set_scene(self.gideon, self.context, gd_scene.scene)
+        try:
+            self.ready = False
+            kernel = self.rebuild_kernel(scene)
 
-        #build the BVH
-        self.update_stats("", "Building BVH")
-        engine.context_build_bvh(self.gideon, self.context)
+            #sync this scene with gideon
+            self.update_stats("", "Syncing scene data")
+            gd_scene = sync.GideonScene(self.gideon, kernel)
+            sync.convert_scene(scene, gd_scene)
+            engine.context_set_scene(self.gideon, self.context, gd_scene.scene)
+
+            #build the BVH
+            self.update_stats("", "Building BVH")
+            engine.context_build_bvh(self.gideon, self.context)
+
+            self.ready = True
+        except RuntimeError:
+            self.update_stats("", "Render Failed")
+
+    #Reports any errors to the console.
+    def report_render_error(self, error_short, error_msg):
+        print(error_msg)
+        self.report({'ERROR'}, error_short)
     
     #Compiles the render kernel.
     def rebuild_kernel(self, scene):
@@ -41,13 +54,22 @@ class DemoRaytraceEngine(bpy.types.RenderEngine):
             print("Loading Object: ", source.name)
             engine.program_load_source(self.gideon, program, source.name)
 
-        kernel = engine.program_compile(self.gideon, program)
+        error_cb = lambda error_str : self.report_render_error("Compiler Error - Check Console",
+                                                               error_str.decode('ascii'))
+        
+        kernel = engine.program_compile(self.gideon, program, error_cb)
+        if kernel == None:
+            raise RuntimeError("Could not compile kernel.")
+
         engine.context_set_kernel(self.gideon, self.context, kernel)
         
         engine.destroy_program(self.gideon, program)
         return kernel
 
     def render(self, scene):
+        if not self.ready:
+            return
+
         #call the renderer's entry point
         pixel_scale = scene.render.resolution_percentage * 0.01
         x_pixels = floor(pixel_scale * scene.render.resolution_x)

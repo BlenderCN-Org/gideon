@@ -66,12 +66,13 @@ def program_load_source(libgideon, prog, filename):
     loader(prog, filename.encode('ascii'))
 
 #Compiles the given program.
-def program_compile(libgideon, prog):
+def program_compile(libgideon, prog, error_cb):
+    cb_func_type = CFUNCTYPE(None, c_char_p)
     compiler = libgideon.gd_api_program_compile
     compiler.restype = c_void_p
-    compiler.argtypes = [c_void_p]
+    compiler.argtypes = [c_void_p, cb_func_type]
 
-    return compiler(prog)
+    return compiler(prog, cb_func_type(error_cb))
 
 #Destroys a compiled program.
 def destroy_compiled(libgideon, prog):

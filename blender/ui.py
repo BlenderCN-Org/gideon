@@ -8,7 +8,7 @@ class GideonButtonsPanel():
     @classmethod
     def poll(cls, context):
         rd = context.scene.render
-        return rd.engine == 'DEMO_RAYTRACE_ENGINE'
+        return rd.engine == 'GIDEON_RENDER_ENGINE'
 
 class GideonRender_Source_Panel(GideonButtonsPanel, bpy.types.Panel):
     bl_label = "Program Sources"
@@ -200,8 +200,8 @@ def get_panels():
 
 def register():
     for panel in get_panels():
-        panel.COMPAT_ENGINES.add('DEMO_RAYTRACE_ENGINE')
+        panel.COMPAT_ENGINES.add('GIDEON_RENDER_ENGINE')
     
 def unregister():
     for panel in get_panels():
-        panel.COMPAT_ENGINES.remove('DEMO_RAYTRACE_ENGINE')
+        panel.COMPAT_ENGINES.remove('GIDEON_RENDER_ENGINE')
