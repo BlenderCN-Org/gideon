@@ -1,4 +1,5 @@
 from ctypes import *
+import bpy
 
 #Loads the gideon library.
 def load_gideon(path):
@@ -9,6 +10,20 @@ def load_gideon(path):
     init.argtypes = [c_char_p]
     init('libraytrace.so'.encode('ascii'))
     return libgideon
+
+#-- Helper Functions --#
+
+def string_copy(libgideon, s):
+    copy = libgideon.gd_api_string_copy
+    copy.restype = c_void_p
+    copy.argtypes = [c_char_p]
+    return copy(s.encode('ascii'))
+
+def set_status(libgideon, s_ptr, s):
+    set_status = libgideon.gd_api_set_status
+    set_status.restype = None
+    set_status.argtypes = [c_void_p, c_int]
+    set_status(s_ptr, s)
 
 #-- Context Management --#
 
@@ -44,14 +59,18 @@ def context_build_bvh(libgideon, context):
 
 #-- Program Management --#
 
-
 #Returns a handle to the renderer program.
-def create_program(libgideon, name):
+def create_program(libgideon, name,
+                   source_loader):
     create = libgideon.gd_api_create_program
     create.restype = c_void_p
-    create.argtypes = [c_char_p]
 
-    return create(name.encode('ascii'))
+    create.argtypes = [c_char_p,
+                       source_loader.path_resolver_cb_type,
+                       source_loader.source_loader_cb_type]
+
+    return create(name.encode('ascii'),
+                  source_loader.get_resolve_cb(), source_loader.get_load_cb())
 
 #Destroys a renderer program.
 def destroy_program(libgideon, prog):

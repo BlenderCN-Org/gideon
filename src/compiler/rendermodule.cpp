@@ -19,9 +19,52 @@
 #include <fstream>
 #include <stdexcept>
 
+#include <boost/filesystem.hpp>
+
 using namespace std;
 using namespace raytrace;
 using namespace llvm;
+
+/* Source File Loading */
+
+string raytrace::basic_path_resolver(const string &src_path_str,
+				     const vector<string> &search_paths) {
+  boost::filesystem::path src_path(src_path_str);
+  if (!src_path.has_extension()) src_path.replace_extension(".gdl");
+  
+  vector<boost::filesystem::path> paths_to_check;
+  if (src_path.is_absolute()) paths_to_check.push_back(src_path);
+  else {
+    //check current directory and search paths
+    for (auto search_it : search_paths) {
+      paths_to_check.push_back(search_it / src_path);
+    }
+
+    paths_to_check.push_back(boost::filesystem::current_path() / src_path);
+  }
+
+  for (auto it = paths_to_check.begin(); it != paths_to_check.end(); ++it) {
+    if (boost::filesystem::exists(*it) &&
+	boost::filesystem::is_regular_file(*it)) {
+      return it->native();
+    }
+  }
+
+  stringstream err_ss;
+  err_ss << "Unable to resolve path: " << src_path << endl;
+  throw runtime_error(err_ss.str());
+}
+
+string raytrace::basic_source_loader(const string &abs_path) {
+  ifstream file(abs_path);
+  if (!file.is_open()) {
+    stringstream err_ss;
+    err_ss << "Unable to load source file: " << abs_path << endl;
+    throw runtime_error(err_ss.str());
+  }
+  
+  return string((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+}
 
 /* Render Object */
 
@@ -93,7 +136,19 @@ void compiled_renderer::map_global(const string &name, void *location_ptr) {
 /* Render Program */
 
 render_program::render_program(const string &name) :
-  name(name)
+  name(name),
+  path_resolver([this] (const string &path) -> string { return path; }),
+  source_loader([this] (const string &path) -> string { return default_loader(path); })
+{
+  initialize_types(types);
+}
+
+render_program::render_program(const string &name,
+			       const boost::function<string (const string &)> &resolver,
+			       const boost::function<string (const string &)> &loader) :
+  name(name),
+  path_resolver(resolver),
+  source_loader(loader)
 {
   initialize_types(types);
 }
@@ -114,15 +169,29 @@ void render_program::add_object(const render_object &obj) {
   objects[obj.name] = std::shared_ptr<object_entry>(new object_entry(this, obj));
 }
 
-void render_program::load_source_file(const string &path) {
+string render_program::default_loader(const string &path) {
   ifstream file(path);
   if (!file.is_open()) {
     stringstream err_ss;
     err_ss << "Unable to load source file: " << path << endl;
     throw runtime_error(err_ss.str());
   }
-
+  
   string source((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+  return source;
+}
+
+void render_program::load_source_file(const string &obj_name) {
+  string full_name = get_object_name(obj_name);
+  load_resolved_filename(full_name);
+}
+
+string render_program::get_object_name(const string &path) {
+  return path_resolver(path);
+}
+
+void render_program::load_resolved_filename(const string &path) {
+  string source = source_loader(path);
   add_object(render_object(path, source));
 }
 
@@ -149,7 +218,8 @@ void render_program::load_all_dependencies() {
     std::shared_ptr<object_entry> &object = obj_it->second;
 
     for (auto dep_it = object->dependencies.begin(); dep_it != object->dependencies.end(); ++dep_it) {
-      need_to_load.push_back(*dep_it);
+      string full_dep_name = get_object_name(*dep_it);
+      need_to_load.push_back(full_dep_name);
     }
   }
 
@@ -157,15 +227,16 @@ void render_program::load_all_dependencies() {
   while (need_to_load.size() > 0) {
     string dep_name = need_to_load.back();
     need_to_load.pop_back();
-
+    
     if (!has_object(dep_name)) {
       //add dependencies to the list and load this source file
-      load_source_file(dep_name);
+      load_resolved_filename(dep_name);
       std::shared_ptr<object_entry> &object = objects[dep_name];
       object->parse();
       
       for (auto dep_it = object->dependencies.begin(); dep_it != object->dependencies.end(); ++dep_it) {
-	need_to_load.push_back(*dep_it);
+	string full_dep_name = get_object_name(*dep_it);
+	need_to_load.push_back(full_dep_name);
       }
     }
   }
@@ -265,97 +336,3 @@ void render_program::optimize(Module *module) {
   
   pm.run(*module);
 }
-
-/* Render Module */
-
-render_module::render_module(const string &name, const string &source_code) :
-  name(name), source(source_code), parser(types)
-{
-  initialize_types(types);
-  binop_table::initialize_standard_ops(parser.binary_operations,
-				       parser.types);
-  parse_source();
-}
-
-render_module::~render_module() { }
-
-void render_module::parse_source() {
-  yyscan_t scanner;
-  
-  if (yylex_init(&scanner)) { throw runtime_error("Could not initialize yylex"); }
-  YY_BUFFER_STATE state = yy_scan_string(source.c_str(), scanner);
-  yyset_lineno(1, scanner);
-  
-  ast::gideon_parser_data gd_data { &parser, &top, &dependencies };
-  if (yyparse(scanner, &gd_data)) { throw runtime_error("Parser error"); }  
-
-  yy_delete_buffer(state, scanner);
-  yylex_destroy(scanner);
-
-  //add a global scene pointer declaration
-  ast::type_expr_ptr scene_type = ast::type_expr_ptr(new ast::typename_expression(&parser, "scene_ptr", 0, 0));
-  top.insert(top.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(&parser, "__gd_scene", scene_type)));
-}
-
-Module *render_module::compile() {
-  Module *module = new Module(name.c_str(), getGlobalContext());
-  IRBuilder<> builder(getGlobalContext());
-
-  auto report_errors = [] (compile_error &err) -> codegen_void {
-    cout << "--- Error Report ---" << endl;
-    cout << err->report() << endl;
-    exit(-1);
-    
-    return empty_type();
-  };
-  raytrace::errors::error_container_operation<codegen_void, codegen_void> report(report_errors);
-  
-  codegen_void result = empty_type();
-  
-  parser.modules.scope_push();
-  
-  for (auto ast_it = top.begin(); ast_it != top.end(); ast_it++) {
-    codegen_value gen_val = (*ast_it)->codegen(module, builder);
-    codegen_void val = raytrace::errors::codegen_ignore_value(gen_val);
-    result = errors::merge_void_values(result, val);
-  }
-
-  parser.modules.scope_pop(module, builder, false);
-  
-  boost::apply_visitor(report, result);
-
-  parser.exports.dump();
-
-  optimize(module);
-  return module;
-}
-
-void render_module::optimize(Module *module) {
-  FunctionPassManager fpm(module);
-
-  // Set up the optimizer pipeline.  Start with registering info about how the
-  // target lays out data structures.
-  fpm.add(new DataLayout(module));  
-  fpm.add(createPromoteMemoryToRegisterPass());
-  
-  // Provide basic AliasAnalysis support for GVN.
-  fpm.add(createBasicAliasAnalysisPass());
-  // Do simple "peephole" optimizations and bit-twiddling optzns.
-  fpm.add(createInstructionCombiningPass());
-  // Reassociate expressions.
-  fpm.add(createReassociatePass());
-  // Eliminate Common SubExpressions.
-  fpm.add(createGVNPass());
-  // Simplify the control flow graph (deleting unreachable blocks, etc).
-  fpm.add(createCFGSimplificationPass());
-
-  fpm.doInitialization();
-
-  Module::FunctionListType &funcs = module->getFunctionList();
-  for (auto it = funcs.begin(); it != funcs.end(); it++) fpm.run(*it);
-  
-}
-
-//vector<distribution_export> render_module::get_distributions() const {
-//  return vector<distribution_export>();
-//}

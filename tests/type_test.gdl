@@ -1,4 +1,3 @@
-
 distribution test(int z) {
   function evaluate(vec3 P_in, vec3 w_in,
 		    vec3 P_out, vec3 w_out,

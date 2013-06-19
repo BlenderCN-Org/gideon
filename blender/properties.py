@@ -64,12 +64,21 @@ class GideonRenderSettings(bpy.types.PropertyGroup):
             default = "main"
             )
 
+        cls.std_path = StringProperty(
+            name = "Standard Path",
+            description = "Directory containing the Gideon Standard Library",
+            subtype = 'DIR_PATH',
+            default = ""
+            )
+
         cls.source_path = StringProperty(
             name = "Source Path",
             description = "Search path for external Gideon source files",
             subtype = 'DIR_PATH',
             default = ""
-            )        
+            )
+
+        
         cls.sources = CollectionProperty(
             name = "Source Files",
             description = "Collection of source files that make up the gideon program",

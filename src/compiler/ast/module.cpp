@@ -122,7 +122,7 @@ void ast::import_declaration::export_module(const string &name, module_ptr &m) {
 ast::load_declaration::load_declaration(parser_state *st, const string &source_name,
 					unsigned int line_no, unsigned int column_no) :
   global_declaration(st),
-  source_name(source_name),
+  source_name(st->objects->get_object_name(source_name)),
   line_no(line_no), column_no(column_no)
 {
   

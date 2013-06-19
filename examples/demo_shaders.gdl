@@ -1,4 +1,4 @@
-load "/home/curtis/Projects/relatively-crazy/src/standard/gideon.gdl";
+load "gideon";
 
 module shaders {
   

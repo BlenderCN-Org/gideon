@@ -239,10 +239,53 @@ extern "C" {
     ctx->build_bvh();
   }
 
+  /* String Allocation */
+
+  //Makes a new copy of the provided string, allocated with new[].
+  char *gd_api_string_copy(const char *s) {
+    char *buf = new char[strlen(s)+1];
+    strcpy(buf, s);
+    return buf;
+  }
+
+  //Easy way to set return status values from Python.
+  void gd_api_set_status(/* out */ void *result, int status) {
+    int *r = reinterpret_cast<int*>(result);
+    *r = status;
+  }
+
   /* Program Management */
 
-  void *gd_api_create_program(const char *name) {
-    return reinterpret_cast<void*>(new render_program(name));
+  void *gd_api_create_program(const char *name,
+			      void *resolve_cb, void *load_cb) {
+    typedef char *(*gd_api_source_load_cb_type)(const char *, void*);
+    typedef char *(*gd_api_path_resolve_cb_type)(const char *, void*);
+    
+    auto resolve_func = [resolve_cb] (const string &path) -> string {
+      int status = 0;
+      char *new_str = ((gd_api_path_resolve_cb_type)(resolve_cb))(path.c_str(), (void*)&status);
+      if (status == 0) {
+	throw runtime_error(string("Unable to resolve pathname: ") + path);
+      }
+      
+      string result = new_str;
+      delete[] new_str;
+      return result;
+    };
+
+    auto loader_func = [load_cb] (const string &path) -> string {
+      int status = 0;
+      char *new_str = ((gd_api_source_load_cb_type)(load_cb))(path.c_str(), (void*)&status);
+      if (status == 0) {
+	throw runtime_error(string("Unable to load source: ") + path);
+      }
+      
+      string source = new_str;
+      delete[] new_str;
+      return source;
+    };
+    
+    return reinterpret_cast<void*>(new render_program(name, resolve_func, loader_func));
   }
 
   void gd_api_destroy_program(void *p) {
@@ -260,7 +303,7 @@ extern "C" {
     try {
       render_program *prog = reinterpret_cast<render_program*>(p);
       Module *module = prog->compile();
-      module->dump();
+      //module->dump();
       return reinterpret_cast<void*>(new compiled_renderer(module));
     }
     catch (runtime_error &e) {

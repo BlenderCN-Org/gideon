@@ -3,6 +3,7 @@ from math import *
 
 from . import sync
 from . import engine
+from . import source
 import ctypes
 
 class GideonRenderEngine(bpy.types.RenderEngine):
@@ -13,6 +14,7 @@ class GideonRenderEngine(bpy.types.RenderEngine):
 
     def __init__(self):
         self.gideon = engine.load_gideon("/home/curtis/Projects/relatively-crazy/build/src/libraytrace.so")
+        self.loader = source.SourceLoader(self.gideon)
         self.context = engine.create_context(self.gideon)
         self.ready = False
 
@@ -48,22 +50,26 @@ class GideonRenderEngine(bpy.types.RenderEngine):
     #Compiles the render kernel.
     def rebuild_kernel(self, scene):
         #load and compile all programs
-        program = engine.create_program(self.gideon, "render")
+        self.loader.set_search_paths([bpy.path.abspath(scene.gideon.std_path),
+                                      bpy.path.abspath(scene.gideon.source_path)])
+                                     
+        program = engine.create_program(self.gideon, "render", self.loader)
 
         for source in scene.gideon.sources:
-            print("Loading Object: ", source.name)
             engine.program_load_source(self.gideon, program, source.name)
 
         error_cb = lambda error_str : self.report_render_error("Compiler Error - Check Console",
                                                                error_str.decode('ascii'))
         
         kernel = engine.program_compile(self.gideon, program, error_cb)
-        if kernel == None:
-            raise RuntimeError("Could not compile kernel.")
-
-        engine.context_set_kernel(self.gideon, self.context, kernel)
+        if kernel != None:
+            engine.context_set_kernel(self.gideon, self.context, kernel)
         
         engine.destroy_program(self.gideon, program)
+
+        if kernel == None:
+            raise RuntimeError("Could not compile kernel.")
+        
         return kernel
 
     def render(self, scene):

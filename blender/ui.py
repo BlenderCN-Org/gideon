@@ -18,6 +18,7 @@ class GideonRender_Source_Panel(GideonButtonsPanel, bpy.types.Panel):
         scene = context.scene
         g_scene = scene.gideon
 
+        layout.prop(g_scene, "std_path", text="Standard Path")
         layout.prop(g_scene, "source_path", text="Search Path")
 
         row = layout.row()
