@@ -66,6 +66,9 @@ namespace raytrace {
       type_spec return_type;
       std::vector<function_argument> arguments;
 
+      typedef enum { MATERIAL, ENTRY, INTERNAL, FOREIGN } export_type;
+      export_type type;
+
       std::string get_hash_string() const;
       bool operator==(const function_export &lhs) const;
     };
@@ -106,6 +109,12 @@ namespace raytrace {
 
     boost::unordered_map<std::string, module_export::pointer>::iterator top_begin() { return top_modules.begin(); }
     boost::unordered_map<std::string, module_export::pointer>::iterator top_end() { return top_modules.end(); }
+
+    //Calls the given function for each exported function of the given type.
+    //The first argument is the full module path to this function, the second is this function's full internal name.
+    void foreach_function_type(function_export::export_type type,
+			       /* inout */ boost::unordered_set<std::string> &names_seen,
+			       const boost::function<void (const std::string &, const std::string &)> &on_function) const;
 
   private:
 

@@ -290,6 +290,10 @@ ast::prototype::function_gen_value ast::prototype::codegen_entry(Module *module,
 	exp.full_name = name_to_use;
 	exp.return_type = entry.return_type;
 	exp.arguments = entry.arguments;
+	
+	if (external) exp.type = exports::function_export::export_type::FOREIGN;
+	else exp.type = exports::function_export::export_type::INTERNAL;
+	
 	state->exports.add_function(exp);
       }
       
@@ -306,17 +310,6 @@ typecheck_vector ast::prototype::get_arg_types() {
   typecheck_vector arg_types;
   for (auto arg_it = args.begin(); arg_it != args.end(); ++arg_it) {
     typecheck_value ty = arg_it->type->codegen_type();
-    ty = errors::codegen_call(ty, [this, &arg_it] (type_spec &t) -> typecheck_value {
-	//disallow output array references
-	bool is_array_ref = (t->is_array() &&
-			     (t == state->types.get_array_ref(t->element_type())));
-	if (is_array_ref && arg_it->output) {
-	  return errors::make_error<errors::error_message>("Array references are already reference parameters.", line_no, column_no);
-	}
-
-	return t;
-      });
-
     arg_types = errors::codegen_vector_push_back(arg_types, ty);
   }
 

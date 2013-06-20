@@ -108,26 +108,30 @@ module render {
 
 
 //Renderer Entry Point
-function main(int x0, int y0, int width, int height, scene output_buffer) void {
-  int samples_per_pixel = 2;
-  float inv_samples = 1.0 / samples_per_pixel;
+module start {
 
-  for (int y = 0; y < height; y += 1) {
-    for (int x = 0; x < width; x += 1) {
-      vec2 pix = vec2(x0 + x, y0 + y);
-      vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
-
-      for (int i = 0; i < samples_per_pixel; i += 1) {
-	//shoot a ray from the camera to the scene
-	vec2 offset = vec2(gideon.random(), gideon.random());
-	vec2 sample = pix + offset;
-	ray r = gideon.camera:shoot_ray(sample.x, sample.y);
-	//color += inv_samples * render.shade(r, 3, 8, 8);
-	color += inv_samples * render.shade(r, 6, 12, 4);
+  function main(int x0, int y0, int width, int height, scene output_buffer) void {
+    int samples_per_pixel = 1;
+    float inv_samples = 1.0 / samples_per_pixel;
+    
+    for (int y = 0; y < height; y += 1) {
+      for (int x = 0; x < width; x += 1) {
+	vec2 pix = vec2(x0 + x, y0 + y);
+	vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
+	
+	for (int i = 0; i < samples_per_pixel; i += 1) {
+	  //shoot a ray from the camera to the scene
+	  vec2 offset = vec2(gideon.random(), gideon.random());
+	  vec2 sample = pix + offset;
+	  ray r = gideon.camera:shoot_ray(sample.x, sample.y);
+	  color += inv_samples * render.shade(r, 3, 8, 8);
+	  //color += inv_samples * render.shade(r, 6, 12, 4);
+	}
+	
+	color.w = 1.0;
+	gideon.write_pixel(x, y, width, height, color, output_buffer);
       }
-      
-      color.w = 1.0;
-      gideon.write_pixel(x, y, width, height, color, output_buffer);
     }
   }
+  
 }

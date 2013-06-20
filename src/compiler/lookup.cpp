@@ -140,3 +140,39 @@ void export_table::dump() {
   for (auto mod_it = top_modules.begin(); mod_it != top_modules.end(); ++mod_it) mod_it->second->dump(0);
 }
 
+void export_table::foreach_function_type(function_export::export_type type,
+					 /* inout */ boost::unordered_set<string> &names_seen,
+					 const boost::function<void (const string &, const string &)> &on_function) const {
+  vector<module_export::pointer> module_ptr_stack;
+  vector<string> path_stack;
+
+  for (auto mod_it = top_modules.begin(); mod_it != top_modules.end(); ++mod_it) {
+    module_ptr_stack.push_back(mod_it->second);
+    path_stack.push_back(mod_it->first);
+  }
+
+  while (module_ptr_stack.size() > 0) {
+    module_export::pointer mod = module_ptr_stack.back();
+    string path_name = path_stack.back();
+
+    path_stack.pop_back();
+    module_ptr_stack.pop_back();
+
+    for (auto func_it = mod->functions.begin(); func_it != mod->functions.end(); ++func_it) {
+      if (func_it->type == type) {
+	bool already_seen = (names_seen.find(func_it->full_name) != names_seen.end());
+	
+	if (!already_seen) {
+	  string func_path = path_name + string(".") + func_it->name;
+	  on_function(func_path, func_it->full_name);
+	  names_seen.insert(func_it->full_name);
+	}
+      }
+    }
+
+    for (auto mod_it = mod->modules.begin(); mod_it != mod->modules.end(); ++mod_it) {
+      module_ptr_stack.push_back(mod_it->second);
+      path_stack.push_back(path_name + string(".") + mod_it->first);
+    }
+  }
+}

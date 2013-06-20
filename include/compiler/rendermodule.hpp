@@ -77,7 +77,12 @@ namespace raytrace {
     void load_source_file(const std::string &obj_name);
     std::string get_object_name(const std::string &path);
 
-    //Compiles, links and optimizes all render objects in this program, returning the final result. */
+    //Calls the given function on any exported function matching the given type.
+    //May only be called after the program's been compiled.
+    void foreach_function_type(exports::function_export::export_type type,
+			       const boost::function<void (const std::string &, const std::string &)> &on_function) const;
+
+    //Compiles, links and optimizes all render objects in this program, returning the final result.
     llvm::Module *compile();
 
     bool has_object(const std::string &name);

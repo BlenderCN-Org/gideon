@@ -48,6 +48,7 @@ class GideonSourceFileSettings(bpy.types.PropertyGroup):
 
 class GideonMaterialFunctionSettings(bpy.types.PropertyGroup):
     name = bpy.props.StringProperty(name = "Function Name", default = "")
+    intern_name = bpy.props.StringProperty(name = "Internal Function Name", default = "")
 
 #Gideon-Specific Render Settings
 class GideonRenderSettings(bpy.types.PropertyGroup):
@@ -95,7 +96,7 @@ class GideonRenderSettings(bpy.types.PropertyGroup):
             description = "List of externally visible material functions in the compiled renderer",
             type = GideonMaterialFunctionSettings
             )
-
+        
     @classmethod
     def unregister(cls):
         del bpy.types.Scene.gideon

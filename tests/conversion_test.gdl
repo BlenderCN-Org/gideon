@@ -17,6 +17,16 @@ distribution test(int z) {
   }
 }
 
+function output_array(float k, output float[] aref) float {
+  float sum = 0.0;
+
+  for (int i = 0; i < aref.length; i += 1) {
+    sum += k*aref[i];
+  }
+
+  return sum;
+}
+
 function array_sum(float[] arr) float {
   float sum = 0.0;
 
@@ -24,7 +34,7 @@ function array_sum(float[] arr) float {
     sum += arr[i];
   }
 
-  return sum;
+  return sum * output_array(3.0, arr);
 }
 
 function bar(float y, output float z) float {

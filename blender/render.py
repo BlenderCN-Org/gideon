@@ -11,16 +11,18 @@ class GideonRenderEngine(bpy.types.RenderEngine):
     bl_label = "Gideon"
     bl_use_shading_nodes = True
     use_highlight_tiles = True
-
+    libgideon = engine.load_gideon("/home/curtis/Projects/relatively-crazy/build/src/libraytrace.so")
+    
     def __init__(self):
-        self.gideon = engine.load_gideon("/home/curtis/Projects/relatively-crazy/build/src/libraytrace.so")
+        self.gideon = GideonRenderEngine.libgideon
         self.loader = source.SourceLoader(self.gideon)
         self.context = engine.create_context(self.gideon)
         self.ready = False
 
     def __del__(self):
-        engine.destroy_context(self.gideon, self.context)
-    
+        if hasattr(self, "context"):
+            engine.destroy_context(self.gideon, self.context)
+            
     def update(self, data, scene):
         self.update_stats("", "Compiling render kernel")
 
@@ -40,7 +42,7 @@ class GideonRenderEngine(bpy.types.RenderEngine):
 
             self.ready = True
         except RuntimeError:
-            self.update_stats("", "Render Failed")
+            self.update_stats("", "Render Update Failed")
 
     #Reports any errors to the console.
     def report_render_error(self, error_short, error_msg):
@@ -64,6 +66,16 @@ class GideonRenderEngine(bpy.types.RenderEngine):
         kernel = engine.program_compile(self.gideon, program, error_cb)
         if kernel != None:
             engine.context_set_kernel(self.gideon, self.context, kernel)
+
+            #rebuild the function lists
+            scene.gideon.shader_list.clear()
+            
+            #lookup function list
+            func_list = engine.get_material_list(self.gideon, program)
+            for func in func_list:
+                f = scene.gideon.shader_list.add()
+                f.name = func[0]
+                f.intern_name = func[1]
         
         engine.destroy_program(self.gideon, program)
 
@@ -93,9 +105,15 @@ class GideonRenderEngine(bpy.types.RenderEngine):
         print("Num Tiles: ", num_x_tiles, num_y_tiles)
         print("Entry Point: ", scene.gideon.entry_point)
 
+        try:
+            entry_obj = scene.gideon.shader_list[scene.gideon.entry_point]
+        except KeyError:
+            self.report({'ERROR'}, "Invalid choice of render entry function")
+            return
+
         total_tiles = num_x_tiles * num_y_tiles
         completed_tiles = 0
-
+        
         for ty in range(num_y_tiles):
             end_py = min(start_py + tile_y, y_pixels)
             th = end_py - start_py
@@ -109,7 +127,7 @@ class GideonRenderEngine(bpy.types.RenderEngine):
                 float4_ty = 4 * ctypes.c_float
                 result = (tw * th * float4_ty)()
                 engine.render_tile(self.gideon, self.context,
-                                   scene.gideon.entry_point.encode('ascii'),
+                                   entry_obj.intern_name.encode('ascii'),
                                    start_px, start_py, tw, th,
                                    result)
                 r.layers[0].rect = result
@@ -119,7 +137,50 @@ class GideonRenderEngine(bpy.types.RenderEngine):
                 completed_tiles += 1
                 self.update_stats("", str.format("Completed {0}/{1} tiles", completed_tiles, total_tiles))
                 start_px += tile_x
+
+                if self.test_break():
+                    return
                 
             start_px = 0
-            start_py += tile_y
-    
+            start_py += tile_y    
+
+class KERNEL_FUNCTION_LIST_update(bpy.types.Operator):
+    bl_idname = "gideon.update_kernel_functions"
+    bl_label = "Update Kernel Function List"
+    bl_description = "Recompiles the kernel and rebuilds the entry/material function list"
+
+    def report_compile_error(self, message):
+        self.report({'ERROR'}, "Compile Error - Check Console")
+        print(message)
+
+    def invoke(self, context, event):
+        #load and compile all programs
+        scene = context.scene
+        libgideon = GideonRenderEngine.libgideon
+        loader = source.SourceLoader(libgideon)
+        loader.set_search_paths([bpy.path.abspath(scene.gideon.std_path),
+                                 bpy.path.abspath(scene.gideon.source_path)])
+                                     
+        program = engine.create_program(libgideon, "test", loader)
+
+        for src_prop in scene.gideon.sources:
+            engine.program_load_source(libgideon, program, src_prop.name)
+
+        error_cb = lambda error_str : self.report_compile_error(error_str.decode('ascii'))
+        
+        kernel = engine.program_compile(libgideon, program, error_cb)
+        if kernel != None:
+            #clear old list
+            scene.gideon.shader_list.clear()
+
+            #lookup function list
+            func_list = engine.get_material_list(libgideon, program)
+            for func in func_list:
+                f = scene.gideon.shader_list.add()
+                f.name = func[0]
+                f.intern_name = func[1]
+            
+        #cleanup
+        engine.destroy_compiled(libgideon, kernel)
+        engine.destroy_program(libgideon, program)
+        return {'FINISHED'}

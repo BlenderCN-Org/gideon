@@ -32,6 +32,8 @@ class GideonRender_Source_Panel(GideonButtonsPanel, bpy.types.Panel):
             layout.prop(active_source, "name", text="Filename")
             layout.prop(active_source, "external", text="External")
 
+        layout.operator('gideon.update_kernel_functions', text="Refresh Function List")
+
 class GideonRender_Entry_Panel(GideonButtonsPanel, bpy.types.Panel):
     bl_label = "Program Entry"
 
@@ -39,8 +41,8 @@ class GideonRender_Entry_Panel(GideonButtonsPanel, bpy.types.Panel):
         layout = self.layout
         scene = context.scene
         g_scene = scene.gideon
-
-        layout.prop(g_scene, "entry_point", text = "Entry Point")
+        
+        layout.prop_search(g_scene, "entry_point", g_scene, "shader_list", text = "Entry Point", icon = 'MATERIAL')
         layout.prop(scene.render, "tile_x", text = "Tile Width")
         layout.prop(scene.render, "tile_y", text = "Tile Height")
 

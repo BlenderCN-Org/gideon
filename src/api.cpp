@@ -304,12 +304,25 @@ extern "C" {
       render_program *prog = reinterpret_cast<render_program*>(p);
       Module *module = prog->compile();
       //module->dump();
+      
       return reinterpret_cast<void*>(new compiled_renderer(module));
     }
     catch (runtime_error &e) {
       error_cb(e.what());
       return NULL;
     }
+  }
+
+  void gd_api_list_material_functions(void *p, void *on_func_cb) {
+    typedef void (*func_list_cb_type)(const char *, const char *);
+    render_program *prog = reinterpret_cast<render_program*>(p);
+
+    auto on_func = [on_func_cb] (const string &name, const string &full_name) -> void {
+      ((func_list_cb_type)(on_func_cb))(name.c_str(), full_name.c_str());
+    };
+
+    prog->foreach_function_type(exports::function_export::export_type::INTERNAL,
+				on_func);
   }
 
   void gd_api_destroy_renderer(void *r) {

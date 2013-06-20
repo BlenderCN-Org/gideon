@@ -313,6 +313,14 @@ Module *render_program::compile() {
   return result;
 }
 
+void render_program::foreach_function_type(exports::function_export::export_type type,
+					   const boost::function<void (const std::string &, const std::string &)> &on_function) const {
+  boost::unordered_set<string> names_seen;
+  for (auto obj_it = objects.begin(); obj_it != objects.end(); ++obj_it) {
+    obj_it->second->parser.exports.foreach_function_type(type, names_seen, on_function);
+  }
+}
+
 void render_program::optimize(Module *module) {
   PassManager pm;
   

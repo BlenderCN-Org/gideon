@@ -42,10 +42,14 @@ class GideonScene:
             material_slot = gd_mesh['shaders'][shader_idx]
             mat = obj.material_slots[material_slot]
             
-            shader_name = obj.material_slots[gd_mesh['shaders'][shader_idx]].material.gideon.shader
+            shader_key = mat.material.gideon.shader
             shader_func = None
-            if len(shader_name) > 0:
-                shader_func = engine.lookup_function(self.gideon, self.renderer, shader_name)
+            if len(shader_key) > 0:
+                try:
+                    shader_obj = bl_scene.gideon.shader_list[shader_key]
+                    shader_func = engine.lookup_function(self.gideon, self.renderer, shader_obj.intern_name)
+                except KeyError:
+                    pass
                 
             shader_arr[shader_idx] = shader_func
         
