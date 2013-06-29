@@ -37,18 +37,53 @@ namespace raytrace {
       typecheck_vector get_parameter_types();
 
       llvm::StructType *getParameterType(const std::vector<type_spec> &param_types);
+
       llvm::Function *createConstructor(llvm::Module *module, llvm::IRBuilder<> &builder,
 					const std::string &ctor_name,
 					llvm::Type *parameter_type, const std::vector<type_spec> &param_type_list,
-					llvm::Function *eval, llvm::Function *sample, llvm::Function *dtor);
+					llvm::Value *eval, llvm::Value *sample, llvm::Value *pdf, llvm::Value *emit,
+					llvm::Function *dtor);
       
       llvm::Function *createDestructor(llvm::Module *module, llvm::IRBuilder<> &builder,
 				       llvm::Type *param_ty, const std::vector<type_spec> &param_type_list);
+      
+      //Checks for a function using the given key.
+      static llvm::Function *dummy_default(llvm::Module *, llvm::IRBuilder<> &) { return nullptr; }
+      codegen_value check_for_function(const function_key &key,
+				       const std::vector<bool> &output_args,
+				       bool use_default = false);
+      
+      //Creates a wrapper function that can be called from C++ (aggregate types are passed as pointers).
+      struct wrapper_argument {
+	type_spec ty;
+	bool is_output;
+      };
 
-      llvm::Function *createEvaluator(llvm::Function *eval, llvm::Type *parameter_type,
-				      llvm::Module *module, llvm::IRBuilder<> &builder);
-      llvm::Function *createSampler(llvm::Function *sample, llvm::Type *parameter_type,
+      llvm::Value *create_wrapper(llvm::Function *func, const std::string &name,
+				  llvm::Type *parameter_type,
+				  const std::vector<wrapper_argument> &arguments,
+				  llvm::Type *return_type,
+				  bool last_arg_as_return, const type_spec &return_arg_type,
+				  llvm::Module *module, llvm::IRBuilder<> &builder);
+
+      //Functions looking for and wrapping the distribution's main functions.
+      codegen_value check_for_evaluate();
+      llvm::Value *create_evaluator(llvm::Function *eval, llvm::Type *parameter_type,
 				    llvm::Module *module, llvm::IRBuilder<> &builder);
+
+      codegen_value check_for_sample();
+      llvm::Value *create_sampler(llvm::Function *sample, llvm::Type *parameter_type,
+				     llvm::Module *module, llvm::IRBuilder<> &builder);
+
+      codegen_value check_for_pdf();
+      llvm::Value *create_pdf(llvm::Function *pdf, llvm::Type *parameter_type,
+			      llvm::Module *module, llvm::IRBuilder<> &builder);
+
+      codegen_value check_for_emission();
+      llvm::Value *create_emission(llvm::Function *emit, llvm::Type *parameter_type,
+				   llvm::Module *module, llvm::IRBuilder<> &builder);
+      
+
     };
 
   };

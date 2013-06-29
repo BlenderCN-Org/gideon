@@ -1,0 +1,49 @@
+load "gideon";
+
+module start {
+
+  function interp(float val, float y0, float x0, float y1, float x1) float {
+    return ((val - x0) * (y1 - y0) / (x1 - x0)) + y0;
+  }
+
+  function heat_base(float val) float {
+    if (val < -0.75) return 0.0;
+    if (val < -0.25) return interp(val, 0.0, -0.75, 1.0, -0.25);
+    if (val < 0.25) return 1.0;
+    if (val < 0.75) return interp(val, 1.0, 0.25, 0.0, 0.75);
+    return 0.0;
+  }
+
+  function heat_map(float val) vec4 {
+    float v2 = (2.0 * val) - 1.0;
+    return vec4(heat_base(v2 - 0.5),
+		heat_base(v2),
+		heat_base(v2 + 0.5),
+		1.0);
+  }
+
+  function bvh_heatmap(int x0, int y0, int width, int height, scene output_buffer) void {
+    for (int y = 0; y < height; y += 1) {
+      for (int x = 0; x < width; x += 1) {
+	int px = x0 + x;
+	int py = y0 + y;
+
+	ray r = gideon.camera:shoot_ray(px, py);
+	vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+	isect hit;
+
+	int box_count;
+	int prim_count;
+
+	if (gideon.trace(r, hit, box_count, prim_count)) {
+	  float k = 100.0;
+	  color = heat_map(box_count / k);
+	}
+
+	gideon.write_pixel(x, y, width, height, color, output_buffer);
+      }
+    }
+
+  }
+
+}

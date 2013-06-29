@@ -59,3 +59,11 @@ float3 raytrace::cosine_sample_hemisphere(const float3 &N, float rand_u, float r
   make_orthonormals(N, T, B);
   return (v.x * T) + (v.y * B) + (z * N);
 }
+
+float3 raytrace::uniform_sample_sphere(float rand_u, float rand_v) {
+  float z = 2.0f * (rand_u - 1.0f);
+  float t = rand_v * 2.0f * pi;
+  
+  float r = sqrtf(1.0f - (z*z));
+  return {r*cosf(t), r*sinf(t), z};
+}

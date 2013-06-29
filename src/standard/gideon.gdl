@@ -187,6 +187,16 @@ module gideon {
     return __dfunc_sample(d, P_out, w_out, rand_D, rand_P, rand_w, P_in, w_in);
   }
 
+  //Returns the amount of emitted light from a distribution.
+  extern function __dfunc_emission(output dfunc d,
+				   output vec3 P_out, output vec3 w_out,
+				   output vec4 Le) void : gde_dfunc_emission;
+  function dfunc:emission(dfunc d, vec3 P_out, vec3 w_out) vec4 {
+    vec4 Le;
+    __dfunc_emission(d, P_out, w_out, Le);
+    return Le;
+  }
+
   //Returns true if a shader handle references a valid shader function.
   extern function shader_handle:is_valid(shader_handle h) bool : gde_shader_handle_is_valid;
   
@@ -214,7 +224,7 @@ module gideon {
       color -- Reflected Color
   */
   distribution lambert(vec3 N, vec3 Ng, float k, vec4 color) {
-
+    
     function eval_pdf(float dot_N) float {
       float pi = 3.14159265359; 
       return dot_N / pi;
@@ -327,5 +337,30 @@ module gideon {
       return eval_pdf(cos_theta, w_out, H);
     }
 
+  }
+
+  /*
+    Emission only distribution.
+    Parameters:
+      color -- Emitted Color
+  */
+  distribution emission(vec4 color) {
+    
+    function emission(vec3 P_out, vec3 w_out) vec4 { return color; }
+
+    function evaluate(vec3 P_in, vec3 w_in,
+		      vec3 P_out, vec3 w_out,
+		      output float pdf) vec4 {
+      pdf = 0.0;
+      return vec4(0.0, 0.0, 0.0, 1.0);
+    }
+
+    function sample(vec3 P_out, vec3 w_out,
+		    vec2 rand_P, vec2 rand_w,
+		    output vec3 P_in, output vec3 w_in) float {
+      P_in = P_out;
+      w_in = w_out;
+      return 0.0;
+    }
   }
 }

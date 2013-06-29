@@ -11,7 +11,7 @@ class GideonRenderEngine(bpy.types.RenderEngine):
     bl_label = "Gideon"
     bl_use_shading_nodes = True
     use_highlight_tiles = True
-    libgideon = engine.load_gideon("/home/curtis/Projects/relatively-crazy/build/src/libraytrace.so")
+    libgideon = engine.load_gideon("/home/curtis/Projects/gideon/build/src/libraytrace.so")
     
     def __init__(self):
         self.gideon = GideonRenderEngine.libgideon

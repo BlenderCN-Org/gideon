@@ -80,6 +80,9 @@ module render {
 	throughput = inv_prob * throughput;
       }
 
+      //add emitted light from this surface
+      Li += throughput * gideon.dfunc:emission(surface, P, w_out);
+
       //sample bsdf to get new direction
       vec2 rand_P = vec2(0.0, 0.0);
       vec2 rand_w = vec2(gideon.random(), gideon.random());
@@ -124,8 +127,8 @@ module start {
 	  vec2 offset = vec2(gideon.random(), gideon.random());
 	  vec2 sample = pix + offset;
 	  ray r = gideon.camera:shoot_ray(sample.x, sample.y);
-	  color += inv_samples * render.shade(r, 3, 8, 8);
-	  //color += inv_samples * render.shade(r, 6, 12, 4);
+	  //color += inv_samples * render.shade(r, 3, 8, 8);
+	  color += inv_samples * render.shade(r, 4, 6, 8);
 	}
 	
 	color.w = 1.0;

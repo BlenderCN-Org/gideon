@@ -68,46 +68,16 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
       }
       
       //find the 'evaluate' function (error if not declared)
-      function_key eval_key;
-      eval_key.name = "evaluate";
-      eval_key.arguments.push_back(state->types["vec3"]); /* P_in */
-      eval_key.arguments.push_back(state->types["vec3"]); /* w_in */
-      eval_key.arguments.push_back(state->types["vec3"]); /* P_out */
-      eval_key.arguments.push_back(state->types["vec3"]);  /* w_out */
-      eval_key.arguments.push_back(state->types["float"]);  /* out pdf */
-      
-      codegen_value eval_func = nullptr;
-      if (functions().has_local(eval_key)) {
-	function_entry &entry = functions().get(eval_key);
-	eval_func = entry.func;
-	
-	if (!entry.arguments.back().output) {
-	  eval_func = errors::make_error<errors::error_message>("Distribution 'evaluate' function must have an output argument.", line_no, column_no);
-	}
-      }
-      else eval_func = errors::make_error<errors::error_message>("Distribution must define an 'evaluate' function.", line_no, column_no);
+      codegen_value eval_func = check_for_evaluate();
+
+      //find the 'pdf' function
+      codegen_value pdf_func = check_for_pdf();
+
+      //find the 'emission' function
+      codegen_value emit_func = check_for_emission();
       
       //find the 'sample' function
-      function_key sample_key;
-      sample_key.name = "sample";
-      sample_key.arguments.push_back(state->types["vec3"]); /* P_out */
-      sample_key.arguments.push_back(state->types["vec3"]); /* w_out */
-      sample_key.arguments.push_back(state->types["vec2"]); /* rand_P */
-      sample_key.arguments.push_back(state->types["vec2"]); /* rand_w */
-      sample_key.arguments.push_back(state->types["vec3"]); /* out P_in */
-      sample_key.arguments.push_back(state->types["vec3"]); /* out w_in */
-      
-      codegen_value sample_func = nullptr;
-      if (functions().has_local(sample_key)) {
-	function_entry &entry = functions().get(sample_key);
-	sample_func = entry.func;
-	
-	//make sure the last two arguments are outputs
-	if (!(entry.arguments[4].output && entry.arguments[5].output)) {
-	  sample_func = errors::make_error<errors::error_message>("Distribution 'sample' function must provide 2 output arguments.", line_no, column_no);
-	}
-      }
-      else sample_func = errors::make_error<errors::error_message>("Distribution must define a 'sample' function.", line_no, column_no);
+      codegen_value sample_func = check_for_sample();
       
       //leave new scope
       pop_distribution_context(module, builder);
@@ -122,21 +92,28 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
 
       //define an externally visible function to evaluate this distribution (vectors must be passed by pointer, not value).
       //then define an externally visible function to instantiate this distribution
-      boost::function<codegen_value (Value *&, Value *&)> check_funcs = [this,
+      boost::function<codegen_value (Value *&, Value *&,
+				     Value *&, Value *&)> check_funcs = [this,
 									 &ctor_name,
 									 &param_types, param_struct_ty,
 									 module, &builder] (Value *&eval_ptr,
-											    Value *&sample_ptr) -> codegen_value {
-	Function *eval_f = createEvaluator(cast<Function>(eval_ptr), param_struct_ty, module, builder);
-	Function *sample_f = createSampler(cast<Function>(sample_ptr), param_struct_ty, module, builder);
+											    Value *&sample_ptr,
+											    Value *&pdf_ptr,
+											    Value *&emit_ptr) -> codegen_value {
+	Value *eval_f = create_evaluator(cast_or_null<Function>(eval_ptr), param_struct_ty, module, builder);
+	Value *sample_f = create_sampler(cast_or_null<Function>(sample_ptr), param_struct_ty, module, builder);
+	Value *pdf_f = create_pdf(cast_or_null<Function>(pdf_ptr), param_struct_ty, module, builder);
+	Value *emit_f = create_emission(cast_or_null<Function>(emit_ptr), param_struct_ty, module, builder);
+	
 	Function *dtor_f = createDestructor(module, builder, param_struct_ty, param_types);
 	
 	return createConstructor(module, builder,
 				 ctor_name,
 				 param_struct_ty, param_types,
-				 eval_f, sample_f, dtor_f);
+				 eval_f, sample_f, pdf_f, emit_f,
+				 dtor_f);
       };
-      codegen_value ctor_val = errors::codegen_apply(check_funcs, eval_func, sample_func);
+      codegen_value ctor_val = errors::codegen_apply(check_funcs, eval_func, sample_func, pdf_func, emit_func);
       
       //final error checking, add the constructor to the function symtab
       boost::function<codegen_value (vector<Value*> &, Value*&, Value*&)> op = [this,
@@ -167,11 +144,46 @@ codegen_value ast::distribution::codegen(Module *module, IRBuilder<> &builder) {
     });
 }
 
+codegen_value ast::distribution::check_for_function(const function_key &key,
+						    const vector<bool> &output_args,
+						    bool use_default) {
+  codegen_value func = nullptr;
+  if (functions().has_local(key)) {
+    function_entry &entry = functions().get(key);
+    func = entry.func;
+    
+    unsigned int arg_idx = 0;
+    for (auto it = entry.arguments.begin(); it != entry.arguments.end(); ++it, ++arg_idx) {
+      if ((arg_idx < output_args.size()) &&
+	  output_args[arg_idx] && !it->output) {
+	stringstream err_ss;
+	err_ss << "Distribution '" << key.name << "' function expects an output argument.";
+	func = errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
+      }
+    }
+  }
+  else {
+    if (use_default) {
+      return nullptr;
+    }
+    else {
+      stringstream err_ss;
+      err_ss << "Distribution must define an '" << key.name << "' function.";
+      func = errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
+    }
+  }
+
+  return func;
+}
+
+
+
 Function *ast::distribution::createConstructor(Module *module, IRBuilder<> &builder,
 					       const string &ctor_name,
 					       Type *parameter_type,
 					       const vector<type_spec> &param_type_list,
-					       Function *eval, Function *sample, Function *dtor) {
+					       Value *eval, Value *sample, Value *pdf, Value *emit,
+					       Function *dtor) {
   //create function accepting parameters as arguments
   vector<Type*> arg_types;
   for (auto it = param_type_list.begin(); it != param_type_list.end(); ++it) arg_types.push_back((*it)->llvm_type());
@@ -190,15 +202,23 @@ Function *ast::distribution::createConstructor(Module *module, IRBuilder<> &buil
   Value *dfunc_ptr = state->types["dfunc"]->allocate(module, builder);
   
   //initialize the object and dynamically allocate parameter memory (calling a builtin function)
+  Type* int_ptr_ty = Type::getInt32Ty(getGlobalContext())->getPointerTo();
   vector<Type*> alloc_arg_types({state->types["scene_ptr"]->llvm_type(), Type::getInt32Ty(getGlobalContext()),
-	eval->getType(), sample->getType(), dtor->getType(), dfunc_ptr->getType()});
+	//eval->getType(), sample->getType(), pdf->getType(), emit->getType(),
+	int_ptr_ty, int_ptr_ty, int_ptr_ty, int_ptr_ty,
+	dtor->getType(), dfunc_ptr->getType()});
   FunctionType *alloc_type = FunctionType::get(Type::getInt32PtrTy(getGlobalContext()), alloc_arg_types, false);
   Function *alloc_func = cast<Function>(module->getOrInsertFunction("gd_builtin_alloc_dfunc", alloc_type));
   
   int param_data_size = DataLayout(module).getTypeAllocSize(parameter_type);
   Constant *param_size_arg = ConstantInt::get(getGlobalContext(), APInt(8*sizeof(int), param_data_size));
 
-  vector<Value*> alloc_args({scene_ptr, param_size_arg, eval, sample, dtor, dfunc_ptr});
+  vector<Value*> alloc_args({scene_ptr, param_size_arg,
+	builder.CreatePointerCast(eval, int_ptr_ty),
+	builder.CreatePointerCast(sample, int_ptr_ty),
+	builder.CreatePointerCast(pdf, int_ptr_ty),
+	builder.CreatePointerCast(emit, int_ptr_ty),
+	dtor, dfunc_ptr});
   Value *param_ptr = builder.CreatePointerCast(builder.CreateCall(alloc_func, alloc_args),
 					       parameter_type->getPointerTo(), "dfunc_param_ptr");
 
@@ -245,78 +265,156 @@ string ast::distribution::evaluator_name(const string &n) {
   return name_ss.str();
 }
 
-Function *ast::distribution::createEvaluator(Function *eval, Type *parameter_type,
-					     Module *module, IRBuilder<> &builder) {
-  Type *vec3_ptr = state->types["vec3"]->llvm_type()->getPointerTo();
-  Type *vec4_ptr = state->types["vec4"]->llvm_type()->getPointerTo();
-  Type *float_ptr = state->types["float"]->llvm_ptr_type();
-
-  const unsigned int num_args = 4;
-  Type *int_ptr_ty = Type::getInt32PtrTy(getGlobalContext());
-  Type *param_ptr_ty = parameter_type->getPointerTo();
-
-  vector<Type*> arg_types({int_ptr_ty, vec3_ptr, vec3_ptr, vec3_ptr, vec3_ptr, /* out */ float_ptr, /* out */ vec4_ptr});
-  FunctionType *eval_type = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_types, false);
-  Function *f = Function::Create(eval_type, Function::ExternalLinkage, evaluator_name("eval"), module);
-  
-  BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "func_entry", f);
-  builder.SetInsertPoint(bb);
-
-  vector<Value*> eval_args;
-
-  auto arg_it = f->arg_begin();
-  eval_args.push_back(builder.CreatePointerCast(arg_it, param_ptr_ty)); //just copy the first pointer value
-  ++arg_it;
-  
-  //load all except the result argument
-  for (unsigned int i = 0; i < num_args; ++i) {
-    eval_args.push_back(builder.CreateLoad(arg_it));
-    
-    ++arg_it;
-  }
-
-  //add the final pdf argument
-  eval_args.push_back(arg_it++);
-
-  Value *rt_v4 = builder.CreateCall(eval, ArrayRef<Value*>(eval_args), "dist_eval");
-  builder.CreateStore(rt_v4, arg_it);
-  builder.CreateRetVoid();
-
-  return f;
+codegen_value ast::distribution::check_for_evaluate() {
+  return check_for_function({"evaluate",
+	{
+	  state->types["vec3"], /* P_in */
+	    state->types["vec3"], /* w_in */
+	    state->types["vec3"], /* P_out */
+	    state->types["vec3"], /* w_out */
+	    state->types["float"] /* out pdf */
+	    }
+    },
+    {false, false, false, false, true});
 }
 
-Function *ast::distribution::createSampler(Function *eval, Type *parameter_type,
+Value *ast::distribution::create_evaluator(Function *eval, Type *parameter_type,
 					   Module *module, IRBuilder<> &builder) {
-  Type *vec3_ptr = state->types["vec3"]->llvm_ptr_type();
-  Type *vec2_ptr = state->types["vec2"]->llvm_ptr_type();
+  wrapper_argument v3_arg{state->types["vec3"], false};
+  wrapper_argument f_arg{state->types["float"], true};
+  vector<wrapper_argument> wrapped_args{v3_arg, v3_arg, v3_arg, v3_arg, f_arg};
+  return create_wrapper(eval, evaluator_name("eval"), parameter_type,
+			wrapped_args,
+			Type::getVoidTy(getGlobalContext()),
+			true, state->types["vec4"],
+			module, builder);
+}
 
-  const unsigned int num_args = 4;
+codegen_value ast::distribution::check_for_sample() {
+  return check_for_function({"sample",
+	{
+	  state->types["vec3"], /* P_out */
+	    state->types["vec3"], /* w_out */
+	    state->types["vec2"], /* rand_P */
+	    state->types["vec2"], /* rand_w */
+	    state->types["vec3"], /* out P_in */
+	    state->types["vec3"] /* out w_in */
+	    }},
+    {false, false, false, false, true, true});
+}
+
+Value *ast::distribution::create_sampler(Function *sample, Type *parameter_type,
+					 Module *module, IRBuilder<> &builder) {
+  wrapper_argument v3_arg{state->types["vec3"], false};
+  wrapper_argument v3_out{state->types["vec3"], true};
+  wrapper_argument v2_arg{state->types["vec2"], false};
+  vector<wrapper_argument> wrapped_args{v3_arg, v3_arg, v2_arg, v2_arg, v3_out, v3_out};
+  return create_wrapper(sample, evaluator_name("sample"), parameter_type,
+			wrapped_args,
+			state->types["float"]->llvm_type(),
+			false, NULL,
+			module, builder);
+}
+
+codegen_value ast::distribution::check_for_pdf() {
+  return check_for_function({"pdf",
+	{
+	  state->types["vec3"], /* P_in */
+	    state->types["vec3"], /* w_in */
+	    state->types["vec3"], /* P_out */
+	    state->types["vec3"], /* w_out */
+	    }},
+    {false, false, false, false},
+    true);
+}
+
+Value *ast::distribution::create_pdf(Function *pdf, Type *parameter_type,
+				     Module *module, IRBuilder<> &builder) {
+  wrapper_argument v3_arg{state->types["vec3"], false};
+  vector<wrapper_argument> wrapped_args{v3_arg, v3_arg, v3_arg, v3_arg};
+  return create_wrapper(pdf, evaluator_name("pdf"), parameter_type,
+			wrapped_args,
+			state->types["float"]->llvm_type(),
+			false, NULL,
+			module, builder);
+}
+
+codegen_value ast::distribution::check_for_emission() {
+  return check_for_function({"emission",
+	{
+	  state->types["vec3"], /* P_out */
+	    state->types["vec3"], /* w_out */
+	    }},
+    {false, false},
+    true);
+}
+ 
+Value *ast::distribution::create_emission(Function *emit, Type *parameter_type,
+					  Module *module, IRBuilder<> &builder) {
+  wrapper_argument v3_arg{state->types["vec3"], false};
+  vector<wrapper_argument> wrapped_args{v3_arg, v3_arg};
+  return create_wrapper(emit, evaluator_name("emit"), parameter_type,
+			wrapped_args,
+			Type::getVoidTy(getGlobalContext()),
+			true, state->types["vec4"],
+			module, builder);
+}
+
+Value *ast::distribution::create_wrapper(Function *func, const string &name,
+					 Type *parameter_type,
+					 const vector<wrapper_argument> &arguments,
+					 Type *return_type,
+					 bool last_arg_as_return, const type_spec &return_arg_type,
+					 Module *module, IRBuilder<> &builder) {
+  if (!func) {
+    //if the function to be wrapped is NULL, return a null pointer.
+    return ConstantPointerNull::get(PointerType::getUnqual(FunctionType::get(Type::getVoidTy(getGlobalContext()), false)));
+  }
+
   Type *int_ptr_ty = Type::getInt32PtrTy(getGlobalContext());
   Type *param_ptr_ty = parameter_type->getPointerTo();
 
-  vector<Type*> arg_types({int_ptr_ty, vec3_ptr, vec3_ptr, vec2_ptr, vec2_ptr, /* out */ vec3_ptr, /* out */ vec3_ptr});
-  FunctionType *sample_type = FunctionType::get(Type::getFloatTy(getGlobalContext()), arg_types, false);
-  Function *f = Function::Create(sample_type, Function::ExternalLinkage, evaluator_name("sample"), module);
+  //build the argument type list
+  //for non-primitive types, we need to pass a pointer.
+  vector<Type*> arg_types;
+  arg_types.push_back(int_ptr_ty);
+  for (auto it = arguments.begin(); it != arguments.end(); ++it) {
+    Type *arg_ty = it->ty->llvm_type();
+    if (!arg_ty->isPrimitiveType() || it->is_output) arg_types.push_back(it->ty->llvm_ptr_type());
+    else arg_types.push_back(arg_ty);
+  }
+
+  //if we're using the last argument as a return value, add it here
+  if (last_arg_as_return) arg_types.push_back(return_arg_type->llvm_ptr_type());
   
+  FunctionType *func_type = FunctionType::get(return_type, arg_types, false);
+  Function *f = Function::Create(func_type, Function::ExternalLinkage, name, module);
+
   BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "func_entry", f);
   builder.SetInsertPoint(bb);
 
-  vector<Value*> sample_args;
+  vector<Value*> unwrapped_args;
 
   auto arg_it = f->arg_begin();
-  sample_args.push_back(builder.CreatePointerCast(arg_it, param_ptr_ty)); //just copy the first pointer value
+  unwrapped_args.push_back(builder.CreatePointerCast(arg_it, param_ptr_ty)); //just copy the first pointer value
   ++arg_it;
-  
-  //load all except the result argument
-  for (unsigned int i = 0; i < num_args; ++i) {
-    sample_args.push_back(builder.CreateLoad(arg_it));
-    ++arg_it;
+
+  //for any argument that was passed by reference, load it (except output arguments)
+  for (auto wrapped_it = arguments.begin(); wrapped_it != arguments.end(); ++wrapped_it, ++arg_it) {
+    type_spec t = wrapped_it->ty;
+    Type *arg_ty = t->llvm_type();
+    bool do_load = !arg_ty->isPrimitiveType() && !wrapped_it->is_output;
+    if (do_load) unwrapped_args.push_back(t->load(arg_it, module, builder));
+    else unwrapped_args.push_back(arg_it);
   }
+  
+  //call the wrapped function
+  Value *call = builder.CreateCall(func, ArrayRef<Value*>(unwrapped_args), "func_result");
+  if (last_arg_as_return) {
+    return_arg_type->store(call, arg_it, module, builder);
+    builder.CreateRetVoid();
+  }
+  else builder.CreateRet(call);
 
-  //push back the output arguments
-  sample_args.push_back(arg_it++);
-  sample_args.push_back(arg_it++);
-
-  builder.CreateRet(builder.CreateCall(eval, ArrayRef<Value*>(sample_args), "dist_sample"));
   return f;
 }

@@ -1,0 +1,26 @@
+load "gideon";
+
+module start {
+
+  function depth_render(int x0, int y0, int width, int height, scene output_buffer) void {
+    for (int y = 0; y < height; y += 1) {
+      for (int x = 0; x < width; x += 1) {
+	int px = x0 + x;
+	int py = y0 + y;
+
+	ray r = gideon.camera:shoot_ray(px, py);
+	vec4 color = vec4(0.0, 0.0, 0.0, 1.0);
+	isect hit;
+
+	if (gideon.trace(r, hit)) {
+	  float d = gideon.exp(-0.4*gideon.isect:distance(hit));
+	  color = vec4(d, d, d, 1.0);
+	}
+
+	gideon.write_pixel(x, y, width, height, color, output_buffer);
+      }
+    }
+
+  }
+
+}

@@ -145,10 +145,12 @@ extern "C" void *gd_builtin_alloc_dfunc(void *,
 					int param_size,
 					shade_tree::leaf::eval_func_type eval,
 					shade_tree::leaf::sample_func_type sample,
+					shade_tree::leaf::pdf_func_type pdf,
+					shade_tree::leaf::emission_func_type emit,
 					shade_tree::leaf::dtor_func_type dtor,
 					/* out */ void *out) {
   char *params = new char[param_size];
-  new (out) shade_tree::node_ptr(shade_tree::leaf_ptr(new shade_tree::leaf(params, eval, sample, dtor)));
+  new (out) shade_tree::node_ptr(shade_tree::leaf_ptr(new shade_tree::leaf(params, eval, sample, pdf, emit, dtor)));
   return params;
 }
 

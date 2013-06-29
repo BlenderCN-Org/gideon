@@ -14,6 +14,7 @@ namespace raytrace {
   
   float3 cosine_sample_hemisphere(const float3 &N, float rand_u, float rand_v);
 
+  float3 uniform_sample_sphere(float rand_u, float rand_v);
 };
 
 #endif

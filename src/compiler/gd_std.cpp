@@ -134,6 +134,13 @@ extern "C" float gde_dfunc_sample(void *dfunc,
   return shade_tree::sample(node, P_out, w_out, rand_D, rand_P, rand_w, P_in, w_in);
 }
 
+extern "C" void gde_dfunc_emission(void *dfunc,
+				   float3 *P_out, float3 *w_out,
+				   /* out */ float4 *Le) {
+  shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
+  shade_tree::emission(node, P_out, w_out, Le);
+}
+
 extern "C" bool gde_shader_handle_is_valid(void *shader) {
   return (shader != nullptr);
 }
