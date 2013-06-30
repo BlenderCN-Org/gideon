@@ -20,7 +20,7 @@ namespace raytrace {
       
       virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual typecheck_value typecheck() { return { get_literal_type<T>(state) }; }
-      
+      virtual codegen_constant codegen_const_eval(llvm::Module *module, llvm::IRBuilder<> &builder);
       
     private:
       

@@ -93,7 +93,7 @@ void render_object::parse(ast::parser_state *parser,
 
   //add a global scene pointer declaration
   ast::type_expr_ptr scene_type = ast::type_expr_ptr(new ast::typename_expression(parser, "scene_ptr", 0, 0));
-  syntax_tree.insert(syntax_tree.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(parser, "__gd_scene", scene_type)));
+  syntax_tree.insert(syntax_tree.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(parser, "__gd_scene", scene_type, nullptr, 0, 0)));
 }
 
 Module *render_object::compile(const string &name, ast::parser_state *parser,
@@ -304,12 +304,18 @@ Module *render_program::compile() {
     cout << "Compiling Object: " << *name_it << endl;
     std::shared_ptr<object_entry> &object = objects[*name_it];
     Module *module = render_object::compile(object->obj.name, &object->parser, object->syntax_tree);
-    linker.LinkInModule(module);
+    
+    string error_msg;
+    bool link_st = linker.LinkInModule(module, &error_msg);
+    if (link_st) {
+      stringstream link_err;
+      link_err << "Linker Error: " << error_msg;
+      throw runtime_error(link_err.str());
+    }
   }
 
   Module *result = linker.releaseModule();
   optimize(result);
-
   return result;
 }
 

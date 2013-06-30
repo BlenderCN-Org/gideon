@@ -2,6 +2,10 @@
 /** Gideon Standard Library Functions **/
 module gideon {
 
+  /* Constants */
+
+  float pi = 3.14159265359;
+  
   /* Math */
 
   extern function exp(float x) float : gde_exp_f;
@@ -226,7 +230,6 @@ module gideon {
   distribution lambert(vec3 N, vec3 Ng, float k, vec4 color) {
     
     function eval_pdf(float dot_N) float {
-      float pi = 3.14159265359; 
       return dot_N / pi;
     }
 
@@ -259,13 +262,11 @@ module gideon {
   distribution blinn(vec3 N, vec3 Ng, float e, float eta, float k) {
     
     function eval_pdf(float cos_theta, vec3 w_out, vec3 w_h) float {
-      float pi = 3.14159265359; 
       float p_h = (e + 2.0) * pow(cos_theta, e) / (2.0 * pi);
       return p_h / (4.0 * dot(w_out, w_h));
     }
 
     function D(float cos_wh) float {
-      float pi = 3.14159265359; 
       float c = (e + 2.0) / (2.0 * pi);
       return c * pow(cos_wh, e);
     }
@@ -316,7 +317,6 @@ module gideon {
     function sample(vec3 P_out, vec3 w_out,
 		    vec2 rand_P, vec2 rand_w,
 		    output vec3 P_in, output vec3 w_in) float {
-      float pi = 3.14159265359; 
       P_in = P_out;
 
       //sample half vector

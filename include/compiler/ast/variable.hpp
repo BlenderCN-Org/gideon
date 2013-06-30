@@ -42,7 +42,9 @@ namespace raytrace {
     public:
       
       global_variable_decl(parser_state *st,
-			   const std::string &name, const type_expr_ptr &type);
+			   const std::string &name, const type_expr_ptr &type,
+			   const expression_ptr &init,
+			   unsigned int line_no, unsigned int column_no);
       virtual ~global_variable_decl() { }
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder <> &builder);
@@ -51,6 +53,7 @@ namespace raytrace {
       
       std::string name;
       type_expr_ptr type;
+      expression_ptr initializer;
 
       std::string full_name();
 

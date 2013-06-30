@@ -201,7 +201,10 @@ global_declarations
 
 global_declaration
  : function_declaration
- | typespec IDENTIFIER ';' { $$ = ast::global_declaration_ptr(new ast::global_variable_decl(gd_data->state, $2, $1)); }
+ | typespec IDENTIFIER ';' { $$ = ast::global_declaration_ptr(new ast::global_variable_decl(gd_data->state, $2, $1, nullptr,
+											    yylloc.first_line, yylloc.first_column)); }
+ | typespec IDENTIFIER '=' expression ';' { $$ = ast::global_declaration_ptr(new ast::global_variable_decl(gd_data->state, $2, $1, $4,
+													   yylloc.first_line, yylloc.first_column)); }
  | load_declaration
  | import_declaration
  | module_declaration

@@ -66,9 +66,11 @@ codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
 /** Global Variable Declaration **/
 
 raytrace::ast::global_variable_decl::global_variable_decl(parser_state *st,
-							  const string &name, const type_expr_ptr &type) :
+							  const string &name, const type_expr_ptr &type,
+							  const expression_ptr &init,
+							  unsigned int line_no, unsigned int column_no) :
   global_declaration(st),
-  name(name), type(type)
+  name(name), type(type), initializer(init)
 {
 
 }
@@ -84,22 +86,32 @@ raytrace::codegen_value raytrace::ast::global_variable_decl::codegen(llvm::Modul
   }
 
   typecheck_value t = type->codegen_type();
+  bool has_init = (initializer != nullptr);
+  codegen_constant init_val = initializer ? initializer->codegen_const_eval(module, builder) : typed_constant(NULL, state->types["void"]);
   
-  return errors::codegen_call<typecheck_value, codegen_value>(t, [&] (type_spec &ty) -> codegen_value {
-      GlobalVariable *gv = new GlobalVariable(ty->llvm_type(), false, GlobalValue::ExternalLinkage, NULL, full_name());
-      module->getGlobalList().push_back(gv);
-      
-      variable_symbol_table::entry_type entry(gv, ty);
-      global_scope.set(name, entry);
-      
-      exports::variable_export exp;
-      exp.name = name;
-      exp.full_name = full_name();
-      exp.type = ty;
-      state->exports.add_variable(exp);
-      
-      return gv;
-    });
+  //return errors::codegen_call<typecheck_value, codegen_value>(t, [&] (type_spec &ty) -> codegen_value {
+  boost::function<codegen_value (type_spec &, typed_constant &)> create = [&] (type_spec &ty, typed_constant &val) -> codegen_value {
+    if (has_init && (val.get<1>() != ty)) {
+      stringstream err;
+      err << "Invalid const initializer for type '" << ty->name << "', found type '" << val.get<1>()->name << "'.";
+      return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
+    }
+
+    GlobalVariable *gv = new GlobalVariable(ty->llvm_type(), false, GlobalValue::ExternalLinkage, val.get<0>(), full_name());
+    module->getGlobalList().push_back(gv);
+    
+    variable_symbol_table::entry_type entry(gv, ty);
+    global_scope.set(name, entry);
+    
+    exports::variable_export exp;
+    exp.name = name;
+    exp.full_name = full_name();
+    exp.type = ty;
+    state->exports.add_variable(exp);
+    
+    return gv;
+  };
+  return errors::codegen_apply(create, t, init_val);
 }
 
 string ast::global_variable_decl::full_name() {

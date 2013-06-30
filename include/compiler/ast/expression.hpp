@@ -41,6 +41,9 @@ namespace raytrace {
       //special function for use in type checking, where we may need the module's name, but can't call codegen() directly.
       virtual code_value codegen_module();
 
+      //if this is a constant expression, evaluate it
+      virtual codegen_constant codegen_const_eval(llvm::Module *module, llvm::IRBuilder<> &builder);
+
     protected:
 
       type_spec result_type;

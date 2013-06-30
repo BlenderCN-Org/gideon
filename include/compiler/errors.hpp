@@ -15,6 +15,7 @@
 
 #include "llvm/Module.h"
 
+#include <iostream>
 #include <vector>
 #include <stdexcept>
 #include <boost/type_traits.hpp>

@@ -31,6 +31,9 @@ namespace raytrace {
   typedef codegen<typed_value, compile_error>::vector typed_value_vector;
 
   typedef codegen<empty_type, compile_error>::vector void_vector;
+
+  typedef boost::tuple<llvm::Constant*, type_spec> typed_constant;
+  typedef codegen<typed_constant, compile_error>::value codegen_constant;
   
   /* A table of types. */
   class type_table {

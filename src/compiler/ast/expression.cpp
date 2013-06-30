@@ -18,6 +18,10 @@ code_value ast::expression::codegen_module() {
   return errors::make_error<errors::error_message>("Cannot convert expression to module", 0, 0);
 }
 
+codegen_constant ast::expression::codegen_const_eval(Module *module, IRBuilder<> &builder) {
+  return errors::make_error<errors::error_message>("Expression is not constant", line_no, column_no);
+}
+
 void ast::expression::destroy_unbound(typed_value_container &val, Module *module, IRBuilder<> &builder) {
   boost::function<codegen_void (typed_value &)> dtor = [module, &builder] (typed_value &arg) -> codegen_void {
     if (arg.get<0>().type() != value::LLVM_VALUE) return empty_type();

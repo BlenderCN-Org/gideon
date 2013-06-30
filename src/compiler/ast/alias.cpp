@@ -29,7 +29,7 @@ codegen_value ast::global_variable_alias::codegen(Module *module, IRBuilder<> &)
   alias_ss << state->modules.scope_name() << "." << alias_name;
   
   Constant *global_var = module->getOrInsertGlobal(full_name, type->llvm_type());
-  GlobalAlias *alias = new GlobalAlias(type->llvm_type()->getPointerTo(), GlobalValue::ExternalLinkage, alias_ss.str(), global_var, module);
+  GlobalAlias *alias = new GlobalAlias(type->llvm_type()->getPointerTo(), GlobalValue::PrivateLinkage, alias_ss.str(), global_var, module);
   
   variable_symbol_table::entry_type entry(alias, type);
   global_scope.set(alias_name, entry);
