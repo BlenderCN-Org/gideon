@@ -89,7 +89,8 @@ namespace raytrace {
 
       virtual typecheck_value typecheck() { return type->codegen_type(); }
       virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
-      
+      virtual codegen_constant codegen_const_eval(llvm::Module *module, llvm::IRBuilder<> &builder);
+
     private:
       
       type_expr_ptr type;

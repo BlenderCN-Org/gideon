@@ -201,6 +201,18 @@ module gideon {
     return Le;
   }
 
+  //Determines value of the distribution's pdf for given directions.
+  extern function __dfunc_pdf(output dfunc d,
+			      output vec3 P_in, output vec3 w_in,
+			      output vec3 P_out, output vec3 w_out) float : gde_dfunc_pdf;
+  function dfunc:pdf(dfunc d,
+		     vec3 P_in, vec3 w_in,
+		     vec3 P_out, vec3 w_out) float { return __dfunc_pdf(d, P_in, w_in, P_out, w_out); }
+
+  //Returns the combined flags of the distribution.
+  extern function __dfunc_flags(output dfunc d) shader_flag : gde_dfunc_flags;
+  function dfunc:flags(dfunc d) shader_flag { return __dfunc_flags(d); }
+
   //Returns true if a shader handle references a valid shader function.
   extern function shader_handle:is_valid(shader_handle h) bool : gde_shader_handle_is_valid;
   
@@ -219,6 +231,21 @@ module gideon {
 
   /* Builtin Distributions */
 
+  //Standard set of shader flags used by all the distributions.
+  module flags {
+    shader_flag bsdf = shader_flag(1);
+    shader_flag delta = shader_flag(2);    //Contains a delta function (like perfect specular reflections).
+    shader_flag override = shader_flag(3); //Distribution should be excluded from any lighting calculations (it handles that manually).
+    shader_flag emissive = shader_flag(4); //Emits light.
+
+    shader_flag diffuse = shader_flag(5);
+    shader_flag specular = shader_flag(6);
+    shader_flag transparent = shader_flag(7);
+
+    shader_flag volume = shader_flag(8);
+    shader_flag subsurface = shader_flag(9);
+  }
+
   /*
     Simple Lambertian Reflectance.
     Parameters:
@@ -227,7 +254,7 @@ module gideon {
       k     -- Reflectance Factor
       color -- Reflected Color
   */
-  distribution lambert(vec3 N, vec3 Ng, float k, vec4 color) {
+  distribution[flags.bsdf, flags.diffuse] lambert(vec3 N, vec3 Ng, float k, vec4 color) {
     
     function eval_pdf(float dot_N) float {
       return dot_N / pi;
@@ -259,7 +286,7 @@ module gideon {
   /*
     Microfacet Model using Blinn Distribution.
    */
-  distribution blinn(vec3 N, vec3 Ng, float e, float eta, float k) {
+  distribution[flags.bsdf, flags.specular] blinn(vec3 N, vec3 Ng, float e, float eta, float k) {
     
     function eval_pdf(float cos_theta, vec3 w_out, vec3 w_h) float {
       float p_h = (e + 2.0) * pow(cos_theta, e) / (2.0 * pi);
@@ -344,7 +371,7 @@ module gideon {
     Parameters:
       color -- Emitted Color
   */
-  distribution emission(vec4 color) {
+  distribution[flags.emissive] emission(vec4 color) {
     
     function emission(vec3 P_out, vec3 w_out) vec4 { return color; }
 

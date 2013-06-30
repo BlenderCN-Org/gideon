@@ -2,6 +2,7 @@
 #define GD_RL_AST_DISTRIBUTION_HPP
 
 #include "compiler/ast/global.hpp"
+#include "compiler/ast/expression.hpp"
 #include "compiler/ast/typename.hpp"
 
 namespace raytrace {
@@ -19,6 +20,7 @@ namespace raytrace {
     public:
 
       distribution(parser_state *st, const std::string &name,
+		   const std::vector<expression_ptr> &flags,
 		   const std::vector<distribution_parameter> &params,
 		   const std::vector<global_declaration_ptr> &internal_decl,
 		   unsigned int line_no, unsigned int column_no);
@@ -31,6 +33,7 @@ namespace raytrace {
     private:
 
       std::string name;
+      std::vector<expression_ptr> flags;
       std::vector<distribution_parameter> params;
       std::vector<global_declaration_ptr> internal_decl;
       
@@ -38,17 +41,19 @@ namespace raytrace {
 
       llvm::StructType *getParameterType(const std::vector<type_spec> &param_types);
 
-      llvm::Function *createConstructor(llvm::Module *module, llvm::IRBuilder<> &builder,
-					const std::string &ctor_name,
-					llvm::Type *parameter_type, const std::vector<type_spec> &param_type_list,
-					llvm::Value *eval, llvm::Value *sample, llvm::Value *pdf, llvm::Value *emit,
-					llvm::Function *dtor);
+      codegen_value createConstructor(llvm::Module *module, llvm::IRBuilder<> &builder,
+				      const std::string &ctor_name,
+				      llvm::Type *parameter_type, const std::vector<type_spec> &param_type_list,
+				      llvm::Value *eval, llvm::Value *sample, llvm::Value *pdf, llvm::Value *emit,
+				      llvm::Function *dtor);
       
       llvm::Function *createDestructor(llvm::Module *module, llvm::IRBuilder<> &builder,
 				       llvm::Type *param_ty, const std::vector<type_spec> &param_type_list);
+
+      //evaluates all flag expressions (for use in the constructor).
+      codegen_value codegen_all_flags(llvm::Module *module, llvm::IRBuilder<> &builder);
       
       //Checks for a function using the given key.
-      static llvm::Function *dummy_default(llvm::Module *, llvm::IRBuilder<> &) { return nullptr; }
       codegen_value check_for_function(const function_key &key,
 				       const std::vector<bool> &output_args,
 				       bool use_default = false);

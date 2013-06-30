@@ -10,11 +10,12 @@ using namespace raytrace;
 
 /* Lead Node */
 
-shade_tree::leaf::leaf(char *p,
+shade_tree::leaf::leaf(char *p, shader_flags flags,
 		       eval_func_type eval, sample_func_type sample,
 		       pdf_func_type pdf, emission_func_type(emit),
 		       dtor_func_type dtor) : 
-  params(p), evaluate_fn(eval), sample_fn(sample), pdf_fn(pdf), emit_fn(emit), destructor(dtor)
+  params(p), evaluate_fn(eval), sample_fn(sample), pdf_fn(pdf), emit_fn(emit), destructor(dtor),
+  flags(flags)
 {
   
 }
@@ -82,17 +83,33 @@ float shade_tree::get_weight(const node_ptr &node) {
   return boost::apply_visitor(shade_tree_weight(), node);
 }
 
+/* Node Flags Computation */
+
+class shader_flags_visitor : public boost::static_visitor<shade_tree::shader_flags> {
+public:
+
+  shade_tree::shader_flags operator()(const shade_tree::leaf_ptr &node) const { return node->get_flags(); }
+  shade_tree::shader_flags operator()(const shade_tree::scale_ptr &node) const { return node->flags; }
+  shade_tree::shader_flags operator()(const shade_tree::sum_ptr &node) const { return node->flags; }
+
+};
+
+shade_tree::shader_flags shade_tree::get_flags(const node_ptr &node) {
+  return boost::apply_visitor(shader_flags_visitor(), node);
+}
+
 /* Shade-Tree Evaluation */
 
 shade_tree::scale::scale(const float4 &k, const node_ptr &node) :
-  k(k), node(node), weight(length(k)*get_weight(node))
+  k(k), node(node), weight(length(k)*get_weight(node)), flags(get_flags(node))
 {
   
 }
 
 shade_tree::sum::sum(const node_ptr &lhs, const node_ptr &rhs) :
   lhs(lhs), rhs(rhs),
-  weight(get_weight(lhs) + get_weight(rhs))
+  weight(get_weight(lhs) + get_weight(rhs)),
+  flags(get_flags(lhs) | get_flags(rhs))
 {
   
 }
@@ -179,6 +196,12 @@ public:
   }
 
 };
+
+float shade_tree::pdf(node_ptr &node,
+		      float3 *P_in, float3 *w_in,
+		      float3 *P_out, float3 *w_out) {
+  return boost::apply_visitor(pdf_visitor(P_in, w_in, P_out, w_out), node);
+}
 
 /* Shade Tree Sampling */
 

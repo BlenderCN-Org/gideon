@@ -4,6 +4,8 @@
 #include "shading/distribution.hpp"
 #include "geometry/ray.hpp"
 
+#include "compiler/type_conversion.hpp"
+
 using namespace raytrace;
 using namespace llvm;
 using namespace std;
@@ -104,6 +106,77 @@ typed_value_container dfunc_type::create(Module *module, IRBuilder<> &builder,
   };
 
   return errors::codegen_call<typed_value_vector, typed_value_container>(args, ctor);
+}
+
+//Shader Flag
+
+Type *shader_flag_type::llvm_type() const {
+  return Type::getInt64Ty(getGlobalContext());
+}
+
+typed_value_container shader_flag_type::create(Module *module, IRBuilder<> &builder,
+					       typed_value_vector &args, const type_conversion_table &conversions) const {
+  auto build = [this, &conversions, module, &builder] (vector<typed_value> &args) -> typed_value_container {
+    if (args.size() != 1) {
+      stringstream err_ss;
+      err_ss << name << " constructor expects one integer argument, received " << args.size();
+      return errors::make_error<errors::error_message>(err_ss.str(), 0, 0);
+    }
+    
+    typed_value &arg = args[0];
+    int unused;
+    if (!conversions.can_convert(arg.get<1>(), types->at("int"), unused, unused)) {
+      return errors::make_error<errors::error_message>("Argument must be convertible to an integer", 0, 0);
+    }
+    
+    //TODO: Check if this is between 1 and 64
+    code_value bit_idx = conversions.convert(arg.get<1>(), arg.get<0>().extract_value(),
+					     types->at("int"),
+					     module, builder);
+    return errors::codegen_call<code_value, typed_value_container>(bit_idx,
+								   [this, &builder] (value &v) -> typed_value_container {
+								     return typed_value(builder.CreateShl(ConstantInt::get(getGlobalContext(), APInt(64, 1, false)),
+													  v.extract_value(), "shifted_flag"),
+											types->at("shader_flag"));
+								   });
+    
+  };
+
+  return errors::codegen_call<typed_value_vector,
+			      typed_value_container>(args, build);
+}
+
+codegen_constant shader_flag_type::create_const(Module *module, IRBuilder<> &builder,
+						codegen_const_vector &args, const type_conversion_table &conversions) const {
+  auto build = [this, &conversions, module, &builder] (vector<typed_constant> &args) -> codegen_constant {
+    if (args.size() != 1) {
+      stringstream err_ss;
+      err_ss << name << " constructor expects one integer argument, received " << args.size();
+      return errors::make_error<errors::error_message>(err_ss.str(), 0, 0);
+    }
+    
+    typed_constant &arg = args[0];
+    if (arg.get<1>() != types->at("int")) {
+      return errors::make_error<errors::error_message>("Argument must be convertible to an integer", 0, 0);
+    }
+
+    uint64_t bit_idx = cast<ConstantInt>(arg.get<0>())->getZExtValue();
+    if (bit_idx > 64) {
+      return errors::make_error<errors::error_message>("Argument must be an integer in [0, 64]", 0, 0);
+    }
+
+    if (bit_idx == 0) return typed_constant(ConstantInt::get(getGlobalContext(), APInt(64, 0, false)), types->at("shader_flag"));
+
+    uint64_t flag_val = 1 << (bit_idx - 1);
+    return typed_constant(ConstantInt::get(getGlobalContext(), APInt(64, flag_val, false)), types->at("shader_flag"));
+  };
+  return errors::codegen_call<codegen_const_vector,
+			      codegen_constant>(args, build);
+}
+
+typed_value_container shader_flag_type::initialize(Module *module, IRBuilder<> &builder) const {
+  return typed_value(ConstantInt::get(getGlobalContext(), APInt(64, 0, false)),
+		     types->at("shader_flag"));
 }
 
 //Shader Handle

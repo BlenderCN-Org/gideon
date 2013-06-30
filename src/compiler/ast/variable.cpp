@@ -195,6 +195,20 @@ typed_value_container ast::type_constructor::codegen(Module *module, IRBuilder<>
     });
 }
 
+codegen_constant ast::type_constructor::codegen_const_eval(Module *module, IRBuilder<> &builder) {
+  typecheck_value ty_val = type->codegen_type();
+  return errors::codegen_call<typecheck_value, codegen_constant>(ty_val, [this, module, &builder] (type_spec &ty) -> codegen_constant {
+      codegen_const_vector arg_values;
+      
+      for (unsigned int i = 0; i < args.size(); i++) {
+	codegen_constant val = args[i]->codegen_const_eval(module, builder);
+	arg_values = errors::codegen_vector_push_back(arg_values, val);
+      }
+      
+      return ty->create_const(module, builder, arg_values, state->type_conversions);
+    });
+}
+
 typed_value_container ast::type_constructor::get_arg(int i, Module *module, IRBuilder<> &builder) {
   return args[i]->codegen(module, builder);
 }

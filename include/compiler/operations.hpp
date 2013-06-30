@@ -77,6 +77,11 @@ namespace raytrace {
   binop_table::op_codegen llvm_add_dfunc_dfunc(llvm::Type *dfunc_type);
   binop_table::op_codegen llvm_scale_dfunc(llvm::Type *dfunc_type, bool swap_order, type_table &types);
 
+  binop_table::op_codegen llvm_cmp_sf_sf();
+  binop_table::op_codegen llvm_add_sf_sf();
+  binop_table::op_codegen llvm_sub_sf_sf();
+  binop_table::op_codegen llvm_and_sf_sf();
+
   /* Unary Operations */
 
   class unary_op_table {
@@ -125,6 +130,8 @@ namespace raytrace {
   unary_op_table::op_codegen llvm_negate_i();
   
   unary_op_table::op_codegen llvm_negate_f();
+
+  unary_op_table::op_codegen llvm_not_sf();
 
   //Helpers
 

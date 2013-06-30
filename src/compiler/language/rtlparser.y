@@ -81,7 +81,7 @@
 %token <s> FLOAT_TYPE INT_TYPE BOOL_TYPE VOID_TYPE STRING_TYPE
 %token <s> RAY_TYPE INTERSECTION_TYPE
 %token <s> LIGHT_TYPE SCENE_PTR_TYPE DISTRIBUTION_FUNC_TYPE
-%token <s> SHADER_HANDLE_TYPE
+%token <s> SHADER_HANDLE_TYPE SHADER_FLAG_TYPE
 %token <s> FLOAT2_TYPE FLOAT3_TYPE FLOAT4_TYPE
 
 %token <i> DISTRIBUTION FUNCTION
@@ -102,6 +102,9 @@ token <i> OUTPUT
 //Operators
 %right <i> ADD_ASSIGN SUB_ASSIGN DIV_ASSIGN MUL_ASSIGN
 %right <i> '='
+
+%left <i> AND_OP
+%left <i> CMP_EQ
 
 %nonassoc <i> '<' '>'
 
@@ -133,6 +136,8 @@ token <i> OUTPUT
 %type <param> function_formal_param
 
 %type <global> distribution_declaration
+
+%type <expr_list> distribution_flags distribution_flags_opt
 
 %type <dfunc_param> distribution_param
 %type <dfunc_param_list> distribution_params distribution_params_opt
@@ -297,6 +302,7 @@ simple_typename
  | SCENE_PTR_TYPE { $$ = "scene_ptr"; }
  | DISTRIBUTION_FUNC_TYPE { $$ = "dfunc"; }
  | SHADER_HANDLE_TYPE { $$ = "shader_handle"; }
+ | SHADER_FLAG_TYPE { $$ = "shader_flag"; }
  
  | RAY_TYPE { $$ = "ray"; }
  | INTERSECTION_TYPE { $$ = "isect"; }
@@ -314,6 +320,16 @@ typespec
  ;
 
 /* Distributions */
+
+distribution_flags
+ : expression { $$ = std::vector<ast::expression_ptr>(1, $1); }
+ | distribution_flags ',' expression { $$ = $1; $$.push_back($3); }
+ ;
+
+distribution_flags_opt
+ : distribution_flags
+ | { $$ = std::vector<ast::expression_ptr>(); } //empty
+ ;
 
 distribution_param
  : typespec IDENTIFIER { $$ = {$2, $1}; }
@@ -337,10 +353,17 @@ distribution_content_opt
 distribution_declaration
  : DISTRIBUTION IDENTIFIER '(' distribution_params_opt ')' '{' distribution_content_opt '}' {
    $$ = ast::global_declaration_ptr(new ast::distribution(gd_data->state, $2,
+							  std::vector<ast::expression_ptr>(),
 							  $4, $7,
 							  yylloc.first_line, yylloc.first_column));
  }
-;
+ | DISTRIBUTION '[' distribution_flags_opt ']' IDENTIFIER '(' distribution_params_opt ')' '{' distribution_content_opt '}' {
+   $$ = ast::global_declaration_ptr(new ast::distribution(gd_data->state, $5,
+							  $3,
+							  $7, $10,
+							  yylloc.first_line, yylloc.first_column));
+ } 
+ ;
 
 /* Statements */
 
@@ -475,6 +498,8 @@ binary_expression
  | expression '-' expression { $$ = BINARY_OPERATION("-", $1, $3); }
  | expression '*' expression { $$ = BINARY_OPERATION("*", $1, $3); }
  | expression '/' expression { $$ = BINARY_OPERATION("/", $1, $3); }
+ | expression AND_OP expression { $$ = BINARY_OPERATION("&&", $1, $3); }
+ | expression CMP_EQ expression { $$ = BINARY_OPERATION("==", $1, $3); }
  | expression '<' expression { $$ = BINARY_OPERATION("<", $1, $3); }
  | expression '>' expression { $$ = BINARY_OPERATION(">", $1, $3); }
  ;

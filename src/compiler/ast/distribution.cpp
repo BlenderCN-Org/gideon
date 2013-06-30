@@ -7,11 +7,12 @@ using namespace std;
 using namespace llvm;
 
 ast::distribution::distribution(parser_state *st, const string &name,
+				const vector<expression_ptr> &flags,
 				const vector<distribution_parameter> &params,
 				const vector<global_declaration_ptr> &internal_decl,
 				unsigned int line_no, unsigned int column_no) :
   global_declaration(st),
-  name(name), params(params),
+  name(name), flags(flags), params(params),
   internal_decl(internal_decl)
 {
   
@@ -178,12 +179,12 @@ codegen_value ast::distribution::check_for_function(const function_key &key,
 
 
 
-Function *ast::distribution::createConstructor(Module *module, IRBuilder<> &builder,
-					       const string &ctor_name,
-					       Type *parameter_type,
-					       const vector<type_spec> &param_type_list,
-					       Value *eval, Value *sample, Value *pdf, Value *emit,
-					       Function *dtor) {
+codegen_value ast::distribution::createConstructor(Module *module, IRBuilder<> &builder,
+						   const string &ctor_name,
+						   Type *parameter_type,
+						   const vector<type_spec> &param_type_list,
+						   Value *eval, Value *sample, Value *pdf, Value *emit,
+						   Function *dtor) {
   //create function accepting parameters as arguments
   vector<Type*> arg_types;
   for (auto it = param_type_list.begin(); it != param_type_list.end(); ++it) arg_types.push_back((*it)->llvm_type());
@@ -198,42 +199,47 @@ Function *ast::distribution::createConstructor(Module *module, IRBuilder<> &buil
   assert(gd_scene != NULL);
   Value *scene_ptr = builder.CreateLoad(gd_scene);
 
-  //get memory for a new distribution object
-  Value *dfunc_ptr = state->types["dfunc"]->allocate(module, builder);
-  
-  //initialize the object and dynamically allocate parameter memory (calling a builtin function)
-  Type* int_ptr_ty = Type::getInt32Ty(getGlobalContext())->getPointerTo();
-  vector<Type*> alloc_arg_types({state->types["scene_ptr"]->llvm_type(), Type::getInt32Ty(getGlobalContext()),
-	//eval->getType(), sample->getType(), pdf->getType(), emit->getType(),
-	int_ptr_ty, int_ptr_ty, int_ptr_ty, int_ptr_ty,
-	dtor->getType(), dfunc_ptr->getType()});
-  FunctionType *alloc_type = FunctionType::get(Type::getInt32PtrTy(getGlobalContext()), alloc_arg_types, false);
-  Function *alloc_func = cast<Function>(module->getOrInsertFunction("gd_builtin_alloc_dfunc", alloc_type));
-  
-  int param_data_size = DataLayout(module).getTypeAllocSize(parameter_type);
-  Constant *param_size_arg = ConstantInt::get(getGlobalContext(), APInt(8*sizeof(int), param_data_size));
+  //compute the shader flags
+  codegen_value flag_val = codegen_all_flags(module, builder);
 
-  vector<Value*> alloc_args({scene_ptr, param_size_arg,
-	builder.CreatePointerCast(eval, int_ptr_ty),
-	builder.CreatePointerCast(sample, int_ptr_ty),
-	builder.CreatePointerCast(pdf, int_ptr_ty),
-	builder.CreatePointerCast(emit, int_ptr_ty),
-	dtor, dfunc_ptr});
-  Value *param_ptr = builder.CreatePointerCast(builder.CreateCall(alloc_func, alloc_args),
-					       parameter_type->getPointerTo(), "dfunc_param_ptr");
-
-  //set each parameter
-  auto arg_it = f->arg_begin();
-  unsigned int field_idx = 0;
-  for (auto it = param_type_list.begin(); it != param_type_list.end(); ++it, ++arg_it, ++field_idx) {
-    Value *param_copy = (*it)->copy(arg_it, module, builder);
-    (*it)->store(param_copy, builder.CreateStructGEP(param_ptr, field_idx), module, builder);
-  }
+  return errors::codegen_call(flag_val, [&] (Value *&flag_bitmask) -> codegen_value {
+      //get memory for a new distribution object
+      Value *dfunc_ptr = state->types["dfunc"]->allocate(module, builder);
   
-  //return the object
-  Value *rt_val = builder.CreateLoad(dfunc_ptr, "dist_ref");
-  builder.CreateRet(rt_val);
-  return f;
+      //initialize the object and dynamically allocate parameter memory (calling a builtin function)
+      Type* int_ptr_ty = Type::getInt32Ty(getGlobalContext())->getPointerTo();
+      vector<Type*> alloc_arg_types({state->types["scene_ptr"]->llvm_type(),
+	    Type::getInt32Ty(getGlobalContext()), state->types["shader_flag"]->llvm_type(),
+	    int_ptr_ty, int_ptr_ty, int_ptr_ty, int_ptr_ty,
+	    dtor->getType(), dfunc_ptr->getType()});
+      FunctionType *alloc_type = FunctionType::get(Type::getInt32PtrTy(getGlobalContext()), alloc_arg_types, false);
+      Function *alloc_func = cast<Function>(module->getOrInsertFunction("gd_builtin_alloc_dfunc", alloc_type));
+      
+      int param_data_size = DataLayout(module).getTypeAllocSize(parameter_type);
+      Constant *param_size_arg = ConstantInt::get(getGlobalContext(), APInt(8*sizeof(int), param_data_size));
+      
+      vector<Value*> alloc_args({scene_ptr, param_size_arg, flag_bitmask,
+	    builder.CreatePointerCast(eval, int_ptr_ty),
+	    builder.CreatePointerCast(sample, int_ptr_ty),
+	    builder.CreatePointerCast(pdf, int_ptr_ty),
+	    builder.CreatePointerCast(emit, int_ptr_ty),
+	    dtor, dfunc_ptr});
+      Value *param_ptr = builder.CreatePointerCast(builder.CreateCall(alloc_func, alloc_args),
+						   parameter_type->getPointerTo(), "dfunc_param_ptr");
+      
+      //set each parameter
+      auto arg_it = f->arg_begin();
+      unsigned int field_idx = 0;
+      for (auto it = param_type_list.begin(); it != param_type_list.end(); ++it, ++arg_it, ++field_idx) {
+	Value *param_copy = (*it)->copy(arg_it, module, builder);
+	(*it)->store(param_copy, builder.CreateStructGEP(param_ptr, field_idx), module, builder);
+      }
+      
+      //return the object
+      Value *rt_val = builder.CreateLoad(dfunc_ptr, "dist_ref");
+      builder.CreateRet(rt_val);
+      return f;
+    });
 }
 
 Function *ast::distribution::createDestructor(Module *module, IRBuilder<> &builder,
@@ -417,4 +423,40 @@ Value *ast::distribution::create_wrapper(Function *func, const string &name,
   else builder.CreateRet(call);
 
   return f;
+}
+
+codegen_value ast::distribution::codegen_all_flags(Module *module, IRBuilder<> &builder) {
+  typed_value_vector flag_vals;
+  for (auto flag_it = flags.begin(); flag_it != flags.end(); ++flag_it) {
+    typed_value_container flag = (*flag_it)->codegen(module, builder);
+    flag_vals = errors::codegen_vector_push_back(flag_vals, flag);
+  }
+
+  return errors::codegen_call<typed_value_vector, codegen_value>(flag_vals, [this, module, &builder] (vector<typed_value> &flag_arr) -> codegen_value {
+      vector<Value*> flag_bitmasks;
+
+      //ensure that the types are all shader flags
+      for (unsigned int flag_idx = 0; flag_idx < flags.size(); ++flag_idx) {
+	type_spec ty = flag_arr[flag_idx].get<1>();
+	if (ty != state->types["shader_flag"]) {
+	  if (!flags[flag_idx]->bound() && ty != state->types["module"]) {
+	    Value *v = flag_arr[flag_idx].get<0>().extract_value();
+	    ty->destroy(v, module, builder);
+
+	    return errors::make_error<errors::error_message>("All flag expressions must evaluate to 'shader_flag' type.", line_no, column_no);
+	  }
+	}
+
+	Value *mask = flag_arr[flag_idx].get<0>().extract_value();
+	flag_bitmasks.push_back(mask);
+      }
+      
+      //bitwise OR all the masks
+      Value *full_mask = ConstantInt::get(getGlobalContext(), APInt(64, 0, false));
+      for (auto mask = flag_bitmasks.begin(); mask != flag_bitmasks.end(); ++mask) {
+	full_mask = builder.CreateOr(full_mask, *mask);
+      }
+
+      return full_mask;
+    });
 }

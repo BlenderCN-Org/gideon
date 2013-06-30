@@ -63,6 +63,7 @@ module render {
       vec3 w_out = gideon.normalize(gideon.ray:origin(r) - P);
 
       dfunc surface = gideon.shade(r, vec2(0.0, 0.0), ray_hit);
+      shader_flag flags = gideon.dfunc:flags(surface);
       
       //sample direct illumination
       if (i > min_path) L_samples = 1;
@@ -81,7 +82,9 @@ module render {
       }
 
       //add emitted light from this surface
-      Li += throughput * gideon.dfunc:emission(surface, P, w_out);
+      if (flags && gideon.flags.emissive) {
+	Li += throughput * gideon.dfunc:emission(surface, P, w_out);
+      }
 
       //sample bsdf to get new direction
       vec2 rand_P = vec2(0.0, 0.0);
@@ -95,7 +98,7 @@ module render {
 				      rand_D, rand_P, rand_w,
 				      P_in, w_in);
       if (pdf < 0.0001) break;
-
+      
       r = demo.shadow_ray(P_in, w_in, 10000.0);
 
       float tmp;

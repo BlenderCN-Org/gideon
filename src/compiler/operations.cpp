@@ -127,6 +127,16 @@ void binop_table::initialize_standard_ops(binop_table &table, type_table &types)
 		      llvm_scale_dfunc(types["dfunc"]->llvm_type(), false, types));
   table.add_operation("*", types["dfunc"], types["vec4"], types["dfunc"],
 		      llvm_scale_dfunc(types["dfunc"]->llvm_type(), false, types));
+
+  table.add_operation("==", types["shader_flag"], types["shader_flag"], types["bool"],
+		      llvm_cmp_sf_sf());
+  table.add_operation("&&", types["shader_flag"], types["shader_flag"], types["bool"],
+		      llvm_and_sf_sf());
+
+  table.add_operation("+", types["shader_flag"], types["shader_flag"], types["shader_flag"],
+		      llvm_add_sf_sf());
+  table.add_operation("-", types["shader_flag"], types["shader_flag"], types["shader_flag"],
+		      llvm_sub_sf_sf());
 }
 
 /* LLVM Code Generation Functions */
@@ -384,6 +394,36 @@ binop_table::op_codegen raytrace::llvm_scale_dfunc(Type *dfunc_type, bool swap_o
   };
 }
 
+binop_table::op_codegen raytrace::llvm_cmp_sf_sf() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *, IRBuilder<> &builder) -> Value* {
+    return builder.CreateICmpEQ(lhs, rhs);
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_add_sf_sf() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *, IRBuilder<> &builder) -> Value* {
+    return builder.CreateOr(lhs, rhs);
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_sub_sf_sf() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *, IRBuilder<> &builder) -> Value* {
+    Value *inv_rhs = builder.CreateNot(rhs);
+    return builder.CreateAnd(lhs, inv_rhs);
+  };
+}
+
+binop_table::op_codegen raytrace::llvm_and_sf_sf() {
+  return [] (Value *lhs, Value *rhs,
+	     Module *, IRBuilder<> &builder) -> Value* {
+    Value *masked = builder.CreateAnd(lhs, rhs);
+    return builder.CreateICmpNE(masked, ConstantInt::get(getGlobalContext(), APInt(64, 0, false)));
+  };
+}
+
 /* Helpers */
 
 Value *raytrace::llvm_builtin_binop(const string &func_name, 
@@ -474,6 +514,7 @@ int unary_op_table::candidate_score(const type_spec &expected_type,
 
 void unary_op_table::initialize_standard_ops(unary_op_table &table, type_table &types) {
   table.add_operation("!", types["bool"], types["bool"], llvm_not_b());
+  table.add_operation("!", types["shader_flag"], types["shader_flag"], llvm_not_sf());
 
   table.add_operation("-", types["int"], types["int"], llvm_negate_i());
   table.add_operation("-", types["float"], types["float"], llvm_negate_f());
@@ -499,5 +540,12 @@ unary_op_table::op_codegen raytrace::llvm_negate_f() {
   return [] (Value *arg,
 	     Module *module, IRBuilder<> &builder) -> Value* {
     return builder.CreateFNeg(arg, "f_neg_tmp");
+  };
+}
+
+unary_op_table::op_codegen raytrace::llvm_not_sf() {
+  return [] (Value *arg,
+	     Module *module, IRBuilder<> &builder) -> Value* {
+    return builder.CreateNot(arg, "sf_neg_tmp");
   };
 }

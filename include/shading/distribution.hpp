@@ -12,6 +12,9 @@
 namespace raytrace {
   
   namespace shade_tree {
+
+    typedef uint64_t shader_flags;
+    
     struct leaf {
     public:
       
@@ -30,7 +33,7 @@ namespace raytrace {
 
       typedef void (*dtor_func_type)(void*);
 
-      leaf(char *p,
+      leaf(char *p, shader_flags flags,
 	   eval_func_type eval, sample_func_type sample,
 	   pdf_func_type pdf, emission_func_type emit,
 	   dtor_func_type dtor);
@@ -49,6 +52,8 @@ namespace raytrace {
 
       void emission(float3 *P_out, float3 *w_out, /* out */ float4 *Le) const;
 
+      shader_flags get_flags() const { return flags; }
+
     private: 
       
       char *params;
@@ -58,6 +63,8 @@ namespace raytrace {
       emission_func_type emit_fn;
 
       dtor_func_type destructor;
+
+      shader_flags flags;
     };
 
     struct scale;
@@ -72,18 +79,23 @@ namespace raytrace {
 			   sum_ptr> node_ptr;
     
     float get_weight(const node_ptr &node);
+    shader_flags get_flags(const node_ptr &node);
     
     struct scale {
       float4 k;
       node_ptr node;
+
       float weight;
+      shader_flags flags;
 
       scale(const float4 &k, const node_ptr &node);
     };
     
     struct sum {
       node_ptr lhs, rhs;
+
       float weight;
+      shader_flags flags;
 
       sum(const node_ptr &lhs, const node_ptr &rhs);
     };
@@ -93,6 +105,10 @@ namespace raytrace {
 		  float3 *P_out, float3 *w_out,
 		  /* out */ float *pdf, /* out */ float4 *out);
 
+    float pdf(node_ptr &node,
+	      float3 *P_in, float3 *w_in,
+	      float3 *P_out, float3 *w_out);
+    
     float sample(node_ptr &node,
 		 float3 *P_out, float3 *w_out,
 		 float rand_D, float2 *rand_P, float2 *rand_w,

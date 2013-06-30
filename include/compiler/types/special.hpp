@@ -43,7 +43,23 @@ namespace raytrace {
     virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
     
-  private:
+  };
+
+  //A flag that may be applied to a distribution.
+  //Internally represented as a 64bit bitmask.
+  class shader_flag_type : public type {
+  public:
+
+    shader_flag_type(type_table *types) : type(types, "shader_flag", "sf") { }
+    virtual llvm::Type *llvm_type() const;
+
+    //initializes a flag from an integer argument (flag <- 2 ^ arg).
+    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder,
+					 typed_value_vector &args, const type_conversion_table &conversions) const;
+    virtual codegen_constant create_const(llvm::Module *module, llvm::IRBuilder<> &builder,
+					  codegen_const_vector &args, const type_conversion_table &conversions) const;
+
+    virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
     
   };
 

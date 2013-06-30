@@ -70,6 +70,7 @@ void raytrace::initialize_types(type_table &tt) {
   tt.entry("light") = type_table::type_ptr(new light_type(&tt));
 
   tt.entry("dfunc") = type_table::type_ptr(new dfunc_type(&tt));
+  tt.entry("shader_flag") = type_table::type_ptr(new shader_flag_type(&tt));
   tt.entry("shader_handle") = type_table::type_ptr(new shader_handle_type(&tt));
   tt.entry("context_ptr") = type_table::type_ptr(new context_ptr_type(&tt));
   
@@ -98,6 +99,13 @@ typed_value_container type::create(Module *module, IRBuilder<> &builder, typed_v
 				   const type_conversion_table &conversions) const {
   stringstream ss;
   ss << "Type '" << name << "' has no constructor.";
+  return errors::make_error<errors::error_message>(ss.str(), 0, 0);
+}
+
+codegen_constant type::create_const(Module *module, IRBuilder<> &builder, codegen_const_vector &args,
+				    const type_conversion_table &conversions) const {
+  stringstream ss;
+  ss << "Type '" << name << "' has no constant constructor.";
   return errors::make_error<errors::error_message>(ss.str(), 0, 0);
 }
 

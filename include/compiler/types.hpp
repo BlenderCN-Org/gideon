@@ -34,6 +34,7 @@ namespace raytrace {
 
   typedef boost::tuple<llvm::Constant*, type_spec> typed_constant;
   typedef codegen<typed_constant, compile_error>::value codegen_constant;
+  typedef codegen<typed_constant, compile_error>::vector codegen_const_vector;
   
   /* A table of types. */
   class type_table {
@@ -111,6 +112,8 @@ namespace raytrace {
     
     virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args,
 					 const type_conversion_table &conversions) const;
+    virtual codegen_constant create_const(llvm::Module *module, llvm::IRBuilder<> &builder, codegen_const_vector &args,
+					  const type_conversion_table &conversions) const;
 
     virtual llvm::Type *llvm_type() const = 0;
     

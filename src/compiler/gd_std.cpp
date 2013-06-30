@@ -126,6 +126,13 @@ extern "C" void gde_dfunc_eval(void *dfunc,
   shade_tree::evaluate(node, P_in, w_in, P_out, w_out, pdf, out);
 }
 
+extern "C" float gde_dfunc_pdf(void *dfunc,
+			       float3 *P_in, float3 *w_in,
+			       float3 *P_out, float3 *w_out) {
+  shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
+  return shade_tree::pdf(node, P_in, w_in, P_out, w_out);
+}
+
 extern "C" float gde_dfunc_sample(void *dfunc,
 				  float3 *P_out, float3 *w_out,
 				  float rand_D, float2 *rand_P, float2 *rand_w,
@@ -139,6 +146,11 @@ extern "C" void gde_dfunc_emission(void *dfunc,
 				   /* out */ float4 *Le) {
   shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
   shade_tree::emission(node, P_out, w_out, Le);
+}
+
+extern "C" shade_tree::shader_flags gde_dfunc_flags(void *dfunc) {
+  shade_tree::node_ptr &node = *reinterpret_cast<shade_tree::node_ptr*>(dfunc);
+  return shade_tree::get_flags(node);
 }
 
 extern "C" bool gde_shader_handle_is_valid(void *shader) {

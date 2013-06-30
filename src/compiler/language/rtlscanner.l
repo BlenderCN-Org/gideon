@@ -64,6 +64,7 @@
 "scene" { return SCENE_PTR_TYPE; }
 "dfunc" { return DISTRIBUTION_FUNC_TYPE; }
 "shader_handle" { return SHADER_HANDLE_TYPE; }
+"shader_flag" { return SHADER_FLAG_TYPE; }
 
 "distribution" { return DISTRIBUTION; }
 "function" { return FUNCTION; }
@@ -84,6 +85,9 @@
 "true" { yylval->i = 1; return BOOL_LITERAL; }
 "false" { yylval->i = 0; return BOOL_LITERAL; }
 
+"&&" { return AND_OP; }
+
+"==" { return CMP_EQ; }
 "+=" { return ADD_ASSIGN; }
 "-=" { return SUB_ASSIGN; }
 "*=" { return MUL_ASSIGN; }
