@@ -79,6 +79,7 @@ namespace raytrace {
 			   sum_ptr> node_ptr;
     
     float get_weight(const node_ptr &node);
+    float get_weight(shader_flags flags, const node_ptr &node);
     shader_flags get_flags(const node_ptr &node);
     
     struct scale {
@@ -100,21 +101,21 @@ namespace raytrace {
       sum(const node_ptr &lhs, const node_ptr &rhs);
     };
 
-    void evaluate(node_ptr &node,
+    void evaluate(node_ptr &node, shader_flags mask,
 		  float3 *P_in, float3 *w_in,
 		  float3 *P_out, float3 *w_out,
 		  /* out */ float *pdf, /* out */ float4 *out);
 
-    float pdf(node_ptr &node,
+    float pdf(node_ptr &node, shader_flags mask,
 	      float3 *P_in, float3 *w_in,
 	      float3 *P_out, float3 *w_out);
     
-    float sample(node_ptr &node,
+    float sample(node_ptr &node, shader_flags mask,
 		 float3 *P_out, float3 *w_out,
 		 float rand_D, float2 *rand_P, float2 *rand_w,
 		 /* out */ float3 *P_in, /* out */ float3 *w_in);
 
-    void emission(node_ptr &node,
+    void emission(node_ptr &node, shader_flags mask,
 		  float3 *P_out, float3 *w_out,
 		  /* out */ float4 *Le);
     

@@ -38,7 +38,7 @@ module render {
 	  
 	//shade this point
 	float pdf;
-	vec4 refl = gideon.dfunc:evaluate(surface, P, I, P, w_out, pdf) * R;
+	vec4 refl = gideon.dfunc:evaluate(surface, gideon.flags.any, P, I, P, w_out, pdf) * R;
 	L += (inv_N / light_pdf) * refl;
       }
     }
@@ -83,7 +83,7 @@ module render {
 
       //add emitted light from this surface
       if (flags && gideon.flags.emissive) {
-	Li += throughput * gideon.dfunc:emission(surface, P, w_out);
+	Li += throughput * gideon.dfunc:emission(surface, gideon.flags.any, P, w_out);
       }
 
       //sample bsdf to get new direction
@@ -94,7 +94,8 @@ module render {
       vec3 P_in;
       vec3 w_in;
 
-      float pdf = gideon.dfunc:sample(surface, P, w_out,
+      float pdf = gideon.dfunc:sample(surface, gideon.flags.any,
+				      P, w_out,
 				      rand_D, rand_P, rand_w,
 				      P_in, w_in);
       if (pdf < 0.0001) break;
@@ -102,7 +103,7 @@ module render {
       r = demo.shadow_ray(P_in, w_in, 10000.0);
 
       float tmp;
-      throughput *= (1.0 / pdf) * gideon.dfunc:evaluate(surface, P_in, w_in, P, w_out, tmp);
+      throughput *= (1.0 / pdf) * gideon.dfunc:evaluate(surface, gideon.flags.any, P_in, w_in, P, w_out, tmp);
     }
 
     Li.w = 1.0;
