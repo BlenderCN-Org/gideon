@@ -1,26 +1,40 @@
-Relatively Crazy Raytracer
+Gideon
 ==========================
 
-Description
------------
+Gideon is a runtime-compiled language for programmable shading in raytracers, with the ability to define both shaders and the entire
+rendering system. The underlying engine implements a small set of critical features (ray traversal, sampling, vector math, etc.),
+that can be used to build a fully functional raytracer in the language. Languages features include:
+ * Ability to trace a ray through the scene.
+ * User-defined BSDFs (call ```distributions``` in the language), which can be both evaluated and sampled.
+ * Per-primitive shader functions that combine BSDFs with basic arithmetic operations.
+ * Code can be cleanly organized into a ```module```, which can then be loaded using the ```load``` statement.
 
-Terminology
------------
+The goal of Gideon is to allow the user to rapidly iterate on new rendering techniques. The code complexity of a production
+renderer may make it difficult to add new features for experimentation. With Gideon this is no problem, a new renderer
+for testing purposes can be written in minutes.
+ 
+## Usage
 
-This section describes the components of the raytracing engine that can be described by the raytracer language.
+Interaction with Gideon is currently available as a Blender plugin. Enable Gideon from the Addon section of the
+User Preferences UI, then select it as the current Render Engine. In the Render section of the Properties Panel,
+you can choose which source code files to include in the renderer. Once that's done, the "Refresh Function List"
+button will compile the code and build a list of available functions. Then create new materials, selecting the
+appropriate shader function from the drop-down list.
 
-###Distribution Function:
-A function that describes how light interacts with a surface or volume. Also called a BSDF (Bidirectional Scattering Distribution Function). The <code>evaluate</code> function takes 4 basic parameters: 
+## Installation
 
-* P_in - Location where light hits the object
-* P_out - Location where light exits the object
-* w_in - Direction of the incoming light
-* w_out - Direction of the outgoing light
+In the top-level directory, run:
 
-The value returned is color float4 value. As the function depends on the local geometry of the surface, in can also take the surface normal as an input. Distribution functions must also implement a <code>sample</code> function, which draws outgoing point and direction according to the distribution.
+```
+mkdir build; cd build
+cmake ..
+make
+make install
+```
+## Contributing
 
-###Shader:
-Describes how a point on a surface or volume should be rendered. Can read the parameters of the local surface to determine values like texture coordinates and vertex color. Using these values, a shader returns an arithmetic combination of distribution functions that completely describes the color/appearance of the object being rendered.
+## Requirements
 
-###Integrator:
-The high level loop of a raytracing engine. Iterates over pixels, casts rays and evaluates shaders. It's return value is the final rendered image. Integrator programs can also be used to describe render prepasses (such as construction of irradiance caches).
+Gideon uses C++11 and depends on libboost and LLVM 3.2.
+
+##License
