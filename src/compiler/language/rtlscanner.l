@@ -17,8 +17,13 @@
     yylval->i = boost::lexical_cast<int>(str);
   }
 
-  void save_string(YYSTYPE *yylval, const std::string &str) {
-    yylval->s = str.substr(1, str.length()-2);
+  void save_string(YYSTYPE *yylval) {
+    yylval->strbuf.push_back('\0'); //null-terminator
+    yylval->s = std::string(yylval->strbuf.data());
+  }
+
+  void reset_strbuf(YYSTYPE *yylval) {
+    yylval->strbuf.clear();
   }
 
 %}
@@ -29,6 +34,7 @@
 %option yylineno
 
 %x COMMENT
+%x STRING
 
 %%
 
@@ -44,9 +50,30 @@
 
 \/\/.*\n     ; //comments
 
-\"(\\.|[^\\"])*\" { save_string(yylval, TOKEN_STRING); return STRING_LITERAL; }
-\"(\\.|[^\\"])*\" { /* dummy rule */ }
   
+<INITIAL>{
+  "\"" { BEGIN(STRING); reset_strbuf(yylval); }
+}
+
+<STRING>"\"" {
+  BEGIN(INITIAL);
+  save_string(yylval);
+  return STRING_LITERAL;
+}
+<STRING>"\\\"" { yylval->strbuf.push_back('"'); }
+<STRING>"\\'" { yylval->strbuf.push_back('\''); }
+<STRING>"\\a" { yylval->strbuf.push_back('\a'); }
+<STRING>"\\b" { yylval->strbuf.push_back('\b'); }
+<STRING>"\\f" { yylval->strbuf.push_back('\f'); }
+<STRING>"\\n" { yylval->strbuf.push_back('\n'); }
+<STRING>"\\r" { yylval->strbuf.push_back('\r'); }
+<STRING>"\\t" { yylval->strbuf.push_back('\t'); }
+<STRING>"\\v" { yylval->strbuf.push_back('\v'); }
+<STRING>"\\\\" { yylval->strbuf.push_back('\\'); }
+<STRING>\\. { yylval->strbuf.push_back(yytext[1]); }
+<STRING>. { yylval->strbuf.push_back(yytext[0]); }
+
+
 "void" { return VOID_TYPE; }
 "bool" { return BOOL_TYPE; }
 "int" { return INT_TYPE; }

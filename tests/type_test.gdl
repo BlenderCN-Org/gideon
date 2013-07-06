@@ -27,3 +27,7 @@ function foo() int {
   
   return f;
 }
+
+function main() string {
+  return "foo\n \q " + "\\ \"bar\' ";
+}

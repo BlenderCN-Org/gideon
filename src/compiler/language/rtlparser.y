@@ -46,6 +46,7 @@
   typedef struct {
     int i;
     float f;
+    std::vector<char> strbuf;
     std::string s;
     raytrace::ast::type_expr_ptr ty_expr;
 
