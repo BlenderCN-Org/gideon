@@ -32,7 +32,7 @@ namespace raytrace {
     class assignment_operator : public expression {
     public:
 
-      assignment_operator(parser_state *st, const std::string &op,
+      assignment_operator(parser_state *st, const std::string &op, bool return_prior,
 			  const expression_ptr &lhs, const expression_ptr &rhs,
 			  unsigned int line_no, unsigned int column_no);
       virtual ~assignment_operator() {}
@@ -41,18 +41,19 @@ namespace raytrace {
       virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
       virtual typed_value_container codegen_ptr(llvm::Module *module, llvm::IRBuilder<> &builder);
 
-      virtual bool bound() const { return true; }
+      virtual bool bound() const { return !return_prior; }
 
     private:
 
       std::string op;
       expression_ptr lhs, rhs;
+      bool return_prior;
       
       std::pair<typed_value_container, typed_value_container> get_value_and_pointer(llvm::Module *module, llvm::IRBuilder<> &builder);
 
       typed_value_container execute_assignment(binop_table::op_result_value &op_func,
 					       llvm::Module *module, llvm::IRBuilder<> &builder,
-					       type_spec &lhs_type,
+					       type_spec &lhs_type, type_spec &rhs_type,
 					       llvm::Value *lhs_ptr, llvm::Value *rhs_val);
       
     };

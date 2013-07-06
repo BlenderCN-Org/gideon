@@ -62,12 +62,13 @@ typed_value_container ast::assignment::codegen_ptr(Module *module, IRBuilder<> &
 
 /** Assignment Operator **/
 
-ast::assignment_operator::assignment_operator(parser_state *st, const string &op,
+ast::assignment_operator::assignment_operator(parser_state *st, const string &op, bool return_prior,
 					      const expression_ptr &lhs, const expression_ptr &rhs,
 					      unsigned int line_no, unsigned int column_no) :
   expression(st, line_no, column_no),
   op(op),
-  lhs(lhs), rhs(rhs)
+  lhs(lhs), rhs(rhs),
+  return_prior(return_prior)
 {
   
 }
@@ -107,7 +108,7 @@ pair<typed_value_container, typed_value_container> ast::assignment_operator::get
     
     Value *lhs_ptr = errors::get<0>(args).get<0>().extract_value();
     Value *rhs = errors::get<1>(args).get<0>().extract_value();
-    return execute_assignment(op_func, module, builder, lhs_type, lhs_ptr, rhs);    
+    return execute_assignment(op_func, module, builder, lhs_type, rhs_type, lhs_ptr, rhs);    
   };
 
   return make_pair(errors::codegen_call_args(lookup, ptr, rhs_val), ptr);
@@ -115,10 +116,11 @@ pair<typed_value_container, typed_value_container> ast::assignment_operator::get
 
 typed_value_container ast::assignment_operator::execute_assignment(binop_table::op_result_value &op_func,
 								   Module *module, IRBuilder<> &builder,
-								   type_spec &lhs_type,
+								   type_spec &lhs_type, type_spec &rhs_type,
 								   Value *lhs_ptr, Value *rhs_val) {
   boost::function<typed_value_container (binop_table::op_result &)> exec = [this, module, &builder,
-									    &lhs_type, lhs_ptr, rhs_val] (binop_table::op_result &func) -> typed_value_container {
+									    &lhs_type, &rhs_type,
+									    lhs_ptr, rhs_val] (binop_table::op_result &func) -> typed_value_container {
     if (*func.second.result_type != *lhs_type) {
       //resulting value must be of the same type
       return errors::make_error<errors::type_mismatch>(func.second.result_type->name,
@@ -127,17 +129,25 @@ typed_value_container ast::assignment_operator::execute_assignment(binop_table::
 
     //evaluate operation
     Value *lhs_val = lhs_type->load(lhs_ptr, module, builder);
-    Value *new_val = func.second.codegen(lhs_val, rhs_val,
-					 module, builder);
 
-    //destroy old value
-    lhs_type->destroy(lhs_ptr, module, builder);
-
-    //store result into ptr
-    lhs_type->store(new_val, lhs_ptr, module, builder);
+    //cast the rhs to the appropriate type
+    code_value rhs_cast = typecast(rhs_val, rhs_type,
+				   func.first.second, false, !rhs->bound(), module, builder);
     
-    //return new value
-    return typed_value(new_val, lhs_type);
+    return errors::codegen_call<code_value, typed_value_container>(rhs_cast, [&] (value &rhs_final) -> typed_value_container {
+	Value *new_val = func.second.codegen(lhs_val, rhs_final.extract_value(),
+					     module, builder);
+
+	//destroy old value
+	if (!return_prior) lhs_type->destroy(lhs_ptr, module, builder);
+	
+	//store result into ptr
+	lhs_type->store(new_val, lhs_ptr, module, builder);
+	
+	//return new value
+	Value *rt_val = (return_prior ? lhs_val : new_val);
+	return typed_value(rt_val, lhs_type);
+      });
   };
   
   return errors::codegen_call<binop_table::op_result_value, typed_value_container>(op_func, exec);

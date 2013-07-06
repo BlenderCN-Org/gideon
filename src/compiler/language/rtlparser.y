@@ -24,7 +24,7 @@
 										   yylloc.first_line, yylloc.first_column)))
 
 #define ASSIGN_OPERATION(op, lhs, rhs) (ast::expression_ptr(new ast::assignment_operator(gd_data->state, \
-											 op, lhs, rhs, \
+											 op, false, lhs, rhs, \
 											 yylloc.first_line, yylloc.first_column)))
 
  %}
@@ -117,8 +117,10 @@
 %left <i> '*' '/'
 
 %right <i> '!' UMINUS_PREC
+%right <i> PREFIX_INCR_PREC PREFIX_DECR_PREC
 
 %left <i> '(' ')' '.'
+%left <i> INCR_OP DECR_OP
 
 //Non-terminals
 %type <global_list> rt_file
@@ -503,6 +505,22 @@ function_args
 unary_expression
  : '!' expression { $$ = UNARY_OPERATION("!", $2); }
  | '-' expression %prec UMINUS_PREC { $$ = UNARY_OPERATION("-", $2); }
+ | expression INCR_OP { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state,
+									      "+", true, $1,
+									      ast::expression_ptr(new ast::literal<int>(gd_data->state, 1)),
+									      yylloc.first_line, yylloc.first_column)); }
+ | INCR_OP expression %prec PREFIX_INCR_PREC { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state,
+												     "+", false, $2,
+												     ast::expression_ptr(new ast::literal<int>(gd_data->state, 1)),
+												     yylloc.first_line, yylloc.first_column)); }
+ | expression DECR_OP { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state,
+									      "-", true, $1,
+									      ast::expression_ptr(new ast::literal<int>(gd_data->state, 1)),
+									      yylloc.first_line, yylloc.first_column)); }
+ | DECR_OP expression %prec PREFIX_DECR_PREC { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state,
+												     "-", false, $2,
+												     ast::expression_ptr(new ast::literal<int>(gd_data->state, 1)),
+												     yylloc.first_line, yylloc.first_column)); }
  ;
 
 binary_expression

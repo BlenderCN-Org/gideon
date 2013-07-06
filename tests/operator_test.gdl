@@ -6,7 +6,9 @@ function foo(float f) float {
 }
 
 function bar(int x) int {
-  return x && x;
+  x++;
+  x----++++;
+  return x;
 }
 
 function foo(int i) int { return -i; }

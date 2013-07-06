@@ -123,6 +123,9 @@
 "*=" { return MUL_ASSIGN; }
 "/=" { return DIV_ASSIGN; }
 
+"++" { return INCR_OP; }
+"--" { return DECR_OP; }
+
 [ \t\r]      ;
 \n           ;
 
