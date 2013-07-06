@@ -2,9 +2,9 @@
 #define RT_TYPES_HPP
 
 #include <string>
-#include "llvm/DerivedTypes.h"
-#include "llvm/IRBuilder.h"
-#include "llvm/Module.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Module.h"
 
 #include <stdexcept>
 #include <boost/unordered_map.hpp>

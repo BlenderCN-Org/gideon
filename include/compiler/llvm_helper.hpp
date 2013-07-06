@@ -1,8 +1,8 @@
 #ifndef GD_RL_LLVM_HELPER
 #define GD_RL_LLVM_HELPER
 
-#include "llvm/IRBuilder.h"
-#include "llvm/Module.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Module.h"
 
 namespace raytrace {
 

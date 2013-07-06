@@ -1,3 +1,5 @@
+import os.path
+
 import bpy
 from math import *
 
@@ -11,7 +13,7 @@ class GideonRenderEngine(bpy.types.RenderEngine):
     bl_label = "Gideon"
     bl_use_shading_nodes = True
     use_highlight_tiles = True
-    libgideon = engine.load_gideon("/home/curtis/Projects/gideon/build/src/libraytrace.so")
+    libgideon = engine.load_gideon(os.path.join(os.path.dirname(__file__), "libgideon.so"))
     
     def __init__(self):
         self.gideon = GideonRenderEngine.libgideon

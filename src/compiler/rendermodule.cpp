@@ -9,11 +9,11 @@
 
 #include "llvm/PassManager.h"
 #include "llvm/Analysis/Passes.h"
-#include "llvm/DataLayout.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO.h"
 
-#include "llvm/Attributes.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/Linker.h"
 
 #include <fstream>
@@ -307,8 +307,8 @@ Module *render_program::compile() {
   //dependencies will have been satisfied when we perform code generation
   vector<string> order = generate_compile_order();
   
-  //perform code generation and linking
-  Linker linker(name, name, getGlobalContext());
+  Module *result = new Module(name.c_str(), getGlobalContext());
+  Linker linker(result);
   
   for (auto name_it = order.begin(); name_it != order.end(); ++name_it) {
     cout << "Compiling Object: " << *name_it << endl;
@@ -316,7 +316,7 @@ Module *render_program::compile() {
     Module *module = render_object::compile(object->obj.name, &object->parser, object->syntax_tree);
     
     string error_msg;
-    bool link_st = linker.LinkInModule(module, &error_msg);
+    bool link_st = linker.linkInModule(module, &error_msg);
     if (link_st) {
       stringstream link_err;
       link_err << "Linker Error: " << error_msg;
@@ -324,7 +324,6 @@ Module *render_program::compile() {
     }
   }
 
-  Module *result = linker.releaseModule();
   optimize(result);
   return result;
 }

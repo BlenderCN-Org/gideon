@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <boost/variant.hpp>
-#include "llvm/DerivedTypes.h"
+#include "llvm/IR/DerivedTypes.h"
 
 namespace raytrace {
 

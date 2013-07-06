@@ -3,9 +3,9 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/PassManager.h"
 #include "llvm/Analysis/Passes.h"
-#include "llvm/DataLayout.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/Transforms/Scalar.h"
-#include "llvm/Attributes.h"
+#include "llvm/IR/Attributes.h"
 
 #include "math/vector.hpp"
 

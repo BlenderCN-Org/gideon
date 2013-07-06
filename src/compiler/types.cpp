@@ -11,7 +11,7 @@
 
 #include "compiler/llvm_helper.hpp"
 
-#include "llvm/LLVMContext.h"
+#include "llvm/IR/LLVMContext.h"
 #include "llvm/ADT/ArrayRef.h"
 
 #include <vector>

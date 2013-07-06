@@ -13,7 +13,7 @@
 #include <boost/fusion/container/list/cons.hpp>
 #include <boost/fusion/include/cons.hpp>
 
-#include "llvm/Module.h"
+#include "llvm/IR/Module.h"
 
 #include <iostream>
 #include <vector>

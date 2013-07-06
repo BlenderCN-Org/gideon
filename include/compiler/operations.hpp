@@ -2,7 +2,7 @@
 #define RT_OPERATIONS_HPP
 
 #include "compiler/types.hpp"
-#include "llvm/IRBuilder.h"
+#include "llvm/IR/IRBuilder.h"
 
 namespace raytrace {
 

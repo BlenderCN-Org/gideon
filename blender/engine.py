@@ -4,11 +4,11 @@ import bpy
 #Loads the gideon library.
 def load_gideon(path):
     cdll.LoadLibrary(path)
-    libgideon = CDLL('libraytrace.so')
+    libgideon = CDLL('libgideon.so')
 
     init = libgideon.gd_api_initialize
     init.argtypes = [c_char_p]
-    init('libraytrace.so'.encode('ascii'))
+    init('libgideon.so'.encode('ascii'))
     return libgideon
 
 #-- Helper Functions --#

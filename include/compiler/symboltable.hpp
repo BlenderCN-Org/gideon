@@ -6,8 +6,8 @@
 
 #include "compiler/types.hpp"
 
-#include "llvm/DerivedTypes.h"
-#include "llvm/Function.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
 
 #include <iostream>
 #include <string>

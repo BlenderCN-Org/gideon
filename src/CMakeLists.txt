@@ -1,3 +1,5 @@
+include(external)
+
 set(RT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 
 set(RT_SOURCE_FILES
@@ -67,24 +69,17 @@ add_flex_bison_dependency(rtl_scanner rtl_parser)
 
 set(RT_PARSER_LEXER_SOURCE ${BISON_rtl_parser_OUTPUTS} ${FLEX_rtl_scanner_OUTPUTS})
 
-set(LLVM_INCLUDE_DIR /usr/local/include)
-set(LLVM_DEFINITIONS -D_DEBUG -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS)
-set(LLVM_LIB_DIR /usr/local/lib)
-set(LLVM_LIBS 
-  LLVMAsmParser LLVMInstrumentation LLVMLinker LLVMArchive LLVMBitReader LLVMDebugInfo LLVMJIT LLVMipo LLVMVectorize LLVMBitWriter LLVMTableGen LLVMHexagonCodeGen LLVMHexagonAsmPrinter LLVMHexagonDesc LLVMHexagonInfo LLVMNVPTXCodeGen LLVMNVPTXDesc LLVMNVPTXInfo LLVMNVPTXAsmPrinter LLVMMBlazeDisassembler LLVMMBlazeAsmParser LLVMMBlazeCodeGen LLVMMBlazeDesc LLVMMBlazeInfo LLVMMBlazeAsmPrinter LLVMCppBackendCodeGen LLVMCppBackendInfo LLVMMSP430CodeGen LLVMMSP430Desc LLVMMSP430AsmPrinter LLVMMSP430Info LLVMXCoreCodeGen LLVMXCoreDesc LLVMXCoreInfo LLVMCellSPUCodeGen LLVMCellSPUDesc LLVMCellSPUInfo LLVMMipsDisassembler LLVMMipsCodeGen LLVMMipsAsmParser LLVMMipsDesc LLVMMipsInfo LLVMMipsAsmPrinter LLVMARMDisassembler LLVMARMAsmParser LLVMARMCodeGen LLVMARMDesc LLVMARMInfo LLVMARMAsmPrinter LLVMPowerPCCodeGen LLVMPowerPCDesc LLVMPowerPCInfo LLVMPowerPCAsmPrinter LLVMSparcCodeGen LLVMSparcDesc LLVMSparcInfo LLVMX86AsmParser LLVMX86Disassembler LLVMX86CodeGen LLVMSelectionDAG LLVMAsmPrinter LLVMX86Desc LLVMX86Info LLVMX86AsmPrinter LLVMX86Utils LLVMMCDisassembler LLVMMCParser LLVMInterpreter LLVMCodeGen LLVMScalarOpts LLVMInstCombine LLVMTransformUtils LLVMipa LLVMAnalysis LLVMMCJIT LLVMRuntimeDyld LLVMExecutionEngine LLVMTarget LLVMMC LLVMObject LLVMCore LLVMSupport
-)
-
-include_directories(${RT_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-link_directories(${LLVM_LIB_DIR})
+include_directories(${RT_INCLUDE_DIR} ${LLVM_INCLUDE_DIRS} ${Boost_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+link_directories(${LLVM_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
-add_library(raytrace SHARED ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE})
+add_library(gideon SHARED ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE})
 add_executable(gideon_compiler ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
 
-target_link_libraries(raytrace ${LLVM_LIBS} pthread m dl boost_filesystem boost_system)
-target_link_libraries(gideon_compiler raytrace)
+target_link_libraries(gideon ${LLVM_LIBRARIES} ${Boost_LIBRARIES} pthread m dl)
+target_link_libraries(gideon_compiler gideon)
 
-set_target_properties(raytrace
+set_target_properties(gideon
   PROPERTIES
   COMPILE_FLAGS "-std=c++11"
   )
@@ -92,4 +87,12 @@ set_target_properties(raytrace
 set_target_properties(gideon_compiler
   PROPERTIES
   COMPILE_FLAGS "-std=c++11"
+  )
+
+#Install the library and the python code to Blender's addon directory.
+install(TARGETS gideon LIBRARY DESTINATION "${BLENDER_ADDON_ROOT}/gideon")
+install(DIRECTORY "${CMAKE_SOURCE_DIR}/blender/"
+  DESTINATION "${BLENDER_ADDON_ROOT}/gideon"
+  PATTERN "*~" EXCLUDE
+  PATTERN "__pycache__" EXCLUDE
   )
