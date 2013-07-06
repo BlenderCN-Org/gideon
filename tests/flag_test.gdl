@@ -1,0 +1,8 @@
+
+shader_flag diffuse = shader_flag(62);
+shader_flag specular = shader_flag(3);
+
+function main(int a, shader_flag f) bool {
+  shader_flag mask = diffuse + (!specular) + f;
+  return (diffuse && mask);
+}
