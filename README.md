@@ -1,7 +1,7 @@
 Gideon
 ==========================
 
-Gideon is a runtime-compiled language for programmable shading in raytracers, with the ability to define both shaders and the entire
+Gideon is a runtime-compiled language for programmable raytracing, with the ability to define both shaders and the entire
 rendering system. The underlying engine implements a small set of critical features (ray traversal, sampling, vector math, etc.),
 that can be used to build a fully functional raytracer in the language. Languages features include:
  * Ability to trace a ray through the scene.
@@ -51,7 +51,7 @@ In the top-level directory, run:
 
 ```
 mkdir build; cd build
-cmake ..
+cmake -DBLENDER_ADDON_ROOT=<path/to/blenders/addon/dir> <path/to/gideon/root>
 make
 make install
 ```
@@ -59,7 +59,7 @@ make install
 
 ## Requirements
 
-Gideon uses C++11 and depends on libboost and LLVM 3.2. The build system uses CMake, and Blender is required to
+Gideon uses C++11 and depends on libboost and LLVM 3.3. The build system uses CMake, and Blender is required to
 use the plugin.
 
 ##License
