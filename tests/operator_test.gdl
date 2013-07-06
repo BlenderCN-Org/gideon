@@ -5,6 +5,10 @@ function foo(float f) float {
   return v.x + -f;
 }
 
+function bar(int x) int {
+  return x && x;
+}
+
 function foo(int i) int { return -i; }
 
 function main(bool arg) bool {

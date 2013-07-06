@@ -63,7 +63,8 @@ namespace raytrace {
     class variable_ref : public expression {
     public:
 
-      variable_ref(parser_state *st, const std::string &name);
+      variable_ref(parser_state *st, const std::string &name,
+		   unsigned int line_no, unsigned int column_no);
       virtual ~variable_ref() {}
       
       virtual typecheck_value typecheck();

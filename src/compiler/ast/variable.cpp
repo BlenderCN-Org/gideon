@@ -123,8 +123,9 @@ string ast::global_variable_decl::full_name() {
 
 /** Variable Reference **/
 
-raytrace::ast::variable_ref::variable_ref(parser_state *st, const string &name) :
-  expression(st), name(name)
+raytrace::ast::variable_ref::variable_ref(parser_state *st, const string &name,
+					  unsigned int line_no, unsigned int column_no) :
+  expression(st, line_no, column_no), name(name)
 {
   
 }

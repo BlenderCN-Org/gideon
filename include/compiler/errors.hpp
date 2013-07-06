@@ -211,7 +211,7 @@ namespace raytrace {
       void operator()(compile_error &e) const { std::cout << "ERROR: " << e->report() << std::endl; }
 
     };
-
+    
     /* Operates on the error in a container type. */
     template<typename ContainerType, typename ResultType = ContainerType>
     class error_container_operation : public boost::static_visitor<ResultType> {
@@ -232,6 +232,18 @@ namespace raytrace {
       op_type func;
 
     };
+
+    //If the value is an error, sets its location.
+    template<typename ContainerType>
+    void error_set_location(ContainerType &v,
+			    unsigned int line_no, unsigned int column_no) {
+      typedef error_container_operation<ContainerType> error_op_type;
+      error_op_type tag([line_no, column_no] (typename error_op_type::error_type &e) -> ContainerType {
+	  e->set_location(line_no, column_no);
+	  return e;
+	});
+      boost::apply_visitor(tag, v);
+    }
 
     /* Extracts a value from a codegen_value or throws and exception in case of error. */
     template<typename T>

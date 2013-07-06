@@ -20,9 +20,9 @@ namespace raytrace {
     
     //Parses the source code, throwing an exception if an error occurs.
     //Generates a syntax tree as well as a list of objects this object depends on.
-    void parse(ast::parser_state *parser,
-	       /* out */ std::vector<ast::global_declaration_ptr> &syntax_tree,
-	       /* out */ std::vector<std::string> &object_dependencies);
+    codegen_void parse(ast::parser_state *parser,
+		       /* out */ std::vector<ast::global_declaration_ptr> &syntax_tree,
+		       /* out */ std::vector<std::string> &object_dependencies);
 
     std::string name;
     std::string source_code;
@@ -63,7 +63,7 @@ namespace raytrace {
       llvm::Module *module;
 
       object_entry(render_program *prog, const render_object &obj);
-      void parse();
+      codegen_void parse();
     };
     
     typedef boost::unordered_map<std::string, std::shared_ptr<object_entry>> object_table;

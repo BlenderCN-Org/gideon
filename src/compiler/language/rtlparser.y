@@ -9,9 +9,10 @@
   using namespace raytrace;
   
   int yyerror(YYLTYPE *yylloc, yyscan_t scanner, ast::gideon_parser_data *gd_data, const char *msg) {
-    std::cerr << "Parser Error: " << msg << std::endl;
-    std::cerr << "Column: " << yylloc->first_column << std::endl;
-    std::cerr << "Line Number: " << yylloc->last_line << std::endl;
+    std::stringstream err_ss;
+    err_ss << "Parser Error: " << msg;
+    throw errors::make_error<errors::error_message>(err_ss.str(), yylloc->first_line, yylloc->first_column);
+    return 0;
   }
 
 #define BINARY_OPERATION(binop, lhs, rhs) (ast::expression_ptr(new ast::binary_expression(gd_data->state, \
@@ -223,7 +224,7 @@ function_declaration
  ;
 
 module_import_path
- : IDENTIFIER { $$ = ast::expression_ptr(new ast::variable_ref(gd_data->state, $1)); }
+ : IDENTIFIER { $$ = ast::expression_ptr(new ast::variable_ref(gd_data->state, $1, yylloc.first_line, yylloc.first_column)); }
  | module_import_path '.' IDENTIFIER { $$ = ast::expression_ptr(new ast::field_selection(gd_data->state, $3, $1, yylloc.first_line, yylloc.first_column)); }
  ;
 
@@ -429,7 +430,7 @@ scoped_statement
 /** Expressions **/
 
 variable_ref
- : IDENTIFIER { $$ = ast::expression_ptr(new ast::variable_ref(gd_data->state, $1)); }
+: IDENTIFIER { $$ = ast::expression_ptr(new ast::variable_ref(gd_data->state, $1, yylloc.first_line, yylloc.first_column)); }
  ;
 
 primary_expression

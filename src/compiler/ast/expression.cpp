@@ -60,6 +60,7 @@ typecheck_value ast::binary_expression::typecheck() {
   };
 
   binop_table::op_result_value op_func = errors::codegen_apply(lookup, ltype, rtype);
+  errors::error_set_location(op_func, line_no, column_no);
   
   return errors::codegen_call<binop_table::op_result_value, typecheck_value>(op_func,
 									     [] (binop_table::op_result &op_func) -> typecheck_value {
@@ -102,6 +103,8 @@ typed_value_container ast::binary_expression::codegen(Module *module, IRBuilder<
     binop_table::op_result_value op_func = state->binary_operations.find_best_operation(op,
 											left.get<1>(), right.get<1>(),
 											state->type_conversions);
+    errors::error_set_location(op_func, line_no, column_no);
+
     return execute_op(op_func, module, builder,
 		      left.get<0>().extract_value(), right.get<0>().extract_value(),
 		      left.get<1>(), right.get<1>());
@@ -128,6 +131,7 @@ typecheck_value ast::unary_op_expression::typecheck() {
   };
 
   unary_op_table::op_candidate_value op_func = errors::codegen_call<typecheck_value, unary_op_table::op_candidate_value>(arg_type, lookup);
+  errors::error_set_location(op_func, line_no, column_no);
   
   return errors::codegen_call<unary_op_table::op_candidate_value, typecheck_value>(op_func,
 										   [] (unary_op_table::op_candidate &op_func) -> typecheck_value {
@@ -140,6 +144,8 @@ typed_value_container ast::unary_op_expression::codegen(Module *module, IRBuilde
 
   return errors::codegen_call(arg_val, [this, module, &builder] (typed_value &arg) -> typed_value_container {
       unary_op_table::op_candidate_value op_func = state->unary_operations.find_best_operation(op, arg.get<1>(), state->type_conversions);
+      errors::error_set_location(op_func, line_no, column_no);
+      
       return execute_op(op_func, module, builder, arg.get<0>().extract_value(), arg.get<1>());
     });
 }

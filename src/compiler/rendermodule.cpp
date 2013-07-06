@@ -76,9 +76,9 @@ render_object::render_object(const string &name, const string &source_code) :
 
 int yyparse(yyscan_t scanner, ast::gideon_parser_data *gd_data);
 
-void render_object::parse(ast::parser_state *parser,
-			  /* out */ vector<ast::global_declaration_ptr> &syntax_tree,
-			  /* out */ vector<string> &object_dependencies) {
+codegen_void render_object::parse(ast::parser_state *parser,
+				  /* out */ vector<ast::global_declaration_ptr> &syntax_tree,
+				  /* out */ vector<string> &object_dependencies) {
   yyscan_t scanner;
   
   if (yylex_init(&scanner)) { throw runtime_error("Could not initialize yylex"); }
@@ -86,7 +86,14 @@ void render_object::parse(ast::parser_state *parser,
   yyset_lineno(1, scanner);
   
   ast::gideon_parser_data gd_data { parser, &syntax_tree, &object_dependencies };
-  if (yyparse(scanner, &gd_data)) { throw runtime_error("Parser error"); }  
+  codegen_void result = empty_type();
+
+  try {
+    if (yyparse(scanner, &gd_data)) { throw runtime_error("Parser error"); }  
+  }
+  catch (compile_error &e) {
+    result = e;
+  }
 
   yy_delete_buffer(state, scanner);
   yylex_destroy(scanner);
@@ -94,6 +101,7 @@ void render_object::parse(ast::parser_state *parser,
   //add a global scene pointer declaration
   ast::type_expr_ptr scene_type = ast::type_expr_ptr(new ast::typename_expression(parser, "scene_ptr", 0, 0));
   syntax_tree.insert(syntax_tree.begin(), ast::global_declaration_ptr(new ast::global_variable_decl(parser, "__gd_scene", scene_type, nullptr, 0, 0)));
+  return result;
 }
 
 Module *render_object::compile(const string &name, ast::parser_state *parser,
@@ -195,8 +203,8 @@ void render_program::load_resolved_filename(const string &path) {
   add_object(render_object(path, source));
 }
 
-void render_program::object_entry::parse() {
-  obj.parse(&parser, syntax_tree, dependencies);
+codegen_void render_program::object_entry::parse() {
+  return obj.parse(&parser, syntax_tree, dependencies);
 }
 
 bool render_program::has_object(const string &name) {
@@ -232,7 +240,8 @@ void render_program::load_all_dependencies() {
       //add dependencies to the list and load this source file
       load_resolved_filename(dep_name);
       std::shared_ptr<object_entry> &object = objects[dep_name];
-      object->parse();
+      codegen_void parse_result = object->parse();
+      errors::extract_left(parse_result);
       
       for (auto dep_it = object->dependencies.begin(); dep_it != object->dependencies.end(); ++dep_it) {
 	string full_dep_name = get_object_name(*dep_it);
@@ -286,7 +295,8 @@ Module *render_program::compile() {
   //parse all objects
   for (auto obj_it = objects.begin(); obj_it != objects.end(); ++obj_it) {
     std::shared_ptr<object_entry> &object = obj_it->second;
-    object->parse();
+    codegen_void parse_result = object->parse();
+    errors::extract_left(parse_result);
   }
   
   //load and parse all dependency objects

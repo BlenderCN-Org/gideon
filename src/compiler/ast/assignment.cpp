@@ -103,6 +103,7 @@ pair<typed_value_container, typed_value_container> ast::assignment_operator::get
     
     binop_table::op_result_value op_func = state->binary_operations.find_best_operation(op, lhs_type, rhs_type,
 											state->type_conversions);
+    errors::error_set_location(op_func, line_no, column_no);
     
     Value *lhs_ptr = errors::get<0>(args).get<0>().extract_value();
     Value *rhs = errors::get<1>(args).get<0>().extract_value();

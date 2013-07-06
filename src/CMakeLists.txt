@@ -1,6 +1,3 @@
-SET (CMAKE_C_COMPILER             "/usr/bin/clang")
-SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
-
 set(RT_INCLUDE_DIR ${PROJECT_SOURCE_DIR}/include)
 
 set(RT_SOURCE_FILES
