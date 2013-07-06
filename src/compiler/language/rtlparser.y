@@ -60,7 +60,9 @@
     
     raytrace::ast::distribution_parameter dfunc_param;
     std::vector<raytrace::ast::distribution_parameter> dfunc_param_list;
-
+    
+    raytrace::exports::function_export::export_type exp_type;
+    
     raytrace::ast::function_parameter param;
     std::vector<raytrace::ast::function_parameter> param_list;
     raytrace::ast::prototype_ptr ptype;
@@ -91,7 +93,8 @@
 %token<i> MODULE
 
 %token <i> EXTERN
-token <i> OUTPUT
+%token <i> OUTPUT
+%token <i> ENTRY MATERIAL
 
 %token <i> IF 
 %right <i> THEN ELSE
@@ -146,6 +149,7 @@ token <i> OUTPUT
 %type <global_list> distribution_content_opt
 
 %type <i> outputspec
+%type <exp_type> function_export_spec
 
 %type <s> simple_typename
 %type <ty_expr> typespec_basic
@@ -248,8 +252,14 @@ module_declaration
 
 /** Functions **/
 
+function_export_spec
+ : ENTRY { $$ = raytrace::exports::function_export::export_type::ENTRY; }
+ | MATERIAL { $$ = raytrace::exports::function_export::export_type::MATERIAL; }
+ | { $$ = raytrace::exports::function_export::export_type::INTERNAL; }
+ ; 
+
 function_prototype
- : FUNCTION IDENTIFIER '(' function_formal_params_opt ')' typespec { $$ = ast::prototype_ptr(new ast::prototype(gd_data->state, $2, $6, $4)); }
+: function_export_spec FUNCTION IDENTIFIER '(' function_formal_params_opt ')' typespec { $$ = ast::prototype_ptr(new ast::prototype(gd_data->state, $3, $7, $5, $1)); }
  ;
 
 external_function_declaration

@@ -71,11 +71,19 @@ class GideonRenderEngine(bpy.types.RenderEngine):
 
             #rebuild the function lists
             scene.gideon.shader_list.clear()
+            scene.gideon.entry_list.clear()
             
-            #lookup function list
+            #lookup material function list
             func_list = engine.get_material_list(self.gideon, program)
             for func in func_list:
                 f = scene.gideon.shader_list.add()
+                f.name = func[0]
+                f.intern_name = func[1]
+
+            #lookup entry points
+            func_list = engine.get_entry_list(self.gideon, program)
+            for func in func_list:
+                f = scene.gideon.entry_list.add()
                 f.name = func[0]
                 f.intern_name = func[1]
         
@@ -108,7 +116,7 @@ class GideonRenderEngine(bpy.types.RenderEngine):
         print("Entry Point: ", scene.gideon.entry_point)
 
         try:
-            entry_obj = scene.gideon.shader_list[scene.gideon.entry_point]
+            entry_obj = scene.gideon.entry_list[scene.gideon.entry_point]
         except KeyError:
             self.report({'ERROR'}, "Invalid choice of render entry function")
             return
@@ -174,11 +182,19 @@ class KERNEL_FUNCTION_LIST_update(bpy.types.Operator):
         if kernel != None:
             #clear old list
             scene.gideon.shader_list.clear()
+            scene.gideon.entry_list.clear()
 
-            #lookup function list
+            #lookup material function list
             func_list = engine.get_material_list(libgideon, program)
             for func in func_list:
                 f = scene.gideon.shader_list.add()
+                f.name = func[0]
+                f.intern_name = func[1]
+
+            #lookup entry points
+            func_list = engine.get_entry_list(libgideon, program)
+            for func in func_list:
+                f = scene.gideon.entry_list.add()
                 f.name = func[0]
                 f.intern_name = func[1]
             

@@ -176,10 +176,12 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
 /* Function Prototype */
 
 raytrace::ast::prototype::prototype(parser_state *st, const string &name, const type_expr_ptr &return_type,
-				    const vector<function_parameter> &args) :
+				    const vector<function_parameter> &args,
+				    exports::function_export::export_type exp_type) :
   global_declaration(st),
   name(name), extern_name(name), return_type(return_type),
-  args(args), external(false), member_function(false)
+  args(args), external(false), member_function(false),
+  exp_type(exp_type)
 {
 
 }
@@ -189,7 +191,8 @@ raytrace::ast::prototype::prototype(parser_state *st, const string &name, const 
   global_declaration(st),
   name(name), extern_name(extern_name),
   return_type(return_type), args(args),
-  external(true), member_function(false)
+  external(true), member_function(false),
+  exp_type(exports::function_export::export_type::FOREIGN)
 {
   
 }
@@ -292,7 +295,7 @@ ast::prototype::function_gen_value ast::prototype::codegen_entry(Module *module,
 	exp.arguments = entry.arguments;
 	
 	if (external) exp.type = exports::function_export::export_type::FOREIGN;
-	else exp.type = exports::function_export::export_type::INTERNAL;
+	else exp.type = exp_type;
 	
 	state->exports.add_function(exp);
       }

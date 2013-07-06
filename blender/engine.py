@@ -113,6 +113,20 @@ def get_material_list(libgideon, prog):
 
     return func_list
 
+#Lists all the entry point functions (may only be called after compilation).
+def get_entry_list(libgideon, prog):
+    func_list = []
+    on_func = lambda name, full_name : func_list.append((name.decode('ascii'), full_name.decode('ascii')))
+
+    cb_func_type = CFUNCTYPE(None, c_char_p, c_char_p)
+
+    do_list = libgideon.gd_api_list_entry_functions
+    do_list.restype = None
+    do_list.argtypes = [c_void_p, cb_func_type]
+    do_list(prog, cb_func_type(on_func))
+
+    return func_list
+
 #Returns a pointer to a function inside the program.
 def lookup_function(libgideon, renderer, name):
     lookup = libgideon.gd_api_lookup_function

@@ -321,7 +321,19 @@ extern "C" {
       ((func_list_cb_type)(on_func_cb))(name.c_str(), full_name.c_str());
     };
 
-    prog->foreach_function_type(exports::function_export::export_type::INTERNAL,
+    prog->foreach_function_type(exports::function_export::export_type::MATERIAL,
+				on_func);
+  }
+
+  void gd_api_list_entry_functions(void *p, void *on_func_cb) {
+    typedef void (*func_list_cb_type)(const char *, const char *);
+    render_program *prog = reinterpret_cast<render_program*>(p);
+
+    auto on_func = [on_func_cb] (const string &name, const string &full_name) -> void {
+      ((func_list_cb_type)(on_func_cb))(name.c_str(), full_name.c_str());
+    };
+
+    prog->foreach_function_type(exports::function_export::export_type::ENTRY,
 				on_func);
   }
 

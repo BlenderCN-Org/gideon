@@ -46,7 +46,7 @@ class GideonSourceFileSettings(bpy.types.PropertyGroup):
     name = bpy.props.StringProperty(name = "Source Name", default = "", subtype = 'FILE_PATH')
     external = bpy.props.BoolProperty(name = "External Source", default = False)
 
-class GideonMaterialFunctionSettings(bpy.types.PropertyGroup):
+class GideonFunctionSettings(bpy.types.PropertyGroup):
     name = bpy.props.StringProperty(name = "Function Name", default = "")
     intern_name = bpy.props.StringProperty(name = "Internal Function Name", default = "")
 
@@ -94,7 +94,13 @@ class GideonRenderSettings(bpy.types.PropertyGroup):
         cls.shader_list = CollectionProperty(
             name = "Material Functions",
             description = "List of externally visible material functions in the compiled renderer",
-            type = GideonMaterialFunctionSettings
+            type = GideonFunctionSettings
+            )
+
+        cls.entry_list = CollectionProperty(
+            name = "Entry Points",
+            description = "List of externally visible render entry point functions",
+            type = GideonFunctionSettings
             )
         
     @classmethod
@@ -138,7 +144,7 @@ def register():
     bpy.utils.register_class(GideonMaterialSettings)
 
     bpy.utils.register_class(GideonSourceFileSettings)
-    bpy.utils.register_class(GideonMaterialFunctionSettings)
+    bpy.utils.register_class(GideonFunctionSettings)
     bpy.utils.register_class(GideonRenderSettings)
 
 

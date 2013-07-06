@@ -57,7 +57,8 @@ namespace raytrace {
       
       //Locally defined functions.
       prototype(parser_state *st, const std::string &name, const type_expr_ptr &return_type,
-		const std::vector<function_parameter> &args);
+		const std::vector<function_parameter> &args,
+		exports::function_export::export_type exp_type);
 
       //Externally defined functions.
       prototype(parser_state *st, const std::string &name, const std::string &extern_name,
@@ -78,8 +79,10 @@ namespace raytrace {
       std::string name, extern_name;
       type_expr_ptr return_type;
       std::vector<function_parameter> args;
-      bool external, member_function;
       
+      bool external, member_function;
+      exports::function_export::export_type exp_type;
+
       //checks to see if this function has been previously defined (and if so, do the prototypes match).
       entry_or_error check_for_entry(const std::vector<type_spec> &arg_types, const type_spec &return_ty);
       

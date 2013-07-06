@@ -117,7 +117,7 @@ module render {
 //Renderer Entry Point
 module start {
 
-  function main(int x0, int y0, int width, int height, scene output_buffer) void {
+  entry function main(int x0, int y0, int width, int height, scene output_buffer) void {
     int samples_per_pixel = 1;
     float inv_samples = 1.0 / samples_per_pixel;
     

@@ -42,7 +42,7 @@ class GideonRender_Entry_Panel(GideonButtonsPanel, bpy.types.Panel):
         scene = context.scene
         g_scene = scene.gideon
         
-        layout.prop_search(g_scene, "entry_point", g_scene, "shader_list", text = "Entry Point", icon = 'MATERIAL')
+        layout.prop_search(g_scene, "entry_point", g_scene, "entry_list", text = "Entry Point", icon = 'MATERIAL')
         layout.prop(scene.render, "tile_x", text = "Tile Width")
         layout.prop(scene.render, "tile_y", text = "Tile Height")
 

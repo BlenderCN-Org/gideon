@@ -99,6 +99,9 @@
 
 "extern" { return EXTERN; }
 "output" { return OUTPUT; }
+"entry" { return ENTRY; }
+"material" { return MATERIAL; }
+
 "return" { return RETURN; }
 "if" { return IF; }
 "else" { return ELSE; }
