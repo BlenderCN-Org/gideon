@@ -5,6 +5,7 @@ module gideon {
   /* Constants */
 
   float pi = 3.14159265359;
+  float epsilon = 0.00001;
   
   /* Math */
 

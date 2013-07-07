@@ -2,14 +2,9 @@ load "gideon";
 
 module render {
   
-  module demo {
-    extern function __gen_shadow_ray(output vec3 O, output vec3 D, float max_t, output ray r) void : gde_gen_ray;
-    function shadow_ray(vec3 O, vec3 D, float max_t) ray { ray r; __gen_shadow_ray(O, D, max_t, r); return r; }
-  }
-
   function in_shadow(vec3 P, vec3 P_lt) bool {
     vec3 D = P_lt - P;
-    ray r = demo.shadow_ray(P, gideon.normalize(D), gideon.length(D));
+    ray r = ray(P, gideon.normalize(D), 5.0*gideon.epsilon, gideon.length(D) + 5.0*gideon.epsilon);
     isect hit;
     
     if (gideon.trace(r, hit)) return true;

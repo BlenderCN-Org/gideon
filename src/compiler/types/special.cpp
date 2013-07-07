@@ -12,9 +12,89 @@ using namespace std;
 
 //Ray
 
+ray_type::ray_type(type_table *types) :
+  type(types, "ray", "r"),
+  type_value(compute_type())
+{
+  
+}
+
+Type *ray_type::compute_type() {
+  Type *v3 = StructType::get(getGlobalContext(),
+			     ArrayRef<Type*>(vector<Type*>(3, Type::getFloatTy(getGlobalContext()))),
+			     true);
+  vector<Type*> elems{v3, v3, Type::getFloatTy(getGlobalContext()), Type::getFloatTy(getGlobalContext())};
+  return StructType::create(getGlobalContext(), ArrayRef<Type*>(elems), "ray", true);
+}
+
 Type *ray_type::llvm_type() const {
-  Type *byte_type = Type::getInt8Ty(getGlobalContext());
-  return ArrayType::get(byte_type, sizeof(ray));
+  return type_value;
+}
+
+typed_value_container ray_type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args,
+				       const type_conversion_table &conversions) const {
+  return errors::codegen_call<typed_value_vector, typed_value_container>(args, [&] (vector<typed_value> &ctor_args) -> typed_value_container {
+      if (ctor_args.size() != 4) {
+	stringstream err_ss;
+	err_ss << " Ray constructor expects 4 arguments, received " << ctor_args.size();
+	return errors::make_error<errors::error_message>(err_ss.str(), 0, 0);
+      }
+
+      vector<type_spec> arg_types;
+      for (auto arg_it = ctor_args.begin(); arg_it != ctor_args.end(); ++arg_it) {
+	arg_types.push_back(arg_it->get<1>());
+      }
+      
+      //check argument types
+      bool valid_arguments = true;
+      int unused;
+      if (!conversions.can_convert(arg_types[0], types->at("vec3"), unused, unused)) valid_arguments = false;
+      if (!conversions.can_convert(arg_types[1], types->at("vec3"), unused, unused)) valid_arguments = false;
+      if (!conversions.can_convert(arg_types[2], types->at("float"), unused, unused)) valid_arguments = false;
+      if (!conversions.can_convert(arg_types[3], types->at("float"), unused, unused)) valid_arguments = false;
+      if (!valid_arguments) {
+	return errors::make_error<errors::error_message>("Invalid arguments. Expected (vec3, vec3, float, float).", 0, 0);
+      }
+      
+      
+      code_value origin = (arg_types[0] == types->at("vec3")) ?
+	ctor_args[0].get<0>().extract_value() :
+	conversions.convert(arg_types[0], ctor_args[0].get<0>().extract_value(),
+			    types->at("vec3"), module, builder);
+      
+      code_value direction = conversions.convert(arg_types[1], ctor_args[1].get<0>().extract_value(),
+						 types->at("vec3"), module, builder);
+      code_value min_t = conversions.convert(arg_types[2], ctor_args[2].get<0>().extract_value(),
+					     types->at("float"), module, builder);
+      code_value max_t = conversions.convert(arg_types[3], ctor_args[3].get<0>().extract_value(),
+					     types->at("float"), module, builder);
+      boost::function<typed_value_container (value &, value &,
+					     value &, value &)> ctor = [this, module, &builder] (value &origin,
+												 value &direction,
+												 value &min_t, value &max_t) -> typed_value_container {
+	Value *ray_val = UndefValue::get(type_value);
+	Value *o_val = origin.extract_value();
+	Value *d_val = direction.extract_value();
+	
+	for (unsigned int i = 0; i < 3; ++i) {
+	  vector<unsigned int> o_idx{0, i};
+	  vector<unsigned int> d_idx{1, i};
+	  
+	  ray_val = builder.CreateInsertValue(ray_val,
+					      builder.CreateExtractValue(o_val, ArrayRef<unsigned int>(i)),
+					      ArrayRef<unsigned int>(o_idx));
+	  ray_val = builder.CreateInsertValue(ray_val,
+					      builder.CreateExtractValue(d_val, ArrayRef<unsigned int>(i)),
+					      ArrayRef<unsigned int>(d_idx));
+	}
+	
+	ray_val = builder.CreateInsertValue(ray_val, min_t.extract_value(), ArrayRef<unsigned int>(2));
+	ray_val = builder.CreateInsertValue(ray_val, max_t.extract_value(), ArrayRef<unsigned int>(3));
+	return typed_value(ray_val, types->at("ray"));
+      };
+      
+      return errors::codegen_apply(ctor, origin, direction, min_t, max_t);
+    });
 }
 
 //Intersection

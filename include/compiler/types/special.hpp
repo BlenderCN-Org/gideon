@@ -8,8 +8,17 @@ namespace raytrace {
   class ray_type : public type {
   public:
     
-    ray_type(type_table *types) : type(types, "ray", "r") { }
+    ray_type(type_table *types);
     virtual llvm::Type *llvm_type() const;
+
+    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder,
+					 typed_value_vector &args, const type_conversion_table &conversions) const;
+
+  private:
+
+    llvm::Type *type_value;
+    
+    static llvm::Type *compute_type();
     
   };
 

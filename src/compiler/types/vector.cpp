@@ -150,7 +150,7 @@ typed_value_container floatN_type::access_field_ptr(const string &field, Value *
   return typed_value(builder.CreateStructGEP(value_ptr, idx, "vec_elem"), types->at("float"));
 }
 
-typed_value_container floatN_type::create(Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args,
+typed_value_container floatN_type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args,
 					  const type_conversion_table &conversions) const {
   return make_llvm_vec_N(module, builder, type_name(N), N, type_value, types->at(type_name(N)), types->at("float"), args, conversions);
 }

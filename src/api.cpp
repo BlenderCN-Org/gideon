@@ -190,10 +190,6 @@ extern "C" void gde_print_ray(ray *r) {
   cout << "Direction: (" << r->d.x << ", " << r->d.y << ", " << r->d.z << ")" << endl;
 }
 
-extern "C" void gde_gen_ray(float3 *O, float3 *D, float max_t, ray *r) {
-  *r = {*O, *D, 5.0f*epsilon, max_t + 5.0f*epsilon};
-}
-
 extern "C" float gde_int_to_float(int i) { return i; }
 extern "C" int gde_floor_int(float f) { return static_cast<int>(floorf(f)); }
 
