@@ -29,12 +29,13 @@ void ast::ast_node::pop_function(Module *module, IRBuilder<> &builder) {
   state->control.pop_function_rt();
 }
 
-void ast::ast_node::push_module(const string &name) {
+void ast::ast_node::push_module(const string &name, bool exported) {
   state->modules.scope_push(name);
-  state->exports.push_module(name);
+  if (exported) state->exports.push_module(name);
 }
  
-codegen_void ast::ast_node::pop_module(const string &name, Module *module, IRBuilder<> &builder) {
+codegen_void ast::ast_node::pop_module(const string &name, bool exported,
+				       Module *module, IRBuilder<> &builder) {
   void_vector result;
 
   //save this module
@@ -54,7 +55,7 @@ codegen_void ast::ast_node::pop_module(const string &name, Module *module, IRBui
     result = errors::codegen_vector_push_back(result, saved);
   }
 
-  state->exports.pop_module();
+  if (exported) state->exports.pop_module();
   state->modules.scope_pop(module, builder, false);
 
   return errors::codegen_call<void_vector, codegen_void>(result, [] (vector<empty_type> &arg) -> codegen_void {

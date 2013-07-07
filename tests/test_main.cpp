@@ -28,8 +28,11 @@ int main(int argc, char **argv) {
     return -1;
   }
   
+  boost::filesystem::path file_dir = boost::filesystem::path(argv[1]).parent_path();
+  
   vector<string> search_paths;
   search_paths.push_back(std_search_path.native());
+  search_paths.push_back(file_dir.native());
 
   InitializeNativeTarget();
   

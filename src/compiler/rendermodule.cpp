@@ -271,7 +271,8 @@ vector<string> render_program::generate_compile_order() {
     std::shared_ptr<object_entry> &object = obj_it->second;
 
     for (auto dep_it = object->dependencies.begin(); dep_it != object->dependencies.end(); ++dep_it) {
-      int src_id = object_id_map[*dep_it];
+      string full_dep_name = get_object_name(*dep_it);
+      int src_id = object_id_map[full_dep_name];
       dep_list.push_back(make_pair(src_id, dst_id));
     }
   }

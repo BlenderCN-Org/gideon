@@ -306,7 +306,8 @@ codegen_value ast::distribution::check_for_sample() {
 	    state->types["vec3"], /* out P_in */
 	    state->types["vec3"] /* out w_in */
 	    }},
-    {false, false, false, false, true, true});
+    {false, false, false, false, true, true},
+    true);
 }
 
 Value *ast::distribution::create_sampler(Function *sample, Type *parameter_type,

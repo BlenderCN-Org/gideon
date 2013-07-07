@@ -249,7 +249,8 @@ load_declaration
 
 module_declaration
  : MODULE IDENTIFIER '{' global_declarations_opt '}' { $$ = ast::global_declaration_ptr(new ast::module(gd_data->state,
-													$2, $4, yylloc.first_line, yylloc.first_column)); }
+													$2, $4, true,
+													yylloc.first_line, yylloc.first_column)); }
  ;
 
 /** Functions **/

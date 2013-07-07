@@ -8,7 +8,7 @@ using namespace llvm;
 using namespace std;
 
 codegen_value ast::module::codegen(Module *module, IRBuilder<> &builder) {
-  push_module(name);
+  push_module(name, exported);
 
   //evaluate all internal declarations
   codegen_vector content_eval;
@@ -17,7 +17,7 @@ codegen_value ast::module::codegen(Module *module, IRBuilder<> &builder) {
     content_eval = errors::codegen_vector_push_back(content_eval, eval);
   }
   
-  codegen_void save_module = pop_module(name, module, builder);
+  codegen_void save_module = pop_module(name, exported, module, builder);
   
   typedef errors::argument_value_join<codegen_vector, codegen_void>::result_value_type arg_val_type;
   boost::function<codegen_value (arg_val_type &)> op = [] (arg_val_type &) -> codegen_value { return nullptr; };
@@ -106,6 +106,7 @@ void ast::import_declaration::export_module(const string &name, module_ptr &m) {
     exp.full_name = entry.full_name;
     exp.return_type = entry.return_type;
     exp.arguments = entry.arguments;
+    exp.type = exports::function_export::export_type::INTERNAL;
     state->exports.add_function(exp);
   }
 
@@ -209,5 +210,6 @@ ast::global_declaration_ptr ast::load_declaration::get_module_content(exports::m
   }
 
   return ast::global_declaration_ptr(new ast::module(state, m->name, module_content,
+						     false,
 						     line_no, column_no));
 }

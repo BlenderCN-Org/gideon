@@ -14,9 +14,10 @@ namespace raytrace {
 
       module(parser_state *st,
 	     const std::string &name, const std::vector<global_declaration_ptr> &content,
+	     bool exported,
 	     unsigned int line_no, unsigned int column_no) :
-	global_declaration(st),
-	name(name), content(content)
+	global_declaration(st, line_no, column_no),
+	name(name), content(content), exported(exported)
       { }
       virtual ~module() { }
 
@@ -27,6 +28,7 @@ namespace raytrace {
 
       std::string name;
       std::vector<global_declaration_ptr> content;
+      bool exported;
 
     };
 
