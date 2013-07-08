@@ -1,0 +1,21 @@
+load "gideon";
+
+module demo {
+
+  distribution[gideon.flags.volume] simple_volume(float a,
+						  vec4 emit) {
+    
+    function emission(vec3 P_out, vec3 w_out) vec4 { 
+      return emit;
+    }
+
+    function evaluate(vec3 P_in, vec3 w_in,
+		      vec3 P_out, vec3 w_out,
+		      output float pdf) vec4 {
+      pdf = 0.0;
+      return vec4(a, a, a, a);
+    }
+    
+  }
+
+}

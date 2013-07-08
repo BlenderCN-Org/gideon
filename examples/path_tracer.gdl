@@ -10,7 +10,55 @@ module render {
     if (gideon.trace(r, hit)) return true;
     return false;
   }
-  
+
+  function eval_volume(ray r, isect hit, float step_size,
+		       vec3 P, output vec4 throughput, output vec4 emit) vec3 {
+    emit = vec4(0.0, 0.0, 0.0, 0.0);
+
+    //determine how far the volume goes
+    vec3 dir = gideon.ray:direction(r);
+    vec3 inv_dir = vec3(-dir.x, -dir.y, -dir.z);
+
+    ray depth_ray = ray(P, dir, 5.0*gideon.epsilon, 10000.0);
+    
+    isect depth_hit;
+    if (!gideon.trace(depth_ray, depth_hit)) {
+      throughput = vec4(1.0, 0.0, 0.0, 0.0);
+      return P;
+    }
+
+    float thickness = gideon.isect:distance(depth_hit);
+    int N = thickness / step_size;
+
+    throughput = vec4(1.0, 1.0, 1.0, 1.0);
+
+    if (step_size > thickness) step_size = thickness;
+    float offset = gideon.max(0.0, thickness - (step_size*N));
+    float t_prev = 0.0;
+    
+    for (float t = offset; t < thickness; t += step_size) {
+      float d_t = t - t_prev;
+      t_prev = t;
+      
+      vec3 Pt = gideon.ray:point_on_ray(depth_ray, t);
+      dfunc volume = gideon.shade_volume(depth_ray, vec2(0.0, 0.0), hit);
+      float unused;
+
+      vec4 optical_thickness = d_t * gideon.dfunc:evaluate(volume, gideon.flags.volume,
+							   Pt, inv_dir, Pt, dir, unused);
+      vec4 d_emit = d_t * gideon.dfunc:emission(volume, gideon.flags.volume,
+						Pt, inv_dir);
+      
+      throughput *= vec4(gideon.exp(-optical_thickness.x),
+			 gideon.exp(-optical_thickness.y),
+			gideon.exp(-optical_thickness.z),
+			1.0);
+      emit += throughput * d_emit;
+    }
+    
+    return gideon.ray:point_on_ray(depth_ray, thickness);
+  }
+
   function sample_direct(dfunc surface, vec3 P, vec3 w_out, int N) vec4 {
     vec4 L = vec4(0.0, 0.0, 0.0, 0.0);
 
@@ -40,7 +88,7 @@ module render {
 
     return num_lights * L;
   }
-
+  
   function shade(ray r, int min_path, int path_length, int light_samples) vec4 {
     vec4 Li = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 throughput = vec4(1.0, 1.0, 1.0, 1.0);
@@ -52,53 +100,65 @@ module render {
     for (int i = 0; i < path_length; i += 1) {
       isect ray_hit;
       if (!gideon.trace(r, ray_hit)) break; //hit nothing
-
+      
       //evaluate material at this point
       vec3 P = gideon.ray:point_on_ray(r, gideon.isect:distance(ray_hit));
       vec3 w_out = gideon.normalize(gideon.ray:origin(r) - P);
-
-      dfunc surface = gideon.shade(r, vec2(0.0, 0.0), ray_hit);
-      shader_flag flags = gideon.dfunc:flags(surface);
       
-      //sample direct illumination
-      if (i > min_path) L_samples = 1;
+      if (gideon.primitive:has_volume(gideon.isect:primitive_id(ray_hit))) {
+	//use the volume rendering code for this object
+	vec4 vol_emit;
+	vec4 vol_throughput;
+	vec3 out_P = eval_volume(r, ray_hit, 0.05,
+				 P, vol_throughput, vol_emit);
+	r = ray(out_P, gideon.ray:direction(r), 5.0*gideon.epsilon, 10000.0);
+	throughput *= vol_throughput;
+	Li += vol_emit;
+      }
       else {
-	if (i > 0) L_samples /= 2;
-	if (L_samples < 1) L_samples = 1;
+	dfunc surface = gideon.shade(r, vec2(0.0, 0.0), ray_hit);
+	shader_flag flags = gideon.dfunc:flags(surface);
+	
+	//sample direct illumination
+	if (i > min_path) L_samples = 1;
+	else {
+	  if (i > 0) L_samples /= 2;
+	  if (L_samples < 1) L_samples = 1;
+	}
+	
+	vec4 Ld = sample_direct(surface, P, w_out, L_samples);
+	Li += throughput * Ld;
+	
+	//possibly terminate path
+	if (i > min_path) {
+	  if (gideon.random() > prob_continue) break;
+	  throughput = inv_prob * throughput;
+	}
+	
+	//add emitted light from this surface
+	if (flags && gideon.flags.emissive) {
+	  Li += throughput * gideon.dfunc:emission(surface, gideon.flags.any, P, w_out);
+	}
+	
+	//sample bsdf to get new direction
+	vec2 rand_P = vec2(0.0, 0.0);
+	vec2 rand_w = vec2(gideon.random(), gideon.random());
+	float rand_D = gideon.random();
+	
+	vec3 P_in;
+	vec3 w_in;
+	
+	float pdf = gideon.dfunc:sample(surface, gideon.flags.any,
+					P, w_out,
+					rand_D, rand_P, rand_w,
+					P_in, w_in);
+	if (pdf < 0.0001) break;
+	
+	r = ray(P_in, w_in, 5.0*gideon.epsilon, 10000.0);
+	
+	float tmp;
+	throughput *= (1.0 / pdf) * gideon.dfunc:evaluate(surface, gideon.flags.any, P_in, w_in, P, w_out, tmp);
       }
-
-      vec4 Ld = sample_direct(surface, P, w_out, L_samples);
-      Li += throughput * Ld;
-      
-      //possibly terminate path
-      if (i > min_path) {
-	if (gideon.random() > prob_continue) break;
-	throughput = inv_prob * throughput;
-      }
-
-      //add emitted light from this surface
-      if (flags && gideon.flags.emissive) {
-	Li += throughput * gideon.dfunc:emission(surface, gideon.flags.any, P, w_out);
-      }
-
-      //sample bsdf to get new direction
-      vec2 rand_P = vec2(0.0, 0.0);
-      vec2 rand_w = vec2(gideon.random(), gideon.random());
-      float rand_D = gideon.random();
-      
-      vec3 P_in;
-      vec3 w_in;
-
-      float pdf = gideon.dfunc:sample(surface, gideon.flags.any,
-				      P, w_out,
-				      rand_D, rand_P, rand_w,
-				      P_in, w_in);
-      if (pdf < 0.0001) break;
-      
-      r = demo.shadow_ray(P_in, w_in, 10000.0);
-
-      float tmp;
-      throughput *= (1.0 / pdf) * gideon.dfunc:evaluate(surface, gideon.flags.any, P_in, w_in, P, w_out, tmp);
     }
 
     Li.w = 1.0;

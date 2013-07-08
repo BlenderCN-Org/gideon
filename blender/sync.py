@@ -38,6 +38,8 @@ class GideonScene:
 
         #map material indices to shader handles
         shader_arr = (len(gd_mesh['shaders'])*ctypes.c_void_p)()
+        volume_arr = (len(gd_mesh['shaders'])*ctypes.c_void_p)()
+
         for shader_idx in range(len(gd_mesh['shaders'])):
             material_slot = gd_mesh['shaders'][shader_idx]
             mat = obj.material_slots[material_slot]
@@ -50,10 +52,21 @@ class GideonScene:
                     shader_func = engine.lookup_function(self.gideon, self.renderer, shader_obj.intern_name)
                 except KeyError:
                     pass
+
+            volume_key = mat.material.gideon.volume
+            volume_func = None
+            if len(volume_key) > 0:
+                try:
+                    volume_obj = bl_scene.gideon.shader_list[volume_key]
+                    volume_func = engine.lookup_function(self.gideon, self.renderer, volume_obj.intern_name)
+                except KeyError:
+                    pass
                 
             shader_arr[shader_idx] = shader_func
+            volume_arr[shader_idx] = volume_func
         
         gd_mesh['shaders'] = shader_arr
+        gd_mesh['volumes'] = volume_arr
         
         #add the mesh to gideon
         obj_id = engine.scene_add_mesh(self.gideon, self.scene, gd_mesh)

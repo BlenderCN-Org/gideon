@@ -49,6 +49,24 @@ extern "C" void *gde_primitive_shader(render_context::scene_data *sdata, int pri
   return prim.shader_id;
 }
 
+extern "C" void *gde_primitive_volume_shader(render_context::scene_data *sdata, int prim_id) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[prim_id];
+  return prim.volume_id;
+}
+
+extern "C" bool gde_primitive_has_surface(render_context::scene_data *sdata, int prim_id) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[prim_id];
+  return (prim.shader_id != NULL);
+}
+
+extern "C" bool gde_primitive_has_volume(render_context::scene_data *sdata, int prim_id) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[prim_id];
+  return (prim.volume_id != NULL);
+}
+
 //Intersection Functions
 
 extern "C" float gde_isect_dist(intersection *i) { return i->t; }
@@ -83,6 +101,7 @@ extern "C" void gde_ray_point_on_ray(ray *r, float t, float3 *P) {
 }
 
 extern "C" void gde_ray_origin(ray *r, float3 *O) { *O = r->o; }
+extern "C" void gde_ray_direction(ray *r, float3 *D) { *D = r->d; }
 extern "C" float gde_ray_max_dist(ray *r) { return r->max_t; }
 
 //Vector Ops

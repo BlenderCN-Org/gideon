@@ -165,13 +165,13 @@ def scene_add_mesh(libgideon, scene, mesh):
     add_mesh = libgideon.gd_api_add_mesh
     add_mesh.argtypes = [c_void_p,
                          c_uint, POINTER(c_float), POINTER(c_float),
-                         c_uint, POINTER(c_int), POINTER(c_void_p)]
+                         c_uint, POINTER(c_int), POINTER(c_void_p), POINTER(c_void_p)]
     add_mesh.restype = c_int
     
     return add_mesh(scene,
                     len(mesh['vertices']), mesh['vertices'], mesh['vertex_norms'],
                     len(mesh['triangles']), mesh['triangles'],
-                    mesh['shaders'])
+                    mesh['shaders'], mesh['volumes'])
 
 #Adds texture coordinates (vec2 attributes) to a mesh object.
 def mesh_add_texcoord(libgideon, scene, object_id, attr_name,

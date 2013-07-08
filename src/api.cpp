@@ -356,7 +356,8 @@ extern "C" {
 
   int gd_api_add_mesh(void *sptr,
 		      unsigned int num_verts, float *v_data, float *v_norm_data,
-		      unsigned int num_triangles, int *t_data, void **mat_data) {
+		      unsigned int num_triangles, int *t_data,
+		      void **mat_data, void **volume_data) {
     scene *s = reinterpret_cast<scene*>(sptr);
     
     int vert_offset = s->vertices.size();
@@ -380,7 +381,7 @@ extern "C" {
 
       int3 t{t_data[i] + vert_offset, t_data[i+1] + vert_offset, t_data[i+2] + vert_offset};
 
-      primitive p{primitive::PRIM_TRIANGLE, static_cast<int>(s->primitives.size()), tri_idx, object_id, -1, mat_data[mat_idx]};
+      primitive p{primitive::PRIM_TRIANGLE, static_cast<int>(s->primitives.size()), tri_idx, object_id, -1, mat_data[mat_idx], volume_data[mat_idx]};
       
       s->triangle_verts.push_back(t);
       s->primitives.push_back(p);

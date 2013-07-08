@@ -127,6 +127,7 @@ class GideonMaterialPanel(GideonButtonsPanel, bpy.types.Panel):
         g_scene = context.scene.gideon
         
         layout.prop_search(g_mat, "shader", g_scene, "shader_list", icon = 'MATERIAL')
+        layout.prop_search(g_mat, "volume", g_scene, "shader_list", icon = 'MATERIAL')
 
         layout.prop(mat, "diffuse_color", text = "Viewport Color")
         

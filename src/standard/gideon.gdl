@@ -112,11 +112,23 @@ module gideon {
   extern function __ray_origin(output ray r, output vec3 O) void : gde_ray_origin;
   function ray:origin(ray r) vec3 { vec3 O; __ray_origin(r, O); return O; }
 
+  extern function __ray_direction(output ray r, output vec3 D) void : gde_ray_direction;
+  function ray:direction(ray r) vec3 { vec3 D; __ray_direction(r, D); return D; }
+
   /* Object/Primitive Access */
 
   extern function __primitive_shader(scene s, int p) shader_handle : gde_primitive_shader;
   function primitive:shader(int p) shader_handle { return __primitive_shader(__gd_scene, p); }
+ 
+  extern function __primitive_has_surface(scene s, int p) bool : gde_primitive_has_surface;
+  function primitive:has_surface(int p) bool { return __primitive_has_surface(__gd_scene, p); }
+ 
+  extern function __primitive_volume_shader(scene s, int p) shader_handle : gde_primitive_volume_shader;
+  function primitive:volume_shader(int p) shader_handle { return __primitive_volume_shader(__gd_scene, p); }
   
+  extern function __primitive_has_volume(scene s, int p) bool : gde_primitive_has_volume;
+  function primitive:has_volume(int p) bool { return __primitive_has_volume(__gd_scene, p); }
+
   /* Scene Query */
 
   //Traces a ray through the scene.
@@ -221,6 +233,13 @@ module gideon {
   function shade(ray r, vec2 coords, isect hit) dfunc {
     int prim_id = isect:primitive_id(hit);
     shader_handle shader = primitive:shader(prim_id);
+    return dfunc(shader, r, coords, hit);
+  }
+
+  //Evaluates the shader of whatever object the ray hit, returning the associated distribution.
+  function shade_volume(ray r, vec2 coords, isect hit) dfunc {
+    int prim_id = isect:primitive_id(hit);
+    shader_handle shader = primitive:volume_shader(prim_id);
     return dfunc(shader, r, coords, hit);
   }
   

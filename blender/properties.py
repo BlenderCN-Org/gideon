@@ -36,6 +36,10 @@ class GideonMaterialSettings(bpy.types.PropertyGroup):
             name = "Shader",
             description = "Name of the shader function to use for this material",
             )
+        cls.volume = StringProperty(
+            name = "Volume Shader",
+            description = "Name of the volume shader function to use for this material",
+            )
 
     @classmethod
     def unregister(cls):
