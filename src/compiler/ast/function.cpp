@@ -177,8 +177,9 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
 
 raytrace::ast::prototype::prototype(parser_state *st, const string &name, const type_expr_ptr &return_type,
 				    const vector<function_parameter> &args,
-				    exports::function_export::export_type exp_type) :
-  global_declaration(st),
+				    exports::function_export::export_type exp_type,
+				    unsigned int line_no, unsigned int column_no) :
+  global_declaration(st, line_no, column_no),
   name(name), extern_name(name), return_type(return_type),
   args(args), external(false), member_function(false),
   exp_type(exp_type)
@@ -187,8 +188,9 @@ raytrace::ast::prototype::prototype(parser_state *st, const string &name, const 
 }
 
 raytrace::ast::prototype::prototype(parser_state *st, const string &name, const string &extern_name,
-				    const type_expr_ptr &return_type, const vector<function_parameter> &args) :
-  global_declaration(st),
+				    const type_expr_ptr &return_type, const vector<function_parameter> &args,
+				    unsigned int line_no, unsigned int column_no) :
+  global_declaration(st, line_no, column_no),
   name(name), extern_name(extern_name),
   return_type(return_type), args(args),
   external(true), member_function(false),
@@ -321,8 +323,9 @@ typecheck_vector ast::prototype::get_arg_types() {
 
 /* Function */
 
-raytrace::ast::function::function(parser_state *st, const prototype_ptr &defn, const statement_list &body) :
-  global_declaration(st),
+raytrace::ast::function::function(parser_state *st, const prototype_ptr &defn, const statement_list &body,
+				  unsigned int line_no, unsigned int column_no) :
+  global_declaration(st, line_no, column_no),
   defn(defn), body(body)
 {
   
@@ -400,8 +403,9 @@ codegen_value raytrace::ast::function::create_function(function_entry &entry, Mo
 
 /* Return Statement */
 
-raytrace::ast::return_statement::return_statement(parser_state *st, const expression_ptr &expr) :
-  statement(st),
+raytrace::ast::return_statement::return_statement(parser_state *st, const expression_ptr &expr,
+						  unsigned int line_no, unsigned int column_no) :
+  statement(st, line_no, column_no),
   expr(expr)
 {
 

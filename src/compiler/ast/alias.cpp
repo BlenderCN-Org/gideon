@@ -8,7 +8,7 @@ ast::global_variable_alias::global_variable_alias(parser_state *st,
 						  const string &full_name, const type_spec &type,
 						  const string &alias_name,
 						  unsigned int line_no, unsigned int column_no) :
-  global_declaration(st),
+  global_declaration(st, line_no, column_no),
   alias_name(alias_name), full_name(full_name),
   type(type)
 {
@@ -49,7 +49,7 @@ ast::function_alias::function_alias(parser_state *st,
 				    const function_entry &entry,
 				    const string &alias_name,
 				    unsigned int line_no, unsigned int column_no) :
-  global_declaration(st),
+  global_declaration(st, line_no, column_no),
   func(entry), alias_name(alias_name)
 {
   

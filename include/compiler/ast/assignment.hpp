@@ -11,7 +11,8 @@ namespace raytrace {
     class assignment : public expression {
     public:
 
-      assignment(parser_state *st, const expression_ptr &lhs, const expression_ptr &rhs);
+      assignment(parser_state *st, const expression_ptr &lhs, const expression_ptr &rhs,
+		 unsigned int line_no, unsigned int column_no);
       virtual ~assignment() {}
       
       virtual typecheck_value typecheck();

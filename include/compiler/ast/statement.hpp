@@ -21,7 +21,7 @@ namespace raytrace {
     class statement : public ast_node {
     public:
 
-      statement(parser_state *st, unsigned int line_no = 0, unsigned int column_no = 0) : ast_node(st, line_no, column_no) {}
+      statement(parser_state *st, unsigned int line_no, unsigned int column_no) : ast_node(st, line_no, column_no) {}
       virtual ~statement() {}
 
       virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder) = 0;
@@ -34,7 +34,8 @@ namespace raytrace {
     class expression_statement : public statement {
     public:
 
-      expression_statement(parser_state *st, const expression_ptr &expr);
+      expression_statement(parser_state *st, const expression_ptr &expr,
+			   unsigned int line_no, unsigned int column_no);
       virtual ~expression_statement() {}
 
       virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
@@ -62,7 +63,8 @@ namespace raytrace {
     class scoped_statement : public statement {
     public:
 
-      scoped_statement(parser_state *st, const statement_list &stmt_list);
+      scoped_statement(parser_state *st, const statement_list &stmt_list,
+		       unsigned int line_no, unsigned int column_no);
       virtual ~scoped_statement() { }
 
       virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);

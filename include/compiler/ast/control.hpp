@@ -20,7 +20,8 @@ namespace raytrace {
     public:
 
       conditional_statement(parser_state *st, const expression_ptr &cond,
-			    const statement_ptr &if_branch, const statement_ptr &else_branch);
+			    const statement_ptr &if_branch, const statement_ptr &else_branch,
+			    unsigned int line_no, unsigned int column_no);
       virtual ~conditional_statement() {}
 
       virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
@@ -40,7 +41,8 @@ namespace raytrace {
 			 const statement_ptr &init,
 			 const expression_ptr &cond,
 			 const expression_ptr &after,
-			 const statement_ptr &body);
+			 const statement_ptr &body,
+			 unsigned int line_no, unsigned int column_no);
 
       virtual ~for_loop_statement() {}
 
@@ -57,7 +59,8 @@ namespace raytrace {
     class break_statement : public statement {
     public:
 
-      break_statement(parser_state *st);
+      break_statement(parser_state *st,
+		      unsigned int line_no, unsigned int column_no);
       virtual ~break_statement() {}
 
       virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
@@ -69,7 +72,8 @@ namespace raytrace {
     class continue_statement : public statement {
     public:
 
-      continue_statement(parser_state *st);
+      continue_statement(parser_state *st,
+			 unsigned int line_no, unsigned int column_no);
       virtual ~continue_statement() {}
 
       virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);

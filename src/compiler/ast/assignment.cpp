@@ -7,8 +7,9 @@ using namespace llvm;
 
 /** Assignment **/
 
-raytrace::ast::assignment::assignment(parser_state *st, const expression_ptr &lhs, const expression_ptr &rhs) :
-  expression(st), lhs(lhs), rhs(rhs)
+raytrace::ast::assignment::assignment(parser_state *st, const expression_ptr &lhs, const expression_ptr &rhs,
+				      unsigned int line_no, unsigned int column_no) :
+  expression(st, line_no, column_no), lhs(lhs), rhs(rhs)
 {
   
 }

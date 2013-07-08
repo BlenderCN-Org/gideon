@@ -58,11 +58,13 @@ namespace raytrace {
       //Locally defined functions.
       prototype(parser_state *st, const std::string &name, const type_expr_ptr &return_type,
 		const std::vector<function_parameter> &args,
-		exports::function_export::export_type exp_type);
+		exports::function_export::export_type exp_type,
+		unsigned int line_no, unsigned int column_no);
 
       //Externally defined functions.
       prototype(parser_state *st, const std::string &name, const std::string &extern_name,
-		const type_expr_ptr &return_type, const std::vector<function_parameter> &args);
+		const type_expr_ptr &return_type, const std::vector<function_parameter> &args,
+		unsigned int line_no, unsigned int column_no);
       
       virtual ~prototype() {}
 
@@ -97,7 +99,8 @@ namespace raytrace {
     class function : public global_declaration {
     public:
       
-      function(parser_state *st, const prototype_ptr &defn, const statement_list &body);
+      function(parser_state *st, const prototype_ptr &defn, const statement_list &body,
+	       unsigned int line_no, unsigned int column_no);
       virtual ~function() {}
 
       virtual codegen_value codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
@@ -117,7 +120,7 @@ namespace raytrace {
     class return_statement : public statement {
     public:
       
-      return_statement(parser_state *st, const expression_ptr &expr);
+      return_statement(parser_state *st, const expression_ptr &expr, unsigned int line_no, unsigned int column_no);
       virtual ~return_statement() {}
 
       virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);

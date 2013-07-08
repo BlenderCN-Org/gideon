@@ -69,7 +69,7 @@ raytrace::ast::global_variable_decl::global_variable_decl(parser_state *st,
 							  const string &name, const type_expr_ptr &type,
 							  const expression_ptr &init,
 							  unsigned int line_no, unsigned int column_no) :
-  global_declaration(st),
+  global_declaration(st, line_no, column_no),
   name(name), type(type), initializer(init)
 {
 
@@ -167,8 +167,9 @@ code_value ast::variable_ref::codegen_module() {
 
 /** Type Constructors **/
 
-raytrace::ast::type_constructor::type_constructor(parser_state *st, const type_expr_ptr &type, const vector<expression_ptr> &args) :
-  expression(st), type(type), args(args)
+raytrace::ast::type_constructor::type_constructor(parser_state *st, const type_expr_ptr &type, const vector<expression_ptr> &args,
+						  unsigned int line_no, unsigned int column_no) :
+  expression(st, line_no, column_no), type(type), args(args)
 {
 
 }
@@ -218,7 +219,7 @@ typed_value_container ast::type_constructor::get_arg(int i, Module *module, IRBu
 
 ast::field_selection::field_selection(parser_state *st, const string &field, const expression_ptr &expr,
 				      unsigned int line_no, unsigned int column_no) :
-  expression(st), field(field), expr(expr)
+  expression(st, line_no, column_no), field(field), expr(expr)
 {
 
 }

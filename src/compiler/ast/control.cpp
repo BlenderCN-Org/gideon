@@ -7,8 +7,9 @@ using namespace llvm;
 /* If-Else Condition */
 
 raytrace::ast::conditional_statement::conditional_statement(parser_state *st, const expression_ptr &cond,
-							    const statement_ptr &if_branch, const statement_ptr &else_branch) :
-  statement(st),
+							    const statement_ptr &if_branch, const statement_ptr &else_branch,
+							    unsigned int line_no, unsigned int column_no) :
+  statement(st, line_no, column_no),
   cond(cond), if_branch(if_branch), else_branch(else_branch)
 {
 
@@ -70,8 +71,9 @@ raytrace::ast::for_loop_statement::for_loop_statement(parser_state *st,
 						      const statement_ptr &init,
 						      const expression_ptr &cond,
 						      const expression_ptr &after,
-						      const statement_ptr &body) :
-  statement(st), init(init), body(body), cond(cond), after(after)
+						      const statement_ptr &body,
+						      unsigned int line_no, unsigned int column_no) :
+  statement(st, line_no, column_no), init(init), body(body), cond(cond), after(after)
 {
 
 }
@@ -137,8 +139,9 @@ codegen_void raytrace::ast::for_loop_statement::codegen(Module *module, IRBuilde
 
 /** Break **/
 
-raytrace::ast::break_statement::break_statement(parser_state *st) :
-  statement(st)
+raytrace::ast::break_statement::break_statement(parser_state *st,
+						unsigned int line_no, unsigned int column_no) :
+  statement(st, line_no, column_no)
 {
 
 }
@@ -156,8 +159,9 @@ codegen_void raytrace::ast::break_statement::codegen(Module *module, IRBuilder<>
 
 /** Continue **/
 
-raytrace::ast::continue_statement::continue_statement(parser_state *st) :
-  statement(st)
+raytrace::ast::continue_statement::continue_statement(parser_state *st,
+						      unsigned int line_no, unsigned int column_no) :
+  statement(st, line_no, column_no)
 {
 
 }

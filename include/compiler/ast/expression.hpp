@@ -21,9 +21,9 @@ namespace raytrace {
     class expression : public ast_node {
     public:
 
-      expression(parser_state *st, unsigned int line_no = 0, unsigned int column_no = 0) : ast_node(st, line_no, column_no), result_type(st->types["void"]) {}
+      expression(parser_state *st, unsigned int line_no, unsigned int column_no) : ast_node(st, line_no, column_no), result_type(st->types["void"]) {}
       expression(parser_state *st, const type_spec &rt,
-		 unsigned int line_no = 0, unsigned int column_no = 0) : ast_node(st, line_no, column_no), result_type(rt) {}
+		 unsigned int line_no, unsigned int column_no) : ast_node(st, line_no, column_no), result_type(rt) {}
       
       virtual ~expression() {}
 

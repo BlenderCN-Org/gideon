@@ -85,7 +85,8 @@ namespace raytrace {
     class type_constructor : public expression {
     public:
 
-      type_constructor(parser_state *st, const type_expr_ptr &type, const std::vector<expression_ptr> &args);
+      type_constructor(parser_state *st, const type_expr_ptr &type, const std::vector<expression_ptr> &args,
+		       unsigned int line_no, unsigned int column_no);
       ~type_constructor() {}
 
       virtual typecheck_value typecheck() { return type->codegen_type(); }

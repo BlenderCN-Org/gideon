@@ -41,7 +41,7 @@ namespace raytrace {
     public:
 
       ast_node(parser_state *st,
-	       unsigned int line_no = 0, unsigned int column_no = 0) : state(st), line_no(line_no), column_no(column_no) { }
+	       unsigned int line_no, unsigned int column_no) : state(st), line_no(line_no), column_no(column_no) { }
       virtual ~ast_node() { }
 
       typedef raytrace::codegen<function_symbol_table::entry_type*, compile_error>::value entry_or_error;

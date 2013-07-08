@@ -74,9 +74,7 @@ namespace raytrace {
 
       bool is_loaded();
       void set_loaded();
-
-      unsigned int line_no, column_no;
-
+      
     };
 
   };

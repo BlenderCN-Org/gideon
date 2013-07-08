@@ -15,7 +15,9 @@ namespace raytrace {
     class literal : public expression {
     public:
       
-      literal(parser_state *st, const T& v) : expression(st, get_literal_type<T>(st)), value(v) {}
+      literal(parser_state *st, const T& v,
+	      unsigned int line_no, unsigned int column_no) : expression(st, get_literal_type<T>(st),
+									 line_no, column_no), value(v) {}
       virtual ~literal() { }
       
       virtual typed_value_container codegen(llvm::Module *module, llvm::IRBuilder<> &builder);

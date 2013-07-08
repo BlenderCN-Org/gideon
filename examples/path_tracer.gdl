@@ -114,53 +114,53 @@ module render {
 	r = ray(out_P, gideon.ray:direction(r), 5.0*gideon.epsilon, 10000.0);
 	throughput *= vol_throughput;
 	Li += vol_emit;
+	continue;
       }
-      else {
-	dfunc surface = gideon.shade(r, vec2(0.0, 0.0), ray_hit);
-	shader_flag flags = gideon.dfunc:flags(surface);
-	
-	//sample direct illumination
-	if (i > min_path) L_samples = 1;
-	else {
-	  if (i > 0) L_samples /= 2;
-	  if (L_samples < 1) L_samples = 1;
-	}
-	
-	vec4 Ld = sample_direct(surface, P, w_out, L_samples);
-	Li += throughput * Ld;
-	
-	//possibly terminate path
-	if (i > min_path) {
-	  if (gideon.random() > prob_continue) break;
-	  throughput = inv_prob * throughput;
-	}
-	
-	//add emitted light from this surface
-	if (flags && gideon.flags.emissive) {
-	  Li += throughput * gideon.dfunc:emission(surface, gideon.flags.any, P, w_out);
-	}
-	
-	//sample bsdf to get new direction
-	vec2 rand_P = vec2(0.0, 0.0);
-	vec2 rand_w = vec2(gideon.random(), gideon.random());
-	float rand_D = gideon.random();
-	
-	vec3 P_in;
-	vec3 w_in;
-	
-	float pdf = gideon.dfunc:sample(surface, gideon.flags.any,
-					P, w_out,
-					rand_D, rand_P, rand_w,
-					P_in, w_in);
-	if (pdf < 0.0001) break;
-	
-	r = ray(P_in, w_in, 5.0*gideon.epsilon, 10000.0);
-	
-	float tmp;
-	throughput *= (1.0 / pdf) * gideon.dfunc:evaluate(surface, gideon.flags.any, P_in, w_in, P, w_out, tmp);
-      }
-    }
 
+      dfunc surface = gideon.shade(r, vec2(0.0, 0.0), ray_hit);
+      shader_flag flags = gideon.dfunc:flags(surface);
+      
+      //sample direct illumination
+      if (i > min_path) L_samples = 1;
+      else {
+	if (i > 0) L_samples /= 2;
+	if (L_samples < 1) L_samples = 1;
+      }
+      
+      vec4 Ld = sample_direct(surface, P, w_out, L_samples);
+      Li += throughput * Ld;
+      
+      //possibly terminate path
+      if (i > min_path) {
+	if (gideon.random() > prob_continue) break;
+	throughput = inv_prob * throughput;
+      }
+      
+      //add emitted light from this surface
+      if (flags && gideon.flags.emissive) {
+	Li += throughput * gideon.dfunc:emission(surface, gideon.flags.any, P, w_out);
+      }
+      
+      //sample bsdf to get new direction
+      vec2 rand_P = vec2(0.0, 0.0);
+      vec2 rand_w = vec2(gideon.random(), gideon.random());
+      float rand_D = gideon.random();
+      
+      vec3 P_in;
+      vec3 w_in;
+      
+      float pdf = gideon.dfunc:sample(surface, gideon.flags.any,
+				      P, w_out,
+				      rand_D, rand_P, rand_w,
+				      P_in, w_in);
+      if (pdf < 0.0001) break;
+      
+      r = ray(P_in, w_in, 5.0*gideon.epsilon, 10000.0);
+      
+      float tmp;
+      throughput *= (1.0 / pdf) * gideon.dfunc:evaluate(surface, gideon.flags.any, P_in, w_in, P, w_out, tmp);
+    }
+    
     Li.w = 1.0;
     return Li;
   }

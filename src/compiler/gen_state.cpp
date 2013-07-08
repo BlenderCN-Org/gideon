@@ -29,7 +29,7 @@ bool control_state::inside_loop() { return loop_stack.size() > 0; }
 
 unsigned int control_state::loop_top_scope() { return loop_stack.back().top_scope; }
 BasicBlock *control_state::post_loop() { return loop_stack.back().post_loop; }
-BasicBlock *control_state::next_iter() { return loop_stack.back().post_loop; }
+BasicBlock *control_state::next_iter() { return loop_stack.back().next_iter; }
 
 void control_state::push_scope() { scope_stack.push_back(1); }
 void control_state::pop_scope() { scope_stack.pop_back(); }

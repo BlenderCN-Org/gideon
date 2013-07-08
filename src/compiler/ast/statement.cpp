@@ -7,8 +7,9 @@ using namespace llvm;
 
 /* Expression Statement */
 
-raytrace::ast::expression_statement::expression_statement(parser_state *st, const expression_ptr &expr) :
-  statement(st), expr(expr)
+raytrace::ast::expression_statement::expression_statement(parser_state *st, const expression_ptr &expr,
+							  unsigned int line_no, unsigned int column_no) :
+  statement(st, line_no, column_no), expr(expr)
 {
 
 }
@@ -56,8 +57,9 @@ codegen_void raytrace::ast::statement_list::codegen(Module *module, IRBuilder<> 
 
 /* Scoped Statements */
 
-raytrace::ast::scoped_statement::scoped_statement(parser_state *st, const statement_list &stmt_list) :
-  statement(st), statements(stmt_list)
+raytrace::ast::scoped_statement::scoped_statement(parser_state *st, const statement_list &stmt_list,
+						  unsigned int line_no, unsigned int column_no) :
+  statement(st, line_no, column_no), statements(stmt_list)
 {
   
 }

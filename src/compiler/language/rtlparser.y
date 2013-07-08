@@ -262,7 +262,8 @@ function_export_spec
  ; 
 
 function_prototype
-: function_export_spec FUNCTION IDENTIFIER '(' function_formal_params_opt ')' typespec { $$ = ast::prototype_ptr(new ast::prototype(gd_data->state, $3, $7, $5, $1)); }
+: function_export_spec FUNCTION IDENTIFIER '(' function_formal_params_opt ')' typespec { $$ = ast::prototype_ptr(new ast::prototype(gd_data->state, $3, $7, $5, $1,
+																    yylloc.first_line, yylloc.first_column)); }
  ;
 
 external_function_declaration
@@ -270,7 +271,8 @@ external_function_declaration
  ;
 
 function_definition
- : function_prototype '{' statement_list '}' { $$ = ast::function_ptr(new ast::function(gd_data->state, $1, ast::statement_list($3))); }
+ : function_prototype '{' statement_list '}' { $$ = ast::function_ptr(new ast::function(gd_data->state, $1, ast::statement_list($3),
+											yylloc.first_line, yylloc.first_column)); }
  ;
 
 function_formal_params_opt
@@ -392,13 +394,16 @@ declaration_statement
  ;
 
 conditional_statement
- : IF '(' expression ')' statement %prec THEN { $$ = ast::statement_ptr(new ast::conditional_statement(gd_data->state, $3, $5, nullptr)); }
- | IF '(' expression ')' statement ELSE statement { $$ = ast::statement_ptr(new ast::conditional_statement(gd_data->state, $3, $5, $7)); }
+ : IF '(' expression ')' statement %prec THEN { $$ = ast::statement_ptr(new ast::conditional_statement(gd_data->state, $3, $5, nullptr,
+												       yylloc.first_line, yylloc.first_column)); }
+ | IF '(' expression ')' statement ELSE statement { $$ = ast::statement_ptr(new ast::conditional_statement(gd_data->state, $3, $5, $7,
+													   yylloc.first_line, yylloc.first_column)); }
  ;
 
 simple_statement
  : declaration_statement
- | expression ';' { $$ = ast::statement_ptr(new ast::expression_statement(gd_data->state, $1)); }
+ | expression ';' { $$ = ast::statement_ptr(new ast::expression_statement(gd_data->state, $1,
+									  yylloc.first_line, yylloc.first_column)); }
  | conditional_statement
  | iteration_statement
  | jump_statement
@@ -406,23 +411,27 @@ simple_statement
  ;
 
 iteration_statement
- : FOR '(' for_init_statement expression ';' expression ')' statement { $$ = ast::statement_ptr(new ast::for_loop_statement(gd_data->state, $3, $4, $6, $8)); }
+ : FOR '(' for_init_statement expression ';' expression ')' statement { $$ = ast::statement_ptr(new ast::for_loop_statement(gd_data->state, $3, $4, $6, $8,
+															    yylloc.first_line, yylloc.first_column)); }
  ;
 
 for_init_statement
  : variable_declaration
- | expression ';' { $$ = ast::statement_ptr(new ast::expression_statement(gd_data->state, $1)); }
+ | expression ';' { $$ = ast::statement_ptr(new ast::expression_statement(gd_data->state, $1,
+									  yylloc.first_line, yylloc.first_column)); }
  | ';' { $$ = nullptr; }
  ;
 
 return_statement
- : RETURN expression ';' { $$ = ast::statement_ptr(new ast::return_statement(gd_data->state, $2)); }
- | RETURN ';' { $$ = ast::statement_ptr(new ast::return_statement(gd_data->state, nullptr)); }
+ : RETURN expression ';' { $$ = ast::statement_ptr(new ast::return_statement(gd_data->state, $2,
+									     yylloc.first_line, yylloc.first_column)); }
+ | RETURN ';' { $$ = ast::statement_ptr(new ast::return_statement(gd_data->state, nullptr,
+								  yylloc.first_line, yylloc.first_column)); }
  ;
 
 jump_statement
- : BREAK ';' { $$ = ast::statement_ptr(new ast::break_statement(gd_data->state)); }
- | CONTINUE ';' { $$ = ast::statement_ptr(new ast::continue_statement(gd_data->state)); }
+ : BREAK ';' { $$ = ast::statement_ptr(new ast::break_statement(gd_data->state, yylloc.first_line, yylloc.first_column)); }
+ | CONTINUE ';' { $$ = ast::statement_ptr(new ast::continue_statement(gd_data->state, yylloc.first_line, yylloc.first_column)); }
  | return_statement
  ;
 
@@ -437,7 +446,7 @@ statement
  ;
 
 scoped_statement
- : '{' statement_list '}' { $$ = ast::statement_ptr(new ast::scoped_statement(gd_data->state, $2)); }
+ : '{' statement_list '}' { $$ = ast::statement_ptr(new ast::scoped_statement(gd_data->state, $2, yylloc.first_line, yylloc.first_column)); }
  ;
 
 
@@ -448,10 +457,10 @@ variable_ref
  ;
 
 primary_expression
- : INTEGER_LITERAL { $$ = ast::expression_ptr(new ast::literal<int>(gd_data->state, $1)); }
- | FLOAT_LITERAL { $$ = ast::expression_ptr(new ast::literal<float>(gd_data->state, $1)); }
- | BOOL_LITERAL { $$ = ast::expression_ptr(new ast::literal<bool>(gd_data->state, $1)); }
- | STRING_LITERAL { $$ = ast::expression_ptr(new ast::literal<std::string>(gd_data->state, $1)); }
+ : INTEGER_LITERAL { $$ = ast::expression_ptr(new ast::literal<int>(gd_data->state, $1, yylloc.first_line, yylloc.first_column)); }
+ | FLOAT_LITERAL { $$ = ast::expression_ptr(new ast::literal<float>(gd_data->state, $1, yylloc.first_line, yylloc.first_column)); }
+ | BOOL_LITERAL { $$ = ast::expression_ptr(new ast::literal<bool>(gd_data->state, $1, yylloc.first_line, yylloc.first_column)); }
+ | STRING_LITERAL { $$ = ast::expression_ptr(new ast::literal<std::string>(gd_data->state, $1, yylloc.first_line, yylloc.first_column)); }
  | variable_ref
  | '(' expression ')' { $$ = $2; }
  ; 
@@ -472,13 +481,14 @@ postfix_expression
 ;
 
 type_constructor
- : typespec_basic '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::type_constructor(gd_data->state, $1, $3)); }
+ : typespec_basic '(' function_args_opt ')' { $$ = ast::expression_ptr(new ast::type_constructor(gd_data->state, $1, $3,
+												 yylloc.first_line, yylloc.first_column)); }
  | typespec_basic '[' ']' '(' function_args_opt ')' {
    $$ = ast::expression_ptr(new ast::type_constructor(gd_data->state,
-						      //gd_data->state->types.get_array($1, $5.size()),
 						      ast::type_expr_ptr(new ast::array_type_expression(gd_data->state, $1, $5.size(),
 													yylloc.first_line, yylloc.first_column)),
-						      $5));
+						      $5,
+						      yylloc.first_line, yylloc.first_column));
    }
  ;
 
@@ -508,19 +518,22 @@ unary_expression
  | '-' expression %prec UMINUS_PREC { $$ = UNARY_OPERATION("-", $2); }
  | expression INCR_OP { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state,
 									      "+", true, $1,
-									      ast::expression_ptr(new ast::literal<int>(gd_data->state, 1)),
+									      ast::expression_ptr(new ast::literal<int>(gd_data->state, 1, yylloc.first_line, yylloc.first_column)),
 									      yylloc.first_line, yylloc.first_column)); }
  | INCR_OP expression %prec PREFIX_INCR_PREC { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state,
 												     "+", false, $2,
-												     ast::expression_ptr(new ast::literal<int>(gd_data->state, 1)),
+												     ast::expression_ptr(new ast::literal<int>(gd_data->state, 1,
+																	       yylloc.first_line, yylloc.first_column)),
 												     yylloc.first_line, yylloc.first_column)); }
  | expression DECR_OP { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state,
 									      "-", true, $1,
-									      ast::expression_ptr(new ast::literal<int>(gd_data->state, 1)),
+									      ast::expression_ptr(new ast::literal<int>(gd_data->state, 1,
+															yylloc.first_line, yylloc.first_column)),
 									      yylloc.first_line, yylloc.first_column)); }
  | DECR_OP expression %prec PREFIX_DECR_PREC { $$ = ast::expression_ptr(new ast::assignment_operator(gd_data->state,
 												     "-", false, $2,
-												     ast::expression_ptr(new ast::literal<int>(gd_data->state, 1)),
+												     ast::expression_ptr(new ast::literal<int>(gd_data->state, 1,
+																	       yylloc.first_line, yylloc.first_column)),
 												     yylloc.first_line, yylloc.first_column)); }
  ;
 
@@ -536,7 +549,8 @@ binary_expression
  ;
 
 assignment_expression
- : expression '=' expression { $$ = ast::expression_ptr(new ast::assignment(gd_data->state, $1, $3)); }
+: expression '=' expression { $$ = ast::expression_ptr(new ast::assignment(gd_data->state, $1, $3,
+									   yylloc.first_line, yylloc.first_column)); }
  | expression ADD_ASSIGN expression { $$ = ASSIGN_OPERATION("+", $1, $3); }
  | expression SUB_ASSIGN expression { $$ = ASSIGN_OPERATION("-", $1, $3); }
  | expression MUL_ASSIGN expression { $$ = ASSIGN_OPERATION("*", $1, $3); }

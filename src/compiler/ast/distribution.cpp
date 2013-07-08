@@ -11,7 +11,7 @@ ast::distribution::distribution(parser_state *st, const string &name,
 				const vector<distribution_parameter> &params,
 				const vector<global_declaration_ptr> &internal_decl,
 				unsigned int line_no, unsigned int column_no) :
-  global_declaration(st),
+  global_declaration(st, line_no, column_no),
   name(name), flags(flags), params(params),
   internal_decl(internal_decl)
 {
