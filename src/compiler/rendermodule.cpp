@@ -164,8 +164,10 @@ void compiled_renderer::map_global(const string &name, void *location_ptr) {
 
 /* Render Program */
 
-render_program::render_program(const string &name) :
+render_program::render_program(const string &name,
+			       bool do_optimize, bool do_debug_info) :
   name(name),
+  do_optimize(do_optimize), do_debug_info(do_debug_info),
   path_resolver([this] (const string &path) -> string { return path; }),
   source_loader([this] (const string &path) -> string { return default_loader(path); })
 {
@@ -173,9 +175,11 @@ render_program::render_program(const string &name) :
 }
 
 render_program::render_program(const string &name,
+			       bool do_optimize, bool do_debug_info,
 			       const boost::function<string (const string &)> &resolver,
 			       const boost::function<string (const string &)> &loader) :
   name(name),
+  do_optimize(do_optimize), do_debug_info(do_debug_info),
   path_resolver(resolver),
   source_loader(loader)
 {
@@ -346,7 +350,7 @@ Module *render_program::compile() {
     }
   }
 
-  optimize(result);
+  if (do_optimize) optimize(result);
   return result;
 }
 

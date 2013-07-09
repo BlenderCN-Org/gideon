@@ -45,7 +45,7 @@ boost::filesystem::path std_search_path = boost::filesystem::path(__FILE__).pare
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    cerr << "Usage: " << argv[0] << " <source-file-name>" << endl;
+    cerr << "Usage: " << argv[0] << " <source-file-name> [entry-point]" << endl;
     return -1;
   }
   
@@ -58,6 +58,7 @@ int main(int argc, char **argv) {
   InitializeNativeTarget();
   
   render_program prog("test_program",
+		      false, true,
 		      [search_paths] (const string &fname) -> string { return basic_path_resolver(fname, search_paths); },
 		      basic_source_loader);
   prog.load_source_file(argv[1]);
@@ -66,6 +67,12 @@ int main(int argc, char **argv) {
   verifyModule(*module);
   module->dump();
   
-  //delete engine;
+  if (argc > 3) {
+    compiled_renderer kernel(module);
+    void *entry_ptr = kernel.get_function_pointer(argv[2]);
+    void (*entry_func)() = (void (*)())(entry_ptr);
+    entry_func();
+  }
+  
   return 0;
 }

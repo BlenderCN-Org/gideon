@@ -302,7 +302,9 @@ extern "C" {
       return source;
     };
     
-    return reinterpret_cast<void*>(new render_program(name, resolve_func, loader_func));
+    return reinterpret_cast<void*>(new render_program(name,
+						      true, false,
+						      resolve_func, loader_func));
   }
 
   void gd_api_destroy_program(void *p) {

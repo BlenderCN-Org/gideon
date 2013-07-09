@@ -89,8 +89,10 @@ namespace raytrace {
     
     typedef boost::unordered_map<std::string, std::shared_ptr<object_entry>> object_table;
     
-    render_program(const std::string &name);
     render_program(const std::string &name,
+		   bool do_optimize, bool do_debug_info);
+    render_program(const std::string &name,
+		   bool do_optimize, bool do_debug_info,
 		   const boost::function<std::string (const std::string &)> &resolve,
 		   const boost::function<std::string (const std::string &)> &loader);
     
@@ -113,6 +115,7 @@ namespace raytrace {
 
     std::string name;
     object_table objects;
+    bool do_optimize, do_debug_info;
 
     boost::function <std::string (const std::string &)> path_resolver, source_loader;
     std::string default_loader(const std::string &path);
