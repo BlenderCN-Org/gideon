@@ -24,6 +24,25 @@ appropriate shader function from the drop-down list.
 
 For an language example, check out ```path_tracer.gdl``` in the ```examples``` directory.
 
+## Images
+
+![Path-Tracer w/ Emission Shader](docs/images/path_trace_emission.png)
+
+Path-tracing example with diffuse, specular and emissive distributions.
+
+![Path-Tracer w/ Volumes](docs/images/volume_suzanne.png)
+
+Simple test of a volume shader supporting absorption and emission.
+
+![Colored by number of BVH nodes encountered](docs/images/bvh_render.png)
+
+Example of using Gideon for debugging purposes. Pixels are colored by the number of BVH nodes encountered while
+casting a ray through the scene.
+
+![Blender UI](docs/images/blender_ui.png)
+
+Screenshot of the Blender UI panel for setting up Gideon source files.
+
 ## Roadmap
 
 Gideon is in a very early stage of development. Most of the major compiler features have been implemented, but it is
@@ -47,19 +66,19 @@ Along with more core engine features:
 
 ## Installation
 
-In the top-level directory, run:
-
 ```
-mkdir build; cd build
+mkdir <build_dir>; cd <build_dir>
 cmake -DBLENDER_ADDON_ROOT=<path/to/blenders/addon/dir> <path/to/gideon/root>
 make
 make install
 ```
-## Contributing
 
 ## Requirements
 
 Gideon uses C++11 and depends on libboost and LLVM 3.3. The build system uses CMake, and Blender is required to
 use the plugin.
 
-##License
+## Contact
+
+Email: candrus@gmail.com
+
