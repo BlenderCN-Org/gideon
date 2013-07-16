@@ -86,7 +86,7 @@ raytrace::ast::scoped_statement::scoped_statement(parser_state *st, const statem
 }
 
 codegen_void raytrace::ast::scoped_statement::codegen(Module *module, IRBuilder<> &builder) {
-  push_scope();
+  push_scope(module, builder);
 
   typedef errors::argument_value_join<codegen_void>::result_value_type arg_val_type;
   boost::function<codegen_void (arg_val_type &)> add_null_value = [] (arg_val_type &) -> codegen_void { return empty_type(); };

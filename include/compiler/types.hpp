@@ -97,6 +97,7 @@ namespace raytrace {
 
     virtual bool is_iterator() const { return false; }
     virtual bool is_array() const { return false; }
+    virtual bool is_void() const { return false; }
     
     bool operator==(const type &rhs) const { return type_id == rhs.type_id; }
     bool operator!=(const type &rhs) const { return !(*this == rhs); }

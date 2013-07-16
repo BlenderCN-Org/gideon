@@ -25,29 +25,87 @@ using namespace std;
 using namespace raytrace;
 using namespace llvm;
 
-void ast::ast_node::push_scope(const string &name) {
+void ast::ast_node::push_symtab_scope(const string &name) {
   variables().scope_push(name);
   functions().scope_push(name);
+}
+
+void ast::ast_node::pop_symtab_scope(Module *module, IRBuilder<> &builder) {
+  functions().scope_pop(module, builder, false);
+  variables().scope_pop(module, builder, false);
+}
+
+void ast::ast_node::push_scope(Module *module, IRBuilder<> &builder) {
+  //create cleanup block for this point in time
+  BasicBlock *cleanup = generate_cleanup(module);
+  
+  //push the new scope state
   state->control.push_scope();
+  control_state::scope_state &scope = state->control.get_scope_state();
+
+  variables().scope_push("");
+  functions().scope_push("");
+
+  //create a new body block for this scope
+  BasicBlock *body = BasicBlock::Create(getGlobalContext(), "scope",
+					state->control.get_function_state().func,
+					cleanup);
+
+  //this block is where the program will go once it leaves the scope normally
+  BasicBlock *post = BasicBlock::Create(getGlobalContext(), "reentry",
+					state->control.get_function_state().func,
+					cleanup);
+  
+  //current block jumps into the new body
+  builder.CreateBr(body);
+  builder.SetInsertPoint(body);
+
+  scope.body_block = body;
+  scope.exit_block = cleanup;
+  scope.next_block = post;
 }
 
 void ast::ast_node::pop_scope(Module *module, IRBuilder<> &builder) {
-  bool reaches_end = state->control.scope_reaches_end();
+  //bool reaches_end = state->control.scope_reaches_end();
+  
+  //create an exit if this block doesn't already have a terminator
+  control_state::scope_state &scope = state->control.get_scope_state();
+  BasicBlock *next_block = state->control.get_next_block();
 
+  if (!builder.GetInsertBlock()->getTerminator()) {
+    
+    //generate cleanup block for this scope
+    BasicBlock *cleanup = generate_cleanup(module);
+    
+    //set target to 'next'
+    state->control.set_jump_target(builder, 0);
+    
+    //branch into cleanup block
+    builder.CreateBr(cleanup);
+  }
+  
   state->control.pop_scope();
-  functions().scope_pop(module, builder, reaches_end);
-  variables().scope_pop(module, builder, reaches_end);
+  
+  builder.SetInsertPoint(next_block);
+  functions().scope_pop(module, builder, false);
+  variables().scope_pop(module, builder, false);
+  
 }
 
-void ast::ast_node::push_function(const type_spec &t) {
+void ast::ast_node::push_function(const type_spec &t, Function *f,
+				  Module *module, IRBuilder<> &builder) {
   //order is important here, we need to know which scope we can exit to
-  state->control.push_function_rt(t);
-  push_scope();
+  state->control.push_function(t, f, module, builder);
+
+  variables().scope_push("");
+  functions().scope_push("");
 }
   
 void ast::ast_node::pop_function(Module *module, IRBuilder<> &builder) {
-  pop_scope(module, builder);
-  state->control.pop_function_rt();
+  functions().scope_pop(module, builder, false);
+  variables().scope_pop(module, builder, false);
+
+  state->control.pop_function();
 }
 
 void ast::ast_node::push_module(const string &name, bool exported) {
@@ -86,43 +144,16 @@ codegen_void ast::ast_node::pop_module(const string &name, bool exported,
 
 void ast::ast_node::push_distribution_context(const string &name, Type *param_ptr_type, const control_state::context_loader_type &loader) {
   state->control.push_context(NULL, param_ptr_type, loader);
-  push_scope(name);
+
+  variables().scope_push(name);
+  functions().scope_push(name);
 }
 
 void ast::ast_node::pop_distribution_context(Module *module, IRBuilder<> &builder) {
-  pop_scope(module, builder);
+  functions().scope_pop(module, builder, false);
+  variables().scope_pop(module, builder, false);
+
   state->control.pop_context();
-}
-
-void ast::ast_node::exit_loop_scopes(Module *module, IRBuilder<> &builder) {
-  assert(state->control.inside_loop());
-  
-  unsigned int end_scope = state->control.loop_top_scope();
-  if (state->control.scope_depth() > end_scope) {
-    unsigned int N = state->control.scope_depth() - (end_scope - 1);
-    variables().scope_destroy(N, module, builder);
-    functions().scope_destroy(N, module, builder);
-  }
-}
-
-void ast::ast_node::exit_to_loop_scope(Module *module, IRBuilder<> &builder) {
-  assert(state->control.inside_loop());
-  
-  unsigned int end_scope = state->control.loop_top_scope();
-  if (state->control.scope_depth() > end_scope) {
-    unsigned int N = state->control.scope_depth() - end_scope;
-    variables().scope_destroy(N, module, builder);
-    functions().scope_destroy(N, module, builder);
-  }
-}
-
-void ast::ast_node::exit_function(Module *module, IRBuilder<> &builder) {
-  unsigned int end_scope = state->control.function_start_depth();
-  if (state->control.scope_depth() > end_scope) {
-    unsigned int N = state->control.scope_depth() - end_scope;
-    variables().scope_destroy(N, module, builder);
-    functions().scope_destroy(N, module, builder);
-  }
 }
 
 variable_symbol_table &ast::ast_node::variables() {
@@ -299,4 +330,41 @@ typecheck_value ast::ast_node::typename_lookup(const string &name) {
   stringstream err_ss;
   err_ss << "No such type named '" << name << "'";
   return errors::make_error<errors::error_message>(err_ss.str(), line_no, column_no);
+}
+
+BasicBlock *ast::ast_node::generate_cleanup(Module *module) {
+  control_state::function_state &func_st = state->control.get_function_state();
+
+  Function *f = func_st.func;
+  BasicBlock *next_block = state->control.get_next_block();
+  BasicBlock *cleanup = BasicBlock::Create(getGlobalContext(), "cleanup", f, next_block);
+
+  IRBuilder<> builder(cleanup, cleanup->begin());
+  variables().scope_destroy(module, builder);
+  functions().scope_destroy(module, builder);
+  
+  BasicBlock *exit = state->control.get_exit_block();
+  
+  int case_count = 2;
+  if (state->control.inside_loop()) case_count += 2;
+
+  SwitchInst* branch = builder.CreateSwitch(builder.CreateLoad(func_st.target_sel), exit, case_count);
+  branch->addCase(ConstantInt::get(getGlobalContext(), APInt(8, 0, true)), next_block);
+  branch->addCase(ConstantInt::get(getGlobalContext(), APInt(8, 1, true)), exit);
+
+  if (state->control.inside_loop()) {
+    BasicBlock *continue_block = state->control.at_loop_top() ? state->control.loop_update_block() : exit;
+    branch->addCase(ConstantInt::get(getGlobalContext(), APInt(8, 2, true)), continue_block);
+
+    BasicBlock *break_block = state->control.at_loop_top() ? next_block : exit;
+    branch->addCase(ConstantInt::get(getGlobalContext(), APInt(8, 3, true)), break_block);
+  }
+  
+  return cleanup;
+}
+
+void ast::ast_node::generate_return_branch(Module *module, IRBuilder<> &builder) {
+  BasicBlock *cleanup = generate_cleanup(module);  
+  state->control.set_jump_target(builder, 1);
+  builder.CreateBr(cleanup);
 }

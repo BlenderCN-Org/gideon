@@ -41,6 +41,8 @@ using namespace std;
 using namespace raytrace;
 using namespace llvm;
 
+static const bool gideon_debug = false;
+
 boost::filesystem::path std_search_path = boost::filesystem::path(__FILE__).parent_path().parent_path() / "src" / "standard";
 
 int main(int argc, char **argv) {
@@ -67,11 +69,17 @@ int main(int argc, char **argv) {
   verifyModule(*module);
   module->dump();
   
-  if (argc > 3) {
-    compiled_renderer kernel(module);
-    void *entry_ptr = kernel.get_function_pointer(argv[2]);
-    void (*entry_func)() = (void (*)())(entry_ptr);
-    entry_func();
+  if (argc >= 3) {
+    if (gideon_debug) {
+      Function *func = module->getFunction(argv[2]);
+      func->viewCFG();
+    }
+    else {
+      compiled_renderer kernel(module);
+      void *entry_ptr = kernel.get_function_pointer(argv[2]);
+      void (*entry_func)() = (void (*)())(entry_ptr);
+      entry_func();
+    }
   }
   
   return 0;

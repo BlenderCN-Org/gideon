@@ -30,6 +30,8 @@ namespace raytrace {
   public:
 
     void_type(type_table *types) : type(types, "void", "v") { }
+
+    virtual bool is_void() const { return true; }
     virtual llvm::Type *llvm_type() const;
 
   };

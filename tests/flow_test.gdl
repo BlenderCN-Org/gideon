@@ -1,0 +1,40 @@
+
+function foo() int {
+  if (true) return -1;
+  return 1;
+}
+
+function main() void {
+  string s = "hello";
+
+  {
+    string b;
+    foo();
+  }
+  
+  {
+    bool q = false;
+    if (!q) return;
+  }
+  
+  return;
+}
+
+function looper() int {
+  int count = 0;
+  for (int i = 0; i < 10; i++) {
+    count += i;
+    string a;
+
+    {
+      string s;
+      count -= 5;
+
+      if (count > 120) return 20*count;
+      continue;
+    }
+
+    if (i > 3) break;
+  }
+  return count;
+}

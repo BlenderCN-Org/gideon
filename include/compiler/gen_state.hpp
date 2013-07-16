@@ -27,8 +27,48 @@
 namespace raytrace {
 
   struct control_state {
+
+    /*
+      Used for tracking state in the current function.
+      The target_sel value stores a code that cleanup blocks
+      use to decide what to execute next. Possible values are:
+
+      0 - Continue normally to the next block.
+      1 - Jump to the next cleanup block until the top of the function is reached, then return.
+      2 - Jump out to the next_iteration block of the current loop, cleaning up along the way (i.e. continue).
+      3 - Jump through cleanup blocks until the loop has been exited (i.e. break).
+      4 - Exception handling.
+    */
+    struct function_state {
+      llvm::Function *func;
+      type_spec return_ty;
+      llvm::Value *rt_val; //location to be used for the return value
+      llvm::Value *target_sel; //used by cleanup blocks
+      llvm::BasicBlock *entry_block, *cleanup_block, *return_block;
+      
+      function_state(llvm::Function *func, const type_spec &t,
+		     llvm::Module *module, llvm::IRBuilder<> &builder);
+    };
+    
+    /*
+      Blocks relevant to a new scope created inside a function.
+      
+      body_block - Main body of this scope.
+      exit_block - Cleanup code for the containing scope (in case this one needs to return/break/continue).
+      next_block - Where to go if we leave this scope normally.      
+    */
+    struct scope_state {
+      llvm::BasicBlock *body_block, *exit_block, *next_block;
+    };
+    
+    /* 
+       Extra information needed by loops to support break/continue.
+
+       update_block - Block that updates any loop variables. The eventual destination of a 'continue' statement.
+       top_scope - Depth of the scope at the top of this loop. Up until this level, break/continue should be branching into cleanup blocks only.
+     */
     struct loop_blocks {
-      llvm::BasicBlock *post_loop, *next_iter;
+      llvm::BasicBlock *update_block;
       unsigned int top_scope;
     };
 
@@ -40,33 +80,35 @@ namespace raytrace {
       context_loader_type loader;
     };
 
-    std::vector<type_spec> return_type_stack;
-    std::vector<unsigned int> function_scope_depth_stack;
-
+    std::vector<function_state> function_stack;
+    
     std::vector<loop_blocks> loop_stack;
     std::vector<class_context> context_stack;
-    std::vector<int> scope_stack;
+
+    //function control
+    void push_function(const type_spec &t, llvm::Function *f,
+		       llvm::Module *module, llvm::IRBuilder<> &builder);
+    void pop_function();
+
+    llvm::Function *get_current_function();
+
+    function_state &get_function_state() { return function_stack.back(); }
+    llvm::BasicBlock *get_function_body();
+    llvm::BasicBlock *get_cleanup_block();
+    llvm::BasicBlock *get_return_block();
+    llvm::Value *get_return_value_ptr();
+    void set_jump_target(llvm::IRBuilder<> &builder, int code);
     
-    void push_function_rt(const type_spec &t);
-    void pop_function_rt();
-    type_spec &return_type();
-    unsigned int function_start_depth();
-    
-    void push_loop(llvm::BasicBlock *post, llvm::BasicBlock *next);    
+    //loop control
+
+    void push_loop(llvm::BasicBlock *update);
     void pop_loop();
     bool inside_loop();
+    llvm::BasicBlock *loop_update_block();
+    bool at_loop_top();
 
-    unsigned int loop_top_scope();
-    llvm::BasicBlock *post_loop();
-    llvm::BasicBlock *next_iter();
-
-    //Used to track the presence of terminator statements in the current scope
-    void push_scope();
-    void pop_scope();
-    bool scope_reaches_end();
-    void set_scope_reaches_end(bool b);
-    unsigned int scope_depth();
-
+    //distribution context control
+    
     void push_context(llvm::Value *ctx, llvm::Type *ctx_type,
 		      const boost::function<void (llvm::Value*, llvm::Module*, llvm::IRBuilder<>&)> &loader);
     void pop_context();
@@ -77,6 +119,20 @@ namespace raytrace {
     void set_context(llvm::Value *ctx);
     llvm::Value *get_context();
     llvm::Type *get_context_type();
+
+    //scope control
+    void push_scope();
+    void pop_scope();
+
+    std::vector<scope_state> scope_state_stack;
+
+    //Upon exiting a scope (via return/break/continue), where is the next cleanup block?
+    llvm::BasicBlock *get_exit_block();
+
+    //The next block we go to when we exit a scope normally.
+    llvm::BasicBlock *get_next_block();
+    
+    scope_state &get_scope_state() { return scope_state_stack.back(); }
   };
 
 };

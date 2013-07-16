@@ -72,10 +72,11 @@ namespace raytrace {
       parser_state *state;
       unsigned int line_no, column_no;
 
-      void push_scope(const std::string &name = "");
+      void push_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
       void pop_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
 
-      void push_function(const type_spec &t);
+      void push_function(const type_spec &t, llvm::Function *f,
+			 llvm::Module *module, llvm::IRBuilder<> &builder);
       void pop_function(llvm::Module *module, llvm::IRBuilder<> &builder);
 
       void push_module(const std::string &name, bool exported);
@@ -84,10 +85,6 @@ namespace raytrace {
 
       void push_distribution_context(const std::string &name, llvm::Type *param_ptr_type, const control_state::context_loader_type &loader);
       void pop_distribution_context(llvm::Module *module, llvm::IRBuilder<> &builder);
-
-      void exit_loop_scopes(llvm::Module *module, llvm::IRBuilder<> &builder);
-      void exit_to_loop_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
-      void exit_function(llvm::Module *module, llvm::IRBuilder<> &builder);
     
       variable_symbol_table &variables();
 
@@ -115,6 +112,17 @@ namespace raytrace {
       entry_or_error function_lookup(const function_key &fkey);
 
       typecheck_value typename_lookup(const std::string &name);
+
+      //Scope Management
+
+      //Creates a block that cleans up any variables declared up to this point.
+      llvm::BasicBlock *generate_cleanup(llvm::Module *module);
+
+      //Generates instruction to branch into the return block (after going through a cleanup block).
+      void generate_return_branch(llvm::Module *module, llvm::IRBuilder<> &builder);
+
+      void push_symtab_scope(const std::string &name = "");
+      void pop_symtab_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
     };
 
   };

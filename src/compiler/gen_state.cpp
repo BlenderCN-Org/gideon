@@ -20,43 +20,114 @@
 */
 
 #include "compiler/gen_state.hpp"
+#include "compiler/llvm_helper.hpp"
 
 using namespace raytrace;
 using namespace llvm;
 using namespace std;
 
-void control_state::push_function_rt(const type_spec &t) {
-  return_type_stack.push_back(t);
-  function_scope_depth_stack.push_back(scope_depth());
-}
-void control_state::pop_function_rt() {
-  function_scope_depth_stack.pop_back();
-  return_type_stack.pop_back();
-}
-
-unsigned int control_state::function_start_depth() {
-  return function_scope_depth_stack.back();
+control_state::function_state::function_state(Function *func, const type_spec &t,
+					      Module *module, IRBuilder<> &builder) :
+  func(func), return_ty(t),
+  rt_val(return_ty->is_void() ? nullptr : return_ty->allocate(module, builder)),
+  target_sel(CreateEntryBlockAlloca(builder,
+				    Type::getInt8Ty(getGlobalContext()), "target_sel")),
+  entry_block(nullptr), cleanup_block(nullptr), return_block(nullptr)
+{
+  
 }
 
-type_spec &control_state::return_type() { return return_type_stack.back(); }
+void control_state::push_function(const type_spec &t, Function *f,
+				  Module *module, IRBuilder<> &builder) {
+  //setup the function's entry block
+  BasicBlock *entry_block = BasicBlock::Create(getGlobalContext(), "entry", f);
+  builder.SetInsertPoint(entry_block);
+  
+  function_stack.push_back(function_state(f, t, module, builder));
+  function_state &func_st = function_stack.back();
+  
+  //setup the return block
+  BasicBlock *return_block = BasicBlock::Create(getGlobalContext(), "return", f);
+  IRBuilder<> tmp(return_block, return_block->begin());
+  if (t->is_void()) tmp.CreateRetVoid();
+  else tmp.CreateRet(tmp.CreateLoad(func_st.rt_val));
+  
+  func_st.entry_block = entry_block;
+  func_st.cleanup_block = nullptr;
+  func_st.return_block = return_block;
+}
+
+
+
+void control_state::pop_function() {
+  function_stack.pop_back();
+}
+
+Function *control_state::get_current_function() {
+  if (function_stack.size() == 0) return nullptr;
+  return function_stack.back().func;
+}
+
+BasicBlock *control_state::get_function_body() {
+  if (function_stack.size() == 0) return nullptr;
+  return function_stack.back().entry_block;
+}
+
+BasicBlock *control_state::get_cleanup_block() {
+  if (function_stack.size() == 0) return nullptr;
+  return function_stack.back().cleanup_block;
+}
+
+BasicBlock *control_state::get_return_block() {
+  if (function_stack.size() == 0) return nullptr;
+  return function_stack.back().return_block;
+}
+
+Value *control_state::get_return_value_ptr() {
+  if (function_stack.size() == 0) return nullptr;
+  return function_stack.back().rt_val;
+}
+
+void control_state::set_jump_target(IRBuilder<> &builder, int code) {
+  if (function_stack.size() == 0) return;
+  builder.CreateStore(ConstantInt::get(getGlobalContext(), APInt(8, code, true)),
+		      function_stack.back().target_sel);
+}
     
-void control_state::push_loop(BasicBlock *post, BasicBlock *next) {
-  loop_blocks loop{post, next, scope_depth()};
+void control_state::push_loop(BasicBlock *update) {
+  loop_blocks loop{update, static_cast<unsigned int>(scope_state_stack.size())};
   loop_stack.push_back(loop);
+}
+
+bool control_state::at_loop_top() {
+  if (loop_stack.size() == 0) return false;
+  return (scope_state_stack.size() == loop_stack.back().top_scope);
 }
 
 void control_state::pop_loop() { loop_stack.pop_back(); }
 bool control_state::inside_loop() { return loop_stack.size() > 0; }
 
-unsigned int control_state::loop_top_scope() { return loop_stack.back().top_scope; }
-BasicBlock *control_state::post_loop() { return loop_stack.back().post_loop; }
-BasicBlock *control_state::next_iter() { return loop_stack.back().next_iter; }
+BasicBlock *control_state::loop_update_block() { return loop_stack.back().update_block; }
 
-void control_state::push_scope() { scope_stack.push_back(1); }
-void control_state::pop_scope() { scope_stack.pop_back(); }
-bool control_state::scope_reaches_end() { return (scope_stack.back() != 0); }
-void control_state::set_scope_reaches_end(bool b) { scope_stack.back() = (b ? 1 : 0); }
-unsigned int control_state::scope_depth() { return scope_stack.size(); }
+void control_state::push_scope() {
+  scope_state_stack.push_back(scope_state());
+}
+
+void control_state::pop_scope() {
+  scope_state_stack.pop_back();
+}
+
+BasicBlock *control_state::get_exit_block() { 
+  if (scope_state_stack.size() > 0) return scope_state_stack.back().exit_block;
+  if (function_stack.size() > 0) return function_stack.back().return_block;
+  return nullptr;
+}
+
+BasicBlock *control_state::get_next_block() {
+  if (scope_state_stack.size() > 0) return scope_state_stack.back().next_block;
+  if (function_stack.size() > 0) return function_stack.back().return_block;
+  return nullptr;
+}
 
 void control_state::push_context(Value *ctx, Type *ctx_type, const boost::function<void (Value*, Module*, IRBuilder<>&)> &loader) {
   class_context cc{ctx, ctx_type, loader};

@@ -368,11 +368,9 @@ codegen_value raytrace::ast::function::create_function(function_entry &entry, Mo
   }
   
   bool is_member_function = entry.member_function;
-  BasicBlock *bb = BasicBlock::Create(getGlobalContext(), "func_entry", f);
-  builder.SetInsertPoint(bb);
   
   //define the body, first name and load up all arguments
-  push_function(entry.return_type);
+  push_function(entry.return_type, f, module, builder);
   
   auto arg_it = f->arg_begin();
   if (is_member_function) {
@@ -435,16 +433,13 @@ raytrace::ast::return_statement::return_statement(parser_state *st, const expres
 codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<> &builder) {
   if (builder.GetInsertBlock()->getTerminator()) return empty_type();
   
-  state->control.set_scope_reaches_end(false);
-
   if (expr == nullptr) {
-    exit_function(module, builder);
-    builder.CreateRetVoid();
+    generate_return_branch(module, builder);
     return empty_type();
   }
   
   typed_value_container rt_val = expr->codegen(module, builder);
-  type_spec &expected_rt = state->control.return_type();  
+  type_spec &expected_rt = state->control.get_function_state().return_ty;
   
   //make sure the expression type matches this function's return type
   boost::function<codegen_void (typed_value &)> check = [this, &expected_rt, module, &builder] (typed_value &result) -> codegen_void {
@@ -453,8 +448,9 @@ codegen_void raytrace::ast::return_statement::codegen(Module *module, IRBuilder<
 				 expr->bound(), true, module, builder);
     
     return errors::codegen_call<code_value, codegen_void>(rt_val, [this, module, &builder] (value &v) -> codegen_void {
-	exit_function(module, builder);
-	builder.CreateRet(v.extract_value());
+	builder.CreateStore(v.extract_value(),
+			    state->control.get_return_value_ptr());
+	generate_return_branch(module, builder);
 	return empty_type();
       });
   };
