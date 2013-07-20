@@ -20,6 +20,8 @@
 */
 
 #include "compiler/ast/function.hpp"
+#include "compiler/debug.hpp"
+
 #include <iostream>
 #include <sstream>
 
@@ -371,6 +373,7 @@ codegen_value raytrace::ast::function::create_function(function_entry &entry, Mo
   
   //define the body, first name and load up all arguments
   push_function(entry.return_type, f, module, builder);
+  state->dbg->push_function(entry, line_no, column_no);
   
   auto arg_it = f->arg_begin();
   if (is_member_function) {
@@ -400,6 +403,7 @@ codegen_value raytrace::ast::function::create_function(function_entry &entry, Mo
   
   //codegen the body and exit the function's scope
   codegen_void body_result = body.codegen(module, builder);
+  state->dbg->pop();
   pop_function(module, builder);
   
   //assuming everything worked, add a terminator and return from the function

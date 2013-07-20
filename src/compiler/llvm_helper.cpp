@@ -27,16 +27,22 @@ using namespace std;
 
 Value *raytrace::CreateEntryBlockAlloca(IRBuilder<> &builder, Type *ty, const string &name) {
   Function *curr_func = builder.GetInsertBlock()->getParent();
-  IRBuilder<> tmp(&curr_func->getEntryBlock(),
-		  curr_func->getEntryBlock().begin());
-  return tmp.CreateAlloca(ty, 0, name.c_str());
+  auto ip = builder.saveIP();
+  builder.SetInsertPoint(&curr_func->getEntryBlock(), curr_func->getEntryBlock().begin());
+  Value *alloc = builder.CreateAlloca(ty, 0, name.c_str());
+
+  builder.restoreIP(ip);
+  return alloc;
 }
 
 Value *raytrace::CreateEntryBlockArrayAlloca(IRBuilder<> &builder, 
 					     Type *ty, Value *arr_size,
 					     const string &name) {
   Function *curr_func = builder.GetInsertBlock()->getParent();
-  IRBuilder<> tmp(&curr_func->getEntryBlock(),
-		  curr_func->getEntryBlock().begin());
-  return tmp.CreateAlloca(ty, arr_size, name.c_str());
+  auto ip = builder.saveIP();
+  builder.SetInsertPoint(&curr_func->getEntryBlock(), curr_func->getEntryBlock().begin());
+  Value *alloc = builder.CreateAlloca(ty, arr_size, name.c_str());
+
+  builder.restoreIP(ip);
+  return alloc;
 }

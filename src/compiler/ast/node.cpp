@@ -20,6 +20,7 @@
 */
 
 #include "compiler/ast/node.hpp"
+#include "llvm/Support/Dwarf.h"
 
 using namespace std;
 using namespace raytrace;
@@ -38,6 +39,7 @@ void ast::ast_node::pop_symtab_scope(Module *module, IRBuilder<> &builder) {
 void ast::ast_node::push_scope(Module *module, IRBuilder<> &builder) {
   //create cleanup block for this point in time
   BasicBlock *cleanup = generate_cleanup(module);
+  MDNode *parent_md = state->control.get_scope_metadata();
   
   //push the new scope state
   state->control.push_scope();
@@ -66,8 +68,6 @@ void ast::ast_node::push_scope(Module *module, IRBuilder<> &builder) {
 }
 
 void ast::ast_node::pop_scope(Module *module, IRBuilder<> &builder) {
-  //bool reaches_end = state->control.scope_reaches_end();
-  
   //create an exit if this block doesn't already have a terminator
   control_state::scope_state &scope = state->control.get_scope_state();
   BasicBlock *next_block = state->control.get_next_block();
@@ -96,7 +96,8 @@ void ast::ast_node::push_function(const type_spec &t, Function *f,
 				  Module *module, IRBuilder<> &builder) {
   //order is important here, we need to know which scope we can exit to
   state->control.push_function(t, f, module, builder);
-
+  control_state::function_state &func_st = state->control.get_function_state();
+  
   variables().scope_push("");
   functions().scope_push("");
 }

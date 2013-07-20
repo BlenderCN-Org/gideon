@@ -1,0 +1,12 @@
+function main() int {
+  int x = 72;
+  int y = 34;
+  int z = x + y;
+
+  {
+    float q = 3.5;
+    q = q + 7.4;
+  }
+
+  return x + y + z;
+}

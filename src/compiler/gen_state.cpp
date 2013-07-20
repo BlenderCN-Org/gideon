@@ -146,3 +146,9 @@ void control_state::load_context(Module *module, IRBuilder<> &builder) {
 Value *control_state::get_context() { return context_stack.back().ctx; }
 void control_state::set_context(Value *ctx) { context_stack.back().ctx = ctx; }
 Type *control_state::get_context_type() { return context_stack.back().ctx_type; }
+
+MDNode *control_state::get_scope_metadata() {
+  if (scope_state_stack.size() > 0) return scope_state_stack.back().metadata;
+  if (function_stack.size() > 0) return function_stack.back().func_metadata;
+  return nullptr;
+}

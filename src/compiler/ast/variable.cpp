@@ -21,6 +21,7 @@
 
 #include "compiler/ast/variable.hpp"
 #include "compiler/llvm_helper.hpp"
+#include "compiler/debug.hpp"
 
 #include <stdexcept>
 #include <sstream>
@@ -72,6 +73,8 @@ codegen_void ast::variable_decl::declare_with_type(type_spec t, Module *module, 
 }
 
 codegen_void ast::variable_decl::codegen(Module *module, IRBuilder<> &builder) {
+  state->dbg->set_location(builder, line_no, column_no);
+
   if (variables().has_local(name)) {
     stringstream err;
     err << "Redeclaration of variable '" << name << "'.";

@@ -22,6 +22,7 @@
 #include "compiler/ast/expression.hpp"
 #include "compiler/operations.hpp"
 #include "compiler/llvm_helper.hpp"
+#include "compiler/debug.hpp"
 
 #include <iostream>
 
@@ -116,6 +117,8 @@ typed_value_container ast::binary_expression::execute_op(binop_table::op_result_
 }
 
 typed_value_container ast::binary_expression::codegen(Module *module, IRBuilder<> &builder) {
+  state->dbg->set_location(builder, line_no, column_no);
+
   typed_value_container lhs_val = lhs->codegen(module, builder);
   typed_value_container rhs_val = rhs->codegen(module, builder);
 

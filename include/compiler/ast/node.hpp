@@ -29,9 +29,12 @@
 #include "compiler/operations.hpp"
 #include "compiler/lookup.hpp"
 
+#include "llvm/DIBuilder.h"
+
 namespace raytrace {
 
   class render_program;
+  class debug_state;
 
   namespace ast {
     
@@ -54,6 +57,8 @@ namespace raytrace {
 
       render_program *objects;
       boost::unordered_set<std::string> object_is_loaded;
+
+      debug_state *dbg;
       
       parser_state(type_table &t) : types(t), type_conversions(t) { }
     };
@@ -71,9 +76,6 @@ namespace raytrace {
 
       parser_state *state;
       unsigned int line_no, column_no;
-
-      void push_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
-      void pop_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
 
       void push_function(const type_spec &t, llvm::Function *f,
 			 llvm::Module *module, llvm::IRBuilder<> &builder);
@@ -114,6 +116,9 @@ namespace raytrace {
       typecheck_value typename_lookup(const std::string &name);
 
       //Scope Management
+      
+      void push_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
+      void pop_scope(llvm::Module *module, llvm::IRBuilder<> &builder);
 
       //Creates a block that cleans up any variables declared up to this point.
       llvm::BasicBlock *generate_cleanup(llvm::Module *module);

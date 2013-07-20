@@ -22,6 +22,8 @@
 #include "compiler/rendermodule.hpp"
 #include "compiler/parser.hpp"
 
+#include "compiler/debug.hpp"
+
 #include "rtlparser.hpp"
 #include "rtlscanner.hpp"
 
@@ -33,6 +35,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Support/Dwarf.h"
 
 #include "llvm/IR/Attributes.h"
 #include "llvm/Linker.h"
@@ -89,8 +92,12 @@ string raytrace::basic_source_loader(const string &abs_path) {
 
 /* Render Object */
 
-render_object::render_object(const string &name, const string &source_code) :
-  name(name), source_code(source_code)
+render_object::render_object(const string &name,
+			     const string &file_path, const string &file_name,
+			     const string &source_code) :
+  name(name),
+  file_path(file_path), file_name(file_name),
+  source_code(source_code)
 {
   
 }
@@ -125,11 +132,16 @@ codegen_void render_object::parse(ast::parser_state *parser,
   return result;
 }
 
-Module *render_object::compile(const string &name, ast::parser_state *parser,
+Module *render_object::compile(const string &name,
+			       const string &file_path, const string &file_name,
+			       ast::parser_state *parser,
+			       bool is_optimized, bool emit_debug,
 			       vector<ast::global_declaration_ptr> &syntax_tree) {
   Module *module = new Module(name.c_str(), getGlobalContext());
   IRBuilder<> builder(getGlobalContext());
+  debug_state dbg(module, file_name, file_path, is_optimized, emit_debug);
   
+  parser->dbg = &dbg;
   parser->modules.scope_push(); //start with an anonymous top-level module
 
   codegen_vector result;
@@ -150,7 +162,7 @@ compiled_renderer::compiled_renderer(Module *module) :
   module(module),
   engine(EngineBuilder(module).create())
 {
-  
+
 }
 
 void *compiled_renderer::get_function_pointer(const string &func_name) {
@@ -225,7 +237,11 @@ string render_program::get_object_name(const string &path) {
 
 void render_program::load_resolved_filename(const string &path) {
   string source = source_loader(path);
-  add_object(render_object(path, source));
+  boost::filesystem::path src_path = path;
+
+  add_object(render_object(path,
+			   src_path.parent_path().native(), src_path.filename().native(),
+			   source));
 }
 
 codegen_void render_program::object_entry::parse() {
@@ -339,7 +355,11 @@ Module *render_program::compile() {
   for (auto name_it = order.begin(); name_it != order.end(); ++name_it) {
     cout << "Compiling Object: " << *name_it << endl;
     std::shared_ptr<object_entry> &object = objects[*name_it];
-    Module *module = render_object::compile(object->obj.name, &object->parser, object->syntax_tree);
+    Module *module = render_object::compile(object->obj.name,
+					    object->obj.file_path, object->obj.file_name,
+					    &object->parser,
+					    do_optimize, do_debug_info,
+					    object->syntax_tree);
     
     string error_msg;
     bool link_st = linker.linkInModule(module, &error_msg);

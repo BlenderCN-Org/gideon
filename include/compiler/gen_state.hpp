@@ -46,6 +46,8 @@ namespace raytrace {
       llvm::Value *target_sel; //used by cleanup blocks
       llvm::BasicBlock *entry_block, *cleanup_block, *return_block;
       
+      llvm::MDNode *func_metadata;
+
       function_state(llvm::Function *func, const type_spec &t,
 		     llvm::Module *module, llvm::IRBuilder<> &builder);
     };
@@ -55,10 +57,13 @@ namespace raytrace {
       
       body_block - Main body of this scope.
       exit_block - Cleanup code for the containing scope (in case this one needs to return/break/continue).
-      next_block - Where to go if we leave this scope normally.      
+      next_block - Where to go if we leave this scope normally.
+      metadata - Metadata to identify this scope for debugging purposes.
     */
     struct scope_state {
       llvm::BasicBlock *body_block, *exit_block, *next_block;
+      
+      llvm::MDNode *metadata;
     };
     
     /* 
@@ -131,8 +136,12 @@ namespace raytrace {
 
     //The next block we go to when we exit a scope normally.
     llvm::BasicBlock *get_next_block();
-    
+
     scope_state &get_scope_state() { return scope_state_stack.back(); }
+
+    //debugging helpers
+
+    llvm::MDNode *get_scope_metadata();
   };
 
 };

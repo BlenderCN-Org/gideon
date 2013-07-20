@@ -30,6 +30,7 @@ set(RT_SOURCE_FILES
   compiler/rendermodule.cpp
   compiler/types.cpp
   compiler/errors.cpp
+  compiler/debug.cpp
   compiler/symboltable.cpp
   compiler/operations.cpp
   compiler/type_conversion.cpp

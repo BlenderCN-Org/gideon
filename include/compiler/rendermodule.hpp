@@ -37,7 +37,9 @@ namespace raytrace {
   /* A single source file in a renderer program. */
   struct render_object {
     
-    render_object(const std::string &name, const std::string &source_code);
+    render_object(const std::string &name,
+		  const std::string &file_path, const std::string &file_name,
+		  const std::string &source_code);
     
     //Parses the source code, throwing an exception if an error occurs.
     //Generates a syntax tree as well as a list of objects this object depends on.
@@ -46,10 +48,14 @@ namespace raytrace {
 		       /* out */ std::vector<std::string> &object_dependencies);
 
     std::string name;
+    std::string file_path, file_name;
     std::string source_code;
 
     //Compiles the given syntax tree, throwing an exception if an error is encountered.
-    static llvm::Module *compile(const std::string &name, ast::parser_state *parser,
+    static llvm::Module *compile(const std::string &name,
+				 const std::string &file_path, const std::string &file_name,
+				 ast::parser_state *parser,
+				 bool is_optimized, bool emit_debug,
 				 std::vector<ast::global_declaration_ptr> &syntax_tree);
     
   };
@@ -82,7 +88,7 @@ namespace raytrace {
       std::vector<std::string> dependencies;
 
       llvm::Module *module;
-
+      
       object_entry(render_program *prog, const render_object &obj);
       codegen_void parse();
     };
@@ -110,6 +116,9 @@ namespace raytrace {
 
     bool has_object(const std::string &name);
     export_table &get_export_table(const std::string &name);
+
+    //Functions to query this program's compile flags.
+    bool optimized() const { return do_optimize; }
 
   private:
 

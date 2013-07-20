@@ -26,6 +26,8 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/DIBuilder.h"
+#include "llvm/DebugInfo.h"
 
 #include <stdexcept>
 #include <boost/unordered_map.hpp>
