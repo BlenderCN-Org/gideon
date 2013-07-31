@@ -234,7 +234,7 @@ codegen_value ast::distribution::createConstructor(Module *module, IRBuilder<> &
 	    int_ptr_ty, int_ptr_ty, int_ptr_ty, int_ptr_ty,
 	    dtor->getType(), dfunc_ptr->getType()});
       FunctionType *alloc_type = FunctionType::get(Type::getInt32PtrTy(getGlobalContext()), alloc_arg_types, false);
-      Function *alloc_func = cast<Function>(module->getOrInsertFunction("gd_builtin_alloc_dfunc", alloc_type));
+      Function *alloc_func = GetExternalFunction(module, "gd_builtin_alloc_dfunc", alloc_type);
       
       int param_data_size = DataLayout(module).getTypeAllocSize(parameter_type);
       Constant *param_size_arg = ConstantInt::get(getGlobalContext(), APInt(8*sizeof(int), param_data_size));

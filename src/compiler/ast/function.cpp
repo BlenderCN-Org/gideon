@@ -315,6 +315,10 @@ ast::prototype::function_gen_value ast::prototype::codegen_entry(Module *module,
       FunctionType *ft = FunctionType::get(return_ty->llvm_type(), arg_llvm_types, false);
       Function *f = Function::Create(ft, Function::ExternalLinkage, name_to_use, module);
       
+      if (external) {
+	f->addFnAttr(Attribute::NoUnwind); //foreign functions may NOT error
+      }
+
       entry.func = f;
       entry.external = external;
       entry.member_function = member_function;

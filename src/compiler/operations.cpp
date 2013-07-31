@@ -362,7 +362,7 @@ binop_table::op_codegen raytrace::llvm_add_str_str(Type *str_type) {
     Type *char_ptr = Type::getInt8PtrTy(getGlobalContext());
     vector<Type*> arg_ty{char_ptr, char_ptr};
     FunctionType *ft = FunctionType::get(char_ptr, ArrayRef<Type*>(arg_ty), false);
-    Function *adder = cast<Function>(module->getOrInsertFunction("gd_builtin_concat_string", ft));
+    Function *adder = GetExternalFunction(module, "gd_builtin_concat_string", ft);
     
     Value *new_data = builder.CreateCall(adder, vector<Value*>{l_data, r_data});
     Value *new_str = builder.CreateInsertValue(UndefValue::get(str_type),
@@ -377,7 +377,7 @@ binop_table::op_codegen raytrace::llvm_add_dfunc_dfunc(Type *dfunc_type) {
     Type *pointer_type = dfunc_type->getPointerTo();
     vector<Type*> arg_type({pointer_type, pointer_type, pointer_type});
     FunctionType *ty = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_type, false);
-    Function *add_f = cast<Function>(module->getOrInsertFunction("gd_builtin_dfunc_add", ty));
+    Function *add_f = GetExternalFunction(module, "gd_builtin_dfunc_add", ty);
     
     Value *lhs_ptr = CreateEntryBlockAlloca(builder, dfunc_type, "dfunc_lhs");
     builder.CreateStore(lhs, lhs_ptr, false);
@@ -401,7 +401,7 @@ binop_table::op_codegen raytrace::llvm_scale_dfunc(Type *dfunc_type, bool swap_o
 
     vector<Type*> arg_type({v4_ptr_type, pointer_type, pointer_type});
     FunctionType *ty = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_type, false);
-    Function *add_f = cast<Function>(module->getOrInsertFunction("gd_builtin_dfunc_scale", ty));
+    Function *add_f = GetExternalFunction(module, "gd_builtin_dfunc_scale", ty);
     
     Value *lhs_ptr = CreateEntryBlockAlloca(builder, v4_type, "dfunc_k");
     builder.CreateStore(lhs, lhs_ptr, false);
@@ -459,7 +459,7 @@ Value *raytrace::llvm_builtin_binop(const string &func_name,
   FunctionType *ft = FunctionType::get(Type::getVoidTy(getGlobalContext()),
 				       ArrayRef<Type*>(arg_ty), false);
   
-  Function *op_func = cast<Function>(module->getOrInsertFunction(func_name.c_str(), ft));
+  Function *op_func = GetExternalFunction(module, func_name.c_str(), ft);
   
   Value *l_ptr = CreateEntryBlockAlloca(builder, lhs_type, "tmp_lhs");
   builder.CreateStore(lhs, l_ptr, false);

@@ -38,6 +38,8 @@ namespace raytrace {
   llvm::Value *CreateEntryBlockArrayAlloca(llvm::IRBuilder<> &builder,
 					   llvm::Type *ty, llvm::Value *arr_size,
 					   const std::string &name);
+
+  llvm::Function *GetExternalFunction(llvm::Module *module, const std::string &name, llvm::FunctionType *ft);
   
   //Memory manager that we can use to control where the "__gd_scene" variable is mapped to.
   //Symbols loaded in this map have priority over other symbols.

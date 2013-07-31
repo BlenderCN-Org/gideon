@@ -152,7 +152,7 @@ Value *dfunc_type::copy(Value *value, Module *module, IRBuilder<> &builder) {
   Type *pointer_type = llvm_type()->getPointerTo();
   vector<Type*> arg_type({pointer_type, pointer_type});
   FunctionType *ty = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_type, false);
-  Function *copy_f = cast<Function>(module->getOrInsertFunction("gd_builtin_copy_dfunc", ty));
+  Function *copy_f = GetExternalFunction(module, "gd_builtin_copy_dfunc", ty);
 
   Value *val_ptr = CreateEntryBlockAlloca(builder, llvm_type(), "dfunc_src");
   builder.CreateStore(value, val_ptr, false);
@@ -165,7 +165,7 @@ Value *dfunc_type::copy(Value *value, Module *module, IRBuilder<> &builder) {
 codegen_void dfunc_type::destroy(Value *value, Module *module, IRBuilder<> &builder) {
   vector<Type*> arg_type({llvm_type()->getPointerTo()});
   FunctionType *ty = FunctionType::get(Type::getVoidTy(getGlobalContext()), arg_type, false);
-  Function *dtor = cast<Function>(module->getOrInsertFunction("gd_builtin_destroy_dfunc", ty));
+  Function *dtor = GetExternalFunction(module, "gd_builtin_destroy_dfunc", ty);
 
   builder.CreateCall(dtor, value);
   return empty_type();

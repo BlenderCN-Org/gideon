@@ -82,7 +82,7 @@ Value *string_type::copy(Value *value, Module *module, IRBuilder<> &builder) {
 
   FunctionType *ft = FunctionType::get(Type::getVoidTy(getGlobalContext()),
 				       ArrayRef<Type*>(arg_ty), false);
-  Function *copy = cast<Function>(module->getOrInsertFunction("gd_builtin_copy_string", ft));
+  Function *copy = GetExternalFunction(module, "gd_builtin_copy_string", ft);
 
   builder.CreateCall(copy, vector<Value*>{src_is_const, src_ptr, dst_is_const, dst_ptr});
   return builder.CreateLoad(dst, "str_copy");
@@ -93,7 +93,7 @@ codegen_void string_type::destroy(Value *value, Module *module, IRBuilder<> &bui
   vector<Type*> arg_ty{Type::getInt1Ty(getGlobalContext()), Type::getInt8PtrTy(getGlobalContext())};
   FunctionType *ft = FunctionType::get(Type::getVoidTy(getGlobalContext()),
 				       ArrayRef<Type*>(arg_ty), false);
-  Function *dtor = cast<Function>(module->getOrInsertFunction("gd_builtin_destroy_string", ft));
+  Function *dtor = GetExternalFunction(module, "gd_builtin_destroy_string", ft);
   Value *is_const = builder.CreateExtractValue(str, ArrayRef<unsigned int>(0), "str_is_const");
   Value *str_ptr = builder.CreateExtractValue(str, ArrayRef<unsigned int>(1), "str_data");
   builder.CreateCall(dtor, vector<Value*>{is_const, str_ptr});

@@ -20,6 +20,7 @@
 */
 
 #include "compiler/llvm_helper.hpp"
+#include <iostream>
 
 using namespace raytrace;
 using namespace llvm;
@@ -45,6 +46,12 @@ Value *raytrace::CreateEntryBlockArrayAlloca(IRBuilder<> &builder,
 
   builder.restoreIP(ip);
   return alloc;
+}
+
+Function *raytrace::GetExternalFunction(Module *module, const string &name, FunctionType *ft) {
+  Function *f = cast<Function>(module->getOrInsertFunction(name, ft));
+  f->addFnAttr(Attribute::NoUnwind);
+  return f;
 }
 
 void *SceneDataMemoryManager::getPointerToNamedFunction(const string &Name,
