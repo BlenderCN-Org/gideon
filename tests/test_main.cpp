@@ -58,9 +58,11 @@ int main(int argc, char **argv) {
   search_paths.push_back(file_dir.native());
 
   InitializeNativeTarget();
+  InitializeNativeTargetAsmPrinter();
+  InitializeNativeTargetAsmParser();
   
   render_program prog("test_program",
-		      false, true,
+		      true, false,
 		      [search_paths] (const string &fname) -> string { return basic_path_resolver(fname, search_paths); },
 		      basic_source_loader);
   prog.load_source_file(argv[1]);

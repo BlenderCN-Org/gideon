@@ -31,23 +31,33 @@ const string debug_state::producer_name = "gideon-compiler 0.1-alpha";
 debug_state::debug_state(llvm::Module *m,
 			 const string &file_name, const string &file_path,
 			 bool do_optimize, bool do_emit_debug) :
+  enabled(false),
   dbg_builder(*m),
   file_info(dbg_builder.createFile(file_name, file_path))
 {
-  dbg_builder.createCompileUnit(dwarf::DW_LANG_C_plus_plus,
-				file_name, file_path,
-				producer_name,
-				do_optimize, "", 0);				
+  if (enabled) {
+    dbg_builder.createCompileUnit(dwarf::DW_LANG_C_plus_plus,
+				  file_name, file_path,
+				  producer_name,
+				  do_optimize, "", 0);
+  }
+}
+
+void debug_state::finalize() {
+  if (enabled) dbg_builder.finalize();
 }
 
 void debug_state::pop() {
+  if (!enabled) return;
   state.pop_back();
 }
 
 void debug_state::push_function(const function_entry &func,
 				unsigned int line_no, unsigned int column_no) {
+  if (!enabled) return;
+  
   const MDNode *scope = (state.size() == 0) ? dbg_builder.getCU() : state.back();
-
+  
   vector<Value*> func_param_ty;
   for (auto it = func.arguments.begin(); it != func.arguments.end(); ++it) {
     func_param_ty.push_back(dbg_builder.createBasicType("int", sizeof(int)*8, 0, dwarf::DW_ATE_signed));
@@ -64,6 +74,8 @@ void debug_state::push_function(const function_entry &func,
 
 void debug_state::set_location(IRBuilder<> &builder,
 			       unsigned int line_no, unsigned int column_no) {
+  if (!enabled) return;
+  
   DICompileUnit cu(dbg_builder.getCU());
   MDNode *scope = (state.size() == 0) ? cu : state.back();
   

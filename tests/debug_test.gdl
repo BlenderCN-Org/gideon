@@ -1,4 +1,10 @@
-function main() int {
+
+function make_error() void {
+  string x = "i should get deleted";
+  error "bar!";
+}
+
+entry function main() int {
   int x = 72;
   int y = 34;
   int z = x + y;
@@ -8,5 +14,9 @@ function main() int {
     q = q + 7.4;
   }
 
+  if (x < 0) error "foo!!";
+
+  //error "wassup";
+  make_error();
   return x + y + z;
 }

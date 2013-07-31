@@ -199,3 +199,16 @@ extern "C" void gd_builtin_dfunc_scale(float4 *k, void *d, /* out */ void *out) 
   shade_tree::node_ptr *node = reinterpret_cast<shade_tree::node_ptr*>(d);
   new (out) shade_tree::node_ptr(shade_tree::scale_ptr(new shade_tree::scale(*k, *node)));
 }
+
+typedef struct { bool is_const; char *data; } gd_error_string_type;
+
+extern "C" void gd_builtin_error(void *str) {  
+  gd_error_string_type *ptr = (gd_error_string_type*)(str);
+  throw *ptr;
+}
+
+extern "C" void gd_builtin_handle_error(void *str) {
+  gd_error_string_type *ptr = (gd_error_string_type*)(str);
+  cerr << "Gideon Error: " << ptr->data << endl;
+  gd_builtin_destroy_string(ptr->is_const, ptr->data);
+}

@@ -221,7 +221,9 @@ extern "C" {
 
   void gd_api_initialize(const char *lib_name) {
     InitializeNativeTarget();
-
+    InitializeNativeTargetAsmPrinter();
+    InitializeNativeTargetAsmParser();
+  
     string load_err;
     sys::DynamicLibrary dylib = sys::DynamicLibrary::getPermanentLibrary(lib_name, &load_err);
     cout << "Library Load: " << load_err << endl;

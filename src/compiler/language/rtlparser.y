@@ -125,6 +125,8 @@
 
 %token <i> IMPORT LOAD
 
+%token <i> ERROR
+
 //Operators
 %right <i> ADD_ASSIGN SUB_ASSIGN DIV_ASSIGN MUL_ASSIGN
 %right <i> '='
@@ -195,6 +197,7 @@
 %type <stmt> for_init_statement
 
 %type <stmt> return_statement
+%type <stmt> error_statement
 
 %type <stmt> scoped_statement
 %type <stmt> statement
@@ -428,6 +431,7 @@ simple_statement
  | conditional_statement
  | iteration_statement
  | jump_statement
+ | error_statement
  | ';' { $$ = nullptr; }
  ;
 
@@ -448,6 +452,11 @@ return_statement
 									     yylloc.first_line, yylloc.first_column)); }
  | RETURN ';' { $$ = ast::statement_ptr(new ast::return_statement(gd_data->state, nullptr,
 								  yylloc.first_line, yylloc.first_column)); }
+ ;
+
+error_statement
+ : ERROR expression ';' { $$ = ast::statement_ptr(new ast::error(gd_data->state, $2,
+								 yylloc.first_line, yylloc.first_column)); }
  ;
 
 jump_statement

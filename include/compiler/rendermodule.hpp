@@ -25,9 +25,12 @@
 #include "compiler/ast/ast.hpp"
 
 #include "llvm/ExecutionEngine/ExecutionEngine.h"
-#include "llvm/ExecutionEngine/JIT.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
 
 namespace raytrace {
+
+  class SceneDataMemoryManager;
 
   /* Helper functions for loading source files. */
   std::string basic_path_resolver(const std::string &src_path_str,
@@ -67,12 +70,17 @@ namespace raytrace {
     compiled_renderer(llvm::Module *module);
 
     void *get_function_pointer(const std::string &func_name);
+
+    //The variable ".__gd_scene" must be mapped to a scene data structure before
+    //retrieving any function pointers.
     void map_global(const std::string &name, void *location_ptr);
     
   private:
     
     llvm::Module *module;
     std::unique_ptr<llvm::ExecutionEngine> engine;
+    SceneDataMemoryManager *jmm;
+    bool finalized;
 
   };
   typedef compiled_renderer render_kernel;

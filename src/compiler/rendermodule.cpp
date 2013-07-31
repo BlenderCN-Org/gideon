@@ -23,6 +23,7 @@
 #include "compiler/parser.hpp"
 
 #include "compiler/debug.hpp"
+#include "compiler/llvm_helper.hpp"
 
 #include "rtlparser.hpp"
 #include "rtlscanner.hpp"
@@ -35,7 +36,9 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/Instrumentation.h"
 #include "llvm/Support/Dwarf.h"
+
 
 #include "llvm/IR/Attributes.h"
 #include "llvm/Linker.h"
@@ -151,6 +154,7 @@ Module *render_object::compile(const string &name,
   }
 
   parser->modules.scope_pop(module, builder, false);
+  dbg.finalize();
 
   errors::extract_left(result);
   return module;
@@ -160,18 +164,34 @@ Module *render_object::compile(const string &name,
 
 compiled_renderer::compiled_renderer(Module *module) :
   module(module),
-  engine(EngineBuilder(module).create())
+  finalized(false),
+  jmm(new SceneDataMemoryManager()) //the ExecutionEngine will take ownership of this pointer
 {
+  string error_str;
 
+  TargetOptions options;
+  options.JITExceptionHandling = true;
+  options.JITEmitDebugInfo = true;
+
+  EngineBuilder builder(module);
+  builder.setErrorStr(&error_str).setUseMCJIT(true).setTargetOptions(options);
+  
+  builder.setJITMemoryManager(jmm);
+  engine.reset(builder.create());
+
+  if (error_str.size() > 0) throw runtime_error(error_str);
 }
 
 void *compiled_renderer::get_function_pointer(const string &func_name) {
+  if (!finalized) {
+    engine->finalizeObject();
+    finalized = true;
+  }
   return engine->getPointerToFunction(module->getFunction(func_name));
 }
 
 void compiled_renderer::map_global(const string &name, void *location_ptr) {
-  //engine->addGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(name)), location_ptr);
-  engine->updateGlobalMapping(cast<GlobalVariable>(module->getNamedGlobal(name)), location_ptr);
+  jmm->explicit_map[name] = location_ptr;
 }
 
 /* Render Program */
@@ -369,7 +389,7 @@ Module *render_program::compile() {
       throw runtime_error(link_err.str());
     }
   }
-
+  
   if (do_optimize) optimize(result);
   return result;
 }

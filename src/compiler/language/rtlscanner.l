@@ -133,6 +133,8 @@
 "import" { return IMPORT; }
 "load" { return LOAD; }
 
+"error" { return ERROR; }
+
 "true" { yylval->i = 1; return BOOL_LITERAL; }
 "false" { yylval->i = 0; return BOOL_LITERAL; }
 

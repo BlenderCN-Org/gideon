@@ -44,11 +44,16 @@ namespace raytrace {
       type_spec return_ty;
       llvm::Value *rt_val; //location to be used for the return value
       llvm::Value *target_sel; //used by cleanup blocks
-      llvm::BasicBlock *entry_block, *cleanup_block, *return_block;
+      llvm::Value *exception; //location of any exception value
+      bool entry_point;
+
+      llvm::BasicBlock *entry_block, *cleanup_block, *return_block, *except_block;
       
       llvm::MDNode *func_metadata;
 
-      function_state(llvm::Function *func, const type_spec &t,
+      function_state(llvm::Function *func,
+		     const type_spec &t,
+		     bool entry_point,
 		     llvm::Module *module, llvm::IRBuilder<> &builder);
     };
     
@@ -91,7 +96,7 @@ namespace raytrace {
     std::vector<class_context> context_stack;
 
     //function control
-    void push_function(const type_spec &t, llvm::Function *f,
+    void push_function(const type_spec &t, bool entry_point, llvm::Function *f,
 		       llvm::Module *module, llvm::IRBuilder<> &builder);
     void pop_function();
 
@@ -133,6 +138,9 @@ namespace raytrace {
 
     //Upon exiting a scope (via return/break/continue), where is the next cleanup block?
     llvm::BasicBlock *get_exit_block();
+
+    //Next cleanup block in a nested scope, otherwise this returns the function's error handling block.
+    llvm::BasicBlock *get_error_block();
 
     //The next block we go to when we exit a scope normally.
     llvm::BasicBlock *get_next_block();

@@ -92,10 +92,10 @@ void ast::ast_node::pop_scope(Module *module, IRBuilder<> &builder) {
   
 }
 
-void ast::ast_node::push_function(const type_spec &t, Function *f,
+void ast::ast_node::push_function(const type_spec &t, bool entry_point, Function *f,
 				  Module *module, IRBuilder<> &builder) {
   //order is important here, we need to know which scope we can exit to
-  state->control.push_function(t, f, module, builder);
+  state->control.push_function(t, entry_point, f, module, builder);
   control_state::function_state &func_st = state->control.get_function_state();
   
   variables().scope_push("");
@@ -345,8 +345,9 @@ BasicBlock *ast::ast_node::generate_cleanup(Module *module) {
   functions().scope_destroy(module, builder);
   
   BasicBlock *exit = state->control.get_exit_block();
+  BasicBlock *exception = state->control.get_error_block();
   
-  int case_count = 2;
+  int case_count = 3;
   if (state->control.inside_loop()) case_count += 2;
 
   SwitchInst* branch = builder.CreateSwitch(builder.CreateLoad(func_st.target_sel), exit, case_count);
@@ -361,11 +362,81 @@ BasicBlock *ast::ast_node::generate_cleanup(Module *module) {
     branch->addCase(ConstantInt::get(getGlobalContext(), APInt(8, 3, true)), break_block);
   }
   
+  branch->addCase(ConstantInt::get(getGlobalContext(), APInt(8, 4, true)), exception);
+
   return cleanup;
 }
 
 void ast::ast_node::generate_return_branch(Module *module, IRBuilder<> &builder) {
-  BasicBlock *cleanup = generate_cleanup(module);  
+  BasicBlock *cleanup = generate_cleanup(module);
   state->control.set_jump_target(builder, 1);
   builder.CreateBr(cleanup);
+}
+
+void ast::ast_node::generate_exception_propagate(Module *module) {
+  control_state::function_state &func_st = state->control.get_function_state();
+
+  BasicBlock *except_block = BasicBlock::Create(getGlobalContext(), "error", func_st.func);
+  IRBuilder<> eh_tmp(except_block, except_block->begin());
+  eh_tmp.CreateResume(eh_tmp.CreateLoad(func_st.exception));
+  func_st.except_block = except_block;
+}
+
+void ast::ast_node::generate_exception_catch(Module *module) {
+  control_state::function_state &func_st = state->control.get_function_state();
+  BasicBlock *except_block = BasicBlock::Create(getGlobalContext(), "error", func_st.func);
+  IRBuilder<> eh_tmp(except_block, except_block->begin());
+
+  Type *int8_ptr = Type::getInt8PtrTy(getGlobalContext());
+  FunctionType *begin_ty = FunctionType::get(int8_ptr, vector<Type*>{int8_ptr}, false);
+  Function *begin_catch = cast<Function>(module->getOrInsertFunction("__cxa_begin_catch", begin_ty));
+
+  Value *eh_ptr = eh_tmp.CreateLoad(eh_tmp.CreateStructGEP(func_st.exception, 0));
+
+  FunctionType *end_ty = FunctionType::get(Type::getVoidTy(getGlobalContext()),
+					   vector<Type*>(), false);
+  Function *end_catch = cast<Function>(module->getOrInsertFunction("__cxa_end_catch", end_ty));
+
+  Value *error_str_ptr = eh_tmp.CreateCall(begin_catch, eh_ptr);
+
+  FunctionType *handle_ty = FunctionType::get(Type::getVoidTy(getGlobalContext()), vector<Type*>{int8_ptr}, false);
+  Function *handle = cast<Function>(module->getOrInsertFunction("gd_builtin_handle_error", handle_ty));
+  eh_tmp.CreateCall(handle, error_str_ptr);
+  
+  eh_tmp.CreateCall(end_catch);
+
+  if (func_st.return_ty->is_void()) eh_tmp.CreateRetVoid();
+  else eh_tmp.CreateRet(eh_tmp.CreateLoad(func_st.rt_val));
+
+  func_st.except_block = except_block;
+}
+
+BasicBlock *ast::ast_node::generate_landing_pad(Module *module) {
+  BasicBlock *cleanup = generate_cleanup(module);
+  
+  control_state::function_state &func_st = state->control.get_function_state();
+  bool handle_error = func_st.entry_point;
+
+  BasicBlock *lp_block = BasicBlock::Create(getGlobalContext(), "landing", func_st.func);
+  IRBuilder<> lp_tmp(lp_block, lp_block->begin());
+  
+  FunctionType *personality_fty = FunctionType::get(Type::getInt32Ty(getGlobalContext()),
+						    true);
+  Function *personality_fn = cast<Function>(module->getOrInsertFunction("__gxx_personality_v0", personality_fty));
+
+  vector<Type*> eh_types{Type::getInt8PtrTy(getGlobalContext()), Type::getInt32Ty(getGlobalContext())};
+  StructType *eh_struct = StructType::get(getGlobalContext(), eh_types);
+
+  unsigned int num_clauses = (handle_error ? 1 : 0);
+
+  LandingPadInst *ex = lp_tmp.CreateLandingPad(eh_struct,
+					       personality_fn, num_clauses);
+  ex->setCleanup(true);
+  if (handle_error) ex->addClause(ConstantPointerNull::get(Type::getInt8PtrTy(getGlobalContext())));
+  
+  state->types["string"]->store(cast<Value>(ex), func_st.exception, module, lp_tmp);
+  state->control.set_jump_target(lp_tmp, 4);
+  lp_tmp.CreateBr(cleanup);
+
+  return lp_block;
 }

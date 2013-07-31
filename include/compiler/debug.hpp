@@ -43,6 +43,8 @@ namespace raytrace {
 
     static const std::string producer_name;
 
+    void finalize();
+
     void push_function(const function_entry &func,
 		       unsigned int line_no, unsigned int column_no);
 
@@ -52,6 +54,8 @@ namespace raytrace {
 		      unsigned int line_no, unsigned int column_no);
 
   private:
+
+    bool enabled;
 
     llvm::DIBuilder dbg_builder;
     llvm::DIFile file_info;

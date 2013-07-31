@@ -97,6 +97,8 @@ namespace raytrace {
       typedef raytrace::codegen<function_symbol_table::entry_type, compile_error>::value function_gen_value;
       function_gen_value codegen_entry(llvm::Module *module, llvm::IRBuilder<> &builder);
       
+      exports::function_export::export_type export_type() { return exp_type; }
+
     private:
 
       std::string name, extern_name;

@@ -1,7 +1,7 @@
 
 
 set(BOOST_COMPONENTS system filesystem)
-set(LLVM_COMPONENTS core jit native linker ipo)
+set(LLVM_COMPONENTS mcjit jit interpreter nativecodegen bitreader asmparser irreader selectiondag native linker ipo)
 
 find_package(Boost COMPONENTS ${BOOST_COMPONENTS})
 if (Boost_FOUND)

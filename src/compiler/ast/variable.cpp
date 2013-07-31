@@ -120,7 +120,7 @@ raytrace::codegen_value raytrace::ast::global_variable_decl::codegen(llvm::Modul
       err << "Invalid const initializer for type '" << ty->name << "', found type '" << val.get<1>()->name << "'.";
       return errors::make_error<errors::error_message>(err.str(), line_no, column_no);
     }
-
+    
     GlobalVariable *gv = new GlobalVariable(ty->llvm_type(), false, GlobalValue::ExternalLinkage, val.get<0>(), full_name());
     module->getGlobalList().push_back(gv);
     

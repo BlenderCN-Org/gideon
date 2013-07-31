@@ -26,26 +26,33 @@ using namespace raytrace;
 using namespace llvm;
 using namespace std;
 
-control_state::function_state::function_state(Function *func, const type_spec &t,
+control_state::function_state::function_state(Function *func,
+					      const type_spec &t,
+					      bool entry_point,
 					      Module *module, IRBuilder<> &builder) :
   func(func), return_ty(t),
   rt_val(return_ty->is_void() ? nullptr : return_ty->allocate(module, builder)),
   target_sel(CreateEntryBlockAlloca(builder,
 				    Type::getInt8Ty(getGlobalContext()), "target_sel")),
-  entry_block(nullptr), cleanup_block(nullptr), return_block(nullptr)
+  exception(CreateEntryBlockAlloca(builder,
+				   StructType::get(getGlobalContext(),
+						   vector<Type*>{Type::getInt8PtrTy(getGlobalContext()), Type::getInt32Ty(getGlobalContext())}),
+				   "eh_val")),
+  entry_point(entry_point),
+  entry_block(nullptr), cleanup_block(nullptr), return_block(nullptr), except_block(nullptr)
 {
   
 }
 
-void control_state::push_function(const type_spec &t, Function *f,
+void control_state::push_function(const type_spec &t, bool entry_point, Function *f,
 				  Module *module, IRBuilder<> &builder) {
   //setup the function's entry block
   BasicBlock *entry_block = BasicBlock::Create(getGlobalContext(), "entry", f);
   builder.SetInsertPoint(entry_block);
   
-  function_stack.push_back(function_state(f, t, module, builder));
+  function_stack.push_back(function_state(f, t, entry_point, module, builder));
   function_state &func_st = function_stack.back();
-  
+    
   //setup the return block
   BasicBlock *return_block = BasicBlock::Create(getGlobalContext(), "return", f);
   IRBuilder<> tmp(return_block, return_block->begin());
@@ -55,6 +62,7 @@ void control_state::push_function(const type_spec &t, Function *f,
   func_st.entry_block = entry_block;
   func_st.cleanup_block = nullptr;
   func_st.return_block = return_block;
+  func_st.except_block = nullptr;
 }
 
 
@@ -120,6 +128,12 @@ void control_state::pop_scope() {
 BasicBlock *control_state::get_exit_block() { 
   if (scope_state_stack.size() > 0) return scope_state_stack.back().exit_block;
   if (function_stack.size() > 0) return function_stack.back().return_block;
+  return nullptr;
+}
+
+BasicBlock *control_state::get_error_block() { 
+  if (scope_state_stack.size() > 0) return scope_state_stack.back().exit_block;
+  if (function_stack.size() > 0) return function_stack.back().except_block;
   return nullptr;
 }
 

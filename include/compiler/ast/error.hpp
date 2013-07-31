@@ -19,20 +19,33 @@
 
 */
 
-#ifndef RT_AST_HPP
-#define RT_AST_HPP
+#ifndef GD_RL_AST_ERROR_HPP
+#define GD_RL_AST_ERROR_HPP
 
-#include "compiler/ast/expression.hpp"
-#include "compiler/ast/typename.hpp"
-#include "compiler/ast/literal.hpp"
-#include "compiler/ast/variable.hpp"
-#include "compiler/ast/assignment.hpp"
-#include "compiler/ast/function.hpp"
 #include "compiler/ast/statement.hpp"
-#include "compiler/ast/control.hpp"
-#include "compiler/ast/distribution.hpp"
-#include "compiler/ast/module.hpp"
-#include "compiler/ast/alias.hpp"
-#include "compiler/ast/error.hpp"
+
+namespace raytrace {
+
+  namespace ast {
+
+    /* Node that throws an error. */
+    class error : public statement {
+    public:
+
+      error(parser_state *st,
+	    const expression_ptr &error_str,
+	    unsigned int line_no, unsigned int column_no);
+
+      virtual codegen_void codegen(llvm::Module *module, llvm::IRBuilder<> &builder);
+
+    private:
+
+      expression_ptr error_str;
+
+    };
+
+  };
+
+};
 
 #endif

@@ -22,8 +22,12 @@
 #ifndef GD_RL_LLVM_HELPER
 #define GD_RL_LLVM_HELPER
 
+#include <boost/unordered_map.hpp>
+
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
 
 namespace raytrace {
 
@@ -35,6 +39,17 @@ namespace raytrace {
 					   llvm::Type *ty, llvm::Value *arr_size,
 					   const std::string &name);
   
+  //Memory manager that we can use to control where the "__gd_scene" variable is mapped to.
+  //Symbols loaded in this map have priority over other symbols.
+  class SceneDataMemoryManager : public llvm::SectionMemoryManager {
+  public:
+
+    boost::unordered_map<std::string, void*> explicit_map;
+
+    virtual void *getPointerToNamedFunction(const std::string &Name,
+					    bool AbortOnFailure = true);
+
+  };
   
 };
 

@@ -46,3 +46,11 @@ Value *raytrace::CreateEntryBlockArrayAlloca(IRBuilder<> &builder,
   builder.restoreIP(ip);
   return alloc;
 }
+
+void *SceneDataMemoryManager::getPointerToNamedFunction(const string &Name,
+							bool AbortOnFailure) {
+  auto map_it = explicit_map.find(Name);
+  if (map_it != explicit_map.end()) return map_it->second;
+
+  return SectionMemoryManager::getPointerToNamedFunction(Name, AbortOnFailure);
+}

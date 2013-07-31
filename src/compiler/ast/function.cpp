@@ -179,11 +179,20 @@ typed_value_container ast::func_call::codegen(Module *module, IRBuilder<> &build
       ++arg_it;
       ++arg_idx;
     }
+
+    BasicBlock *lp = generate_landing_pad(module);
+    BasicBlock *next = BasicBlock::Create(getGlobalContext(), "invoke.next", state->control.get_function_state().func);
     
-    if (f->getReturnType()->isVoidTy()) return typed_value(builder.CreateCall(f, arg_vals), entry->return_type);
+    if (f->getReturnType()->isVoidTy()) {
+      typed_value rt(builder.CreateInvoke(f, next, lp, arg_vals), entry->return_type);
+      builder.SetInsertPoint(next);
+      return rt;
+    }
     
     string tmp_name = fname + string("_call");
-    return typed_value(builder.CreateCall(f, arg_vals, tmp_name.c_str()), entry->return_type);
+    typed_value rt(builder.CreateInvoke(f, next, lp, arg_vals, tmp_name.c_str()), entry->return_type);
+    builder.SetInsertPoint(next);
+    return rt;
   };
   
   typed_value_container result = errors::codegen_apply(call_func, func, arg_eval);
@@ -372,8 +381,15 @@ codegen_value raytrace::ast::function::create_function(function_entry &entry, Mo
   bool is_member_function = entry.member_function;
   
   //define the body, first name and load up all arguments
-  push_function(entry.return_type, f, module, builder);
+  bool is_entry_point = (defn->export_type() == exports::function_export::export_type::ENTRY);
   state->dbg->push_function(entry, line_no, column_no);
+  push_function(entry.return_type, is_entry_point, f, module, builder);
+
+  //generate a top-level exception handling block depending on the type of function
+  if (is_entry_point)
+    generate_exception_catch(module);
+  else
+    generate_exception_propagate(module);
   
   auto arg_it = f->arg_begin();
   if (is_member_function) {
@@ -403,8 +419,6 @@ codegen_value raytrace::ast::function::create_function(function_entry &entry, Mo
   
   //codegen the body and exit the function's scope
   codegen_void body_result = body.codegen(module, builder);
-  state->dbg->pop();
-  pop_function(module, builder);
   
   //assuming everything worked, add a terminator and return from the function
   typedef errors::argument_value_join<codegen_void>::result_value_type arg_val_type;
@@ -413,9 +427,12 @@ codegen_value raytrace::ast::function::create_function(function_entry &entry, Mo
     BasicBlock *func_end = builder.GetInsertBlock();
     if (!func_end->getTerminator()) {
       //no terminator - add if return type is void, error otherwise
-      if (f->getReturnType()->isVoidTy()) builder.CreateRetVoid();
+      if (f->getReturnType()->isVoidTy()) generate_return_branch(module, builder);
       else return errors::make_error<errors::error_message>("No return statement in a non-void function", line_no, column_no);
     }
+
+    state->dbg->pop();
+    pop_function(module, builder);
     
     if (verifyFunction(*f)) return errors::make_error<errors::error_message>("Error verifying function", line_no, column_no);
     return f;
