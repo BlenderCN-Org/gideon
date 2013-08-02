@@ -119,6 +119,15 @@ extern "C" bool gde_primitive_get_attribute_v3(render_context::scene_data *sdata
   return primitive_get_attribute<float3>(prim, *s, attr_name->data, *coords, *result);
 }
 
+extern "C" bool gde_primitive_get_attribute_v4(render_context::scene_data *sdata, int prim_id,
+					       gd_string_type *attr_name, float4 *coords,
+					       /* out */ float4 *result) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[prim_id];
+
+  return primitive_get_attribute<float4>(prim, *s, attr_name->data, *coords, *result);
+}
+
 
 
 //Intersection Functions
