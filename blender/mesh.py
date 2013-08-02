@@ -22,7 +22,7 @@ def UVFromFace(uv_face, n_verts, out_list):
 def VColorFromFace(vcol_face, n_verts, out_list):
     out_list.append((vcol_face.color1, vcol_face.color2, vcol_face.color3))
     if n_verts == 4:
-        out_list.append((vcol_face.color1, vcol_face.color4, vcol_face.color4))
+        out_list.append((vcol_face.color1, vcol_face.color3, vcol_face.color4))
 
 #Flattens a list of points into a ctype array.
 def FlattenList(pt_list):

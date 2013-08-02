@@ -21,6 +21,8 @@
 
 #include "compiler/gd_std.hpp"
 #include "scene/scene.hpp"
+#include "scene/attribute_reader.hpp"
+
 #include "geometry/triangle.hpp"
 #include "math/sampling.hpp"
 
@@ -88,6 +90,37 @@ extern "C" bool gde_primitive_has_volume(render_context::scene_data *sdata, int 
   return (prim.volume_id != NULL);
 }
 
+typedef struct { bool is_const; char *data; } gd_string_type;
+
+extern "C" bool gde_primitive_get_attribute_f(render_context::scene_data *sdata, int prim_id,
+					      gd_string_type *attr_name, float4 *coords,
+					      /* out */ float *result) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[prim_id];
+
+  return primitive_get_attribute<float>(prim, *s, attr_name->data, *coords, *result);
+}
+
+extern "C" bool gde_primitive_get_attribute_v2(render_context::scene_data *sdata, int prim_id,
+					       gd_string_type *attr_name, float4 *coords,
+					       /* out */ float2 *result) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[prim_id];
+
+  return primitive_get_attribute<float2>(prim, *s, attr_name->data, *coords, *result);
+}
+
+extern "C" bool gde_primitive_get_attribute_v3(render_context::scene_data *sdata, int prim_id,
+					       gd_string_type *attr_name, float4 *coords,
+					       /* out */ float3 *result) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[prim_id];
+
+  return primitive_get_attribute<float3>(prim, *s, attr_name->data, *coords, *result);
+}
+
+
+
 //Intersection Functions
 
 extern "C" float gde_isect_dist(intersection *i) { return i->t; }
@@ -119,6 +152,10 @@ extern "C" int gde_isect_primitive_id(intersection *i) {
 
 extern "C" void gde_ray_point_on_ray(ray *r, float t, float3 *P) {
   *P = r->point_on_ray(t);
+}
+
+extern "C" void gde_isect_uv(intersection *i, /* out */ float2 *uv) {
+  *uv = float2{i->u, i->v};
 }
 
 extern "C" void gde_ray_origin(ray *r, float3 *O) { *O = r->o; }

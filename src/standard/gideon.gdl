@@ -126,6 +126,9 @@ module gideon {
   extern function __isect_primitive_id(output isect i) int : gde_isect_primitive_id;
   function isect:primitive_id(isect i) int { return __isect_primitive_id(i); }
 
+  extern function __isect_uv(output isect i, output vec2 uv) void : gde_isect_uv;
+  function isect:uv(isect i) vec2 { vec2 uv; __isect_uv(i, uv); return uv; }
+
   extern function __ray_point_on_ray(output ray r, float t, output vec3 P) void : gde_ray_point_on_ray;
   function ray:point_on_ray(ray r, float t) vec3 { vec3 P; __ray_point_on_ray(r, t, P); return P; }
 
@@ -148,6 +151,29 @@ module gideon {
   
   extern function __primitive_has_volume(scene s, int p) bool : gde_primitive_has_volume;
   function primitive:has_volume(int p) bool { return __primitive_has_volume(__gd_scene, p); }
+
+  /* Attribute Access */
+
+  extern function __primitive_get_attribute(scene s, int p, output string name,
+					    output vec4 coords, output float result) bool : gde_primitive_get_attribute_f;
+  function primitive:get_attribute(int p, string name,
+				   vec4 coords, output float result) bool {
+    return __primitive_get_attribute(__gd_scene, p, name, coords, result);
+  }
+
+  extern function __primitive_get_attribute(scene s, int p, output string name,
+					    output vec4 coords, output vec2 result) bool : gde_primitive_get_attribute_v2;
+  function primitive:get_attribute(int p, string name,
+				   vec4 coords, output vec2 result) bool {
+    return __primitive_get_attribute(__gd_scene, p, name, coords, result);
+  }
+
+  extern function __primitive_get_attribute(scene s, int p, output string name,
+					    output vec4 coords, output vec3 result) bool : gde_primitive_get_attribute_v3;
+  function primitive:get_attribute(int p, string name,
+				   vec4 coords, output vec3 result) bool {
+    return __primitive_get_attribute(__gd_scene, p, name, coords, result);
+  }
 
   /* Scene Query */
 
