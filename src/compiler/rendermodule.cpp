@@ -164,8 +164,8 @@ Module *render_object::compile(const string &name,
 
 compiled_renderer::compiled_renderer(Module *module) :
   module(module),
-  finalized(false),
-  jmm(new SceneDataMemoryManager()) //the ExecutionEngine will take ownership of this pointer
+  finalized(false)//,
+  //jmm(new SceneDataMemoryManager()) //the ExecutionEngine will take ownership of this pointer
 {
   string error_str;
 
@@ -174,9 +174,11 @@ compiled_renderer::compiled_renderer(Module *module) :
   options.JITEmitDebugInfo = true;
 
   EngineBuilder builder(module);
-  builder.setErrorStr(&error_str).setUseMCJIT(true).setTargetOptions(options);
-  
-  builder.setJITMemoryManager(jmm);
+  //builder.setErrorStr(&error_str).setUseMCJIT(true).setTargetOptions(options);
+  //builder.setJITMemoryManager(jmm);
+
+  builder.setErrorStr(&error_str).setTargetOptions(options);
+
   engine.reset(builder.create());
 
   if (error_str.size() > 0) throw runtime_error(error_str);
@@ -191,7 +193,8 @@ void *compiled_renderer::get_function_pointer(const string &func_name) {
 }
 
 void compiled_renderer::map_global(const string &name, void *location_ptr) {
-  jmm->explicit_map[name] = location_ptr;
+  //jmm->explicit_map[name] = location_ptr;
+  engine->addGlobalMapping(module->getNamedGlobal(name), location_ptr);
 }
 
 /* Render Program */
