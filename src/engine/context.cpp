@@ -25,15 +25,21 @@
 using namespace std;
 using namespace gideon;
 
+//OIIO_NAMESPACE_USING
+
 render_context::render_context() :
   sd(new scene_data)
 {
   sd->rng = bind(uniform_real_distribution<float>(0.0f, 1.0f),
 		 mt19937());
+  //sd->textures = TextureSystem::create();
 }
 
 render_context::~render_context() {
-  if (sd) delete sd;
+  if (sd) {
+    //TextureSystem::destroy(sd->textures);
+    delete sd;
+  }
 }
 
 void render_context::set_kernel(unique_ptr<raytrace::render_kernel> k) {

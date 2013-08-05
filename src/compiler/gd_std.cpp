@@ -268,6 +268,39 @@ extern "C" void gde_light_eval_radiance(light *lt, float3 *P, float3 *I, /* out 
   *R = lt->eval_radiance(*P, *I);
 }
 
+//Sampling
+
+extern "C" void gde_setup_sampler(render_context::scene_data *sdata,
+				  int width, int height, int samples_per_pixel,
+				  gd_string_type *type) {
+  sdata->samples.setup(width, height, samples_per_pixel, sdata->samples.select_generator(type->data));
+}
+
+extern "C" int gde_add_sample(render_context::scene_data *sdata,
+			      gd_string_type *type,
+			      int dim, int N) {
+  return static_cast<int>(sdata->samples.add(dim, N, sdata->samples.select_generator(type->data)));
+}
+
+extern "C" void gde_next_sample(render_context::scene_data *sdata, int x, int y,
+				/* out */ float2 *sample) {
+  sdata->samples.next_sample(static_cast<unsigned int>(x), static_cast<unsigned int>(y), sample);
+}
+
+extern "C" int gde_sample_offset(render_context::scene_data *sdata, int id) {
+  return static_cast<int>(sdata->samples.get_offset(static_cast<sampler::sample_id>(id)));
+}
+
+extern "C" float gde_sample_get_1d(render_context::scene_data *sdata,
+				   int idx) {
+  return sdata->samples.access_1d(static_cast<unsigned int>(idx));
+}
+
+extern "C" void gde_sample_get_2d(render_context::scene_data *sdata,
+				  int idx, /* out */ float2 *sample) {
+  *sample = sdata->samples.access_2d(static_cast<unsigned int>(idx));
+}
+
 //Render Output
 
 extern "C" void gde_write_pixel(int x, int y, int width, int height, float4 *color, void *out) {

@@ -51,6 +51,19 @@ int main(int argc, char **argv) {
     return -1;
   }
   
+  TextureSystem *ts = TextureSystem::create();
+  TextureOptions options;
+  options.nchannels = 4;
+
+  float result[4];
+  bool status = ts->texture(ustring("/home/curtis/Projects/gideon/examples/textures/uv_grid.png"), options,
+			    0.5f, 0.5f, 0.0f, 0.0f, 0.0f, 0.0f, result);
+  cout << "Lookup Status: " << status << endl;
+  cout << "Result: [" << result[0] << ", " << result[1] << ", " << result[2] << ", " << result[3] << "]" << endl;
+
+  TextureSystem::destroy(ts);
+  return 0;
+
   boost::filesystem::path file_dir = boost::filesystem::path(argv[1]).parent_path();
   
   vector<string> search_paths;

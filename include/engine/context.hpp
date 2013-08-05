@@ -24,9 +24,12 @@
 
 #include "scene/scene.hpp"
 #include "scene/bvh.hpp"
+#include "math/sampling.hpp"
+
 #include "compiler/rendermodule.hpp"
 
 #include <boost/function.hpp>
+//#include <OpenImageIO/texture.h>
 
 namespace gideon {
 
@@ -37,7 +40,10 @@ namespace gideon {
     struct scene_data {
       raytrace::scene *s;
       raytrace::bvh *accel;
+      raytrace::sampler samples;
       boost::function<float ()> rng; //probably not threadsafe
+
+      //OpenImageIO::TextureSystem *textures;
     };
 
     render_context();

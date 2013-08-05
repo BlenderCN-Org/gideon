@@ -59,19 +59,37 @@ module render {
     return gideon.ray:point_on_ray(depth_ray, thickness);
   }
 
-  function sample_direct(dfunc surface, vec3 P, vec3 w_out, int N) vec4 {
+  function sample_direct(dfunc surface, vec3 P, vec3 w_out, int N,
+			 output int light_pos_sample_idx, output int light_idx_sample_idx) vec4 {
     vec4 L = vec4(0.0, 0.0, 0.0, 0.0);
 
     int num_lights = gideon.scene:num_lights();
-    int light_idx = (num_lights * gideon.random());
-    if (light_idx > (num_lights - 1)) light_idx = num_lights - 1;
 
-    light lt = gideon.scene:get_light(light_idx);
     float inv_N = 1.0 / N;
 
     for (int i = 0; i < N; i += 1) {
+      float idx_rand = 0.0;
+      if (light_idx_sample_idx > -1) {
+	idx_rand = gideon.sampler:get_1d(light_idx_sample_idx);
+	light_idx_sample_idx++;
+      }
+      else idx_rand = gideon.random();
+      
+      int light_idx = (num_lights * idx_rand);
+      if (light_idx > (num_lights - 1)) light_idx = num_lights - 1;
+      
+      light lt = gideon.scene:get_light(light_idx);
+
       float light_pdf;
-      vec4 tmp_P = gideon.light:sample_position(lt, P, gideon.random(), gideon.random(), light_pdf);
+
+      vec2 L_sample = vec2(0.0, 0.0);
+      if (light_pos_sample_idx > -1) {
+        L_sample = gideon.sampler:get_2d(light_pos_sample_idx);
+	light_pos_sample_idx++;
+      }
+      else L_sample = vec2(gideon.random(), gideon.random());
+      
+      vec4 tmp_P = gideon.light:sample_position(lt, P, L_sample.x, L_sample.y, light_pdf);
       vec3 P_lt = vec3(tmp_P.x, tmp_P.y, tmp_P.z);
       
       if (!in_shadow(P, P_lt)) {
@@ -82,14 +100,16 @@ module render {
 	//shade this point
 	float pdf;
 	vec4 refl = gideon.dfunc:evaluate(surface, gideon.flags.any, P, I, P, w_out, pdf) * R;
-	L += (inv_N / light_pdf) * refl;
+	L += (num_lights * inv_N / light_pdf) * refl;
       }
     }
 
     return num_lights * L;
   }
   
-  function shade(ray r, int min_path, int path_length, int light_samples) vec4 {
+  function shade(ray r, int min_path, int path_length, int light_samples,
+		 int[] bsdf_sample_id_arr, int[] bsdf_select_id_arr,
+		 int[] light_pos_sample_id_arr, int[] light_idx_sample_id_arr) vec4 {
     vec4 Li = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 throughput = vec4(1.0, 1.0, 1.0, 1.0);
     
@@ -98,6 +118,22 @@ module render {
     int L_samples = light_samples;
 
     for (int i = 0; i < path_length; i += 1) {
+      int bsdf_sample_idx = -1;
+      int bsdf_select_idx = -1;
+      
+      int light_pos_sample_idx = -1;
+      int light_idx_sample_idx = -1;
+
+      if (i < bsdf_sample_id_arr.length) {
+	bsdf_sample_idx = gideon.sampler:get_offset(bsdf_sample_id_arr[i]);
+	bsdf_select_idx = gideon.sampler:get_offset(bsdf_select_id_arr[i]);
+      }
+      
+      if (i < light_pos_sample_id_arr.length) {
+	light_pos_sample_idx = gideon.sampler:get_offset(light_pos_sample_id_arr[i]);
+	light_idx_sample_idx = gideon.sampler:get_offset(light_idx_sample_id_arr[i]);
+      }
+      
       isect ray_hit;
       if (!gideon.trace(r, ray_hit)) break; //hit nothing
       
@@ -127,7 +163,7 @@ module render {
 	if (L_samples < 1) L_samples = 1;
       }
       
-      vec4 Ld = sample_direct(surface, P, w_out, L_samples);
+      vec4 Ld = sample_direct(surface, P, w_out, L_samples, light_pos_sample_idx, light_idx_sample_idx);
       Li += throughput * Ld;
       
       //possibly terminate path
@@ -143,8 +179,20 @@ module render {
       
       //sample bsdf to get new direction
       vec2 rand_P = vec2(0.0, 0.0);
-      vec2 rand_w = vec2(gideon.random(), gideon.random());
-      float rand_D = gideon.random();
+      vec2 rand_w = vec2(0.0, 0.0);
+
+      if (bsdf_sample_idx > -1) {
+	rand_w = gideon.sampler:get_2d(bsdf_sample_idx);
+	bsdf_sample_idx++;
+      }
+      else rand_w = vec2(gideon.random(), gideon.random());
+
+      float rand_D = 0.0;
+      if (bsdf_select_idx > -1) {
+	rand_D = gideon.sampler:get_1d(bsdf_select_idx);
+	bsdf_select_idx++;
+      }
+      else rand_D = gideon.random();
       
       vec3 P_in;
       vec3 w_in;
@@ -171,10 +219,32 @@ module render {
 
 //Renderer Entry Point
 module start {
-
+  
   entry function main(int x0, int y0, int width, int height, scene output_buffer) void {
-    int samples_per_pixel = 1;
+    int samples_per_pixel = 4;
+
+    int num_light_samples = 8;
+    int num_bsdf_samples = 1;
+
+    int min_path_length = 6;
+    int max_path_length = 8;
+
     float inv_samples = 1.0 / samples_per_pixel;
+    
+    gideon.sampler:setup(width, height, samples_per_pixel, "lhs");
+
+    int[4] light_sample_ids;
+    int[4] light_idx_sample_ids;
+
+    int[4] bsdf_sample_ids;
+    int[4] bsdf_select_sample_ids;
+    
+    for (int i = 0; i < 4; ++i) {
+      light_idx_sample_ids[i] = gideon.sampler:add("lhs", 1, num_light_samples);
+      light_sample_ids[i] = gideon.sampler:add("lhs", 2, num_light_samples);
+      bsdf_sample_ids[i] = gideon.sampler:add("lhs", 2, num_bsdf_samples);
+      bsdf_select_sample_ids[i] = gideon.sampler:add("lhs", 1, num_bsdf_samples);
+    }
     
     for (int y = 0; y < height; y += 1) {
       for (int x = 0; x < width; x += 1) {
@@ -182,12 +252,15 @@ module start {
 	vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
 	
 	for (int i = 0; i < samples_per_pixel; i += 1) {
+	  vec2 sample;
+   	  gideon.sampler:next_sample(x, y, sample);
+	  sample += pix;
+	  
 	  //shoot a ray from the camera to the scene
-	  vec2 offset = vec2(gideon.random(), gideon.random());
-	  vec2 sample = pix + offset;
 	  ray r = gideon.camera:shoot_ray(sample.x, sample.y);
-	  //color += inv_samples * render.shade(r, 3, 8, 8);
-	  color += inv_samples * render.shade(r, 4, 6, 8);
+	  
+	  color += inv_samples * render.shade(r, min_path_length, max_path_length, num_light_samples,
+					      bsdf_sample_ids, bsdf_select_sample_ids, light_sample_ids, light_idx_sample_ids);
 	}
 	
 	color.w = 1.0;

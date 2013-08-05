@@ -196,6 +196,33 @@ module gideon {
     return __trace(r, hit, aabb_count, prim_count, __gd_scene);
   }
 
+  /* Sampling */
+
+  extern function __setup_sampler(scene s,
+				  int width, int height, int samples_per_pixel,
+				  output string generator) void : gde_setup_sampler;
+  function sampler:setup(int width, int height, int samples_per_pixel, string generator) void {
+    __setup_sampler(__gd_scene, width, height, samples_per_pixel, generator);
+  }
+
+  extern function __sampler_add(scene s,
+				output string generator,
+				int dim, int N) int : gde_add_sample;
+  function sampler:add(string generator, int dim, int N) int { return __sampler_add(__gd_scene, generator, dim, N); }
+
+  extern function __sampler_next_sample(scene s, int x, int y,
+					output vec2 sample) void : gde_next_sample;
+  function sampler:next_sample(int x, int y, output vec2 sample) void { __sampler_next_sample(__gd_scene, x, y, sample); }
+
+  extern function __sampler_get_offset(scene s, int id) int : gde_sample_offset;
+  function sampler:get_offset(int id) int { return __sampler_get_offset(__gd_scene, id); }
+  
+  extern function __sampler_get_1d(scene s, int idx) float : gde_sample_get_1d;
+  function sampler:get_1d(int idx) float { return __sampler_get_1d(__gd_scene, idx); }
+
+  extern function __sampler_get_2d(scene s, int idx, output vec2 sample) void : gde_sample_get_2d;
+  function sampler:get_2d(int idx) vec2 { vec2 sample; __sampler_get_2d(__gd_scene, idx, sample); return sample; }
+
   /* Lights */
   
   //Returns the number of lights in the current scene.
