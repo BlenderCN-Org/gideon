@@ -71,14 +71,14 @@ add_flex_bison_dependency(rtl_scanner rtl_parser)
 
 set(RT_PARSER_LEXER_SOURCE ${BISON_rtl_parser_OUTPUTS} ${FLEX_rtl_scanner_OUTPUTS})
 
-include_directories(${RT_INCLUDE_DIR} ${LLVM_INCLUDE_DIRS} ${Boost_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
-link_directories(${LLVM_LIBRARY_DIRS})
+include_directories(${RT_INCLUDE_DIR} ${LLVM_INCLUDE_DIRS} ${OIIO_INCLUDE_DIR} ${Boost_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+link_directories(${LLVM_LIBRARY_DIRS} ${OIIO_LIBRARY_DIRS})
 add_definitions(${LLVM_DEFINITIONS})
 
 add_library(gideon SHARED ${RT_SOURCE_FILES} ${RT_PARSER_LEXER_SOURCE})
 add_executable(gideon_compiler ${CMAKE_SOURCE_DIR}/tests/test_main.cpp)
 
-target_link_libraries(gideon ${LLVM_LIBRARIES} ${Boost_LIBRARIES} pthread m dl)
+target_link_libraries(gideon ${LLVM_LIBRARIES} ${Boost_LIBRARIES} ${OIIO_LIBRARIES} pthread m dl)
 target_link_libraries(gideon_compiler gideon)
 
 set_target_properties(gideon

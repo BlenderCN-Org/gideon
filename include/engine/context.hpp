@@ -29,7 +29,7 @@
 #include "compiler/rendermodule.hpp"
 
 #include <boost/function.hpp>
-//#include <OpenImageIO/texture.h>
+#include <OpenImageIO/texture.h>
 
 namespace gideon {
 
@@ -43,7 +43,7 @@ namespace gideon {
       raytrace::sampler samples;
       boost::function<float ()> rng; //probably not threadsafe
 
-      //OpenImageIO::TextureSystem *textures;
+      OpenImageIO::TextureSystem *textures;
     };
 
     render_context();

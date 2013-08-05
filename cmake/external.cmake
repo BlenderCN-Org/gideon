@@ -20,3 +20,10 @@ endif()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${LLVM_ROOT}/share/llvm/cmake")
 include(LLVMConfig)
 llvm_map_components_to_libraries(LLVM_LIBRARIES ${LLVM_COMPONENTS})
+
+#OIIO
+
+set(OIIO_ROOT "/usr/local" CACHE PATH "Top-level of the the OIIO install")
+set(OIIO_INCLUDE_DIR "${OIIO_ROOT}/include")
+set(OIIO_LIBRARY_DIRS "${OIIO_ROOT}/lib")
+set(OIIO_LIBRARIES "OpenImageIO")

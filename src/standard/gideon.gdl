@@ -223,6 +223,13 @@ module gideon {
   extern function __sampler_get_2d(scene s, int idx, output vec2 sample) void : gde_sample_get_2d;
   function sampler:get_2d(int idx) vec2 { vec2 sample; __sampler_get_2d(__gd_scene, idx, sample); return sample; }
 
+  /* Textures */
+
+  extern function __texture_2d(scene s, output string name,
+			       output vec2 coords, output vec4 color) bool : gde_texture_2d;
+  function texture_2d(string name, vec2 coords, output vec4 color) bool { return __texture_2d(__gd_scene, name, coords, color); }
+  
+
   /* Lights */
   
   //Returns the number of lights in the current scene.

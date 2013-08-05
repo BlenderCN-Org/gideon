@@ -25,19 +25,19 @@
 using namespace std;
 using namespace gideon;
 
-//OIIO_NAMESPACE_USING
+OIIO_NAMESPACE_USING
 
 render_context::render_context() :
   sd(new scene_data)
 {
   sd->rng = bind(uniform_real_distribution<float>(0.0f, 1.0f),
 		 mt19937());
-  //sd->textures = TextureSystem::create();
+  sd->textures = TextureSystem::create();
 }
 
 render_context::~render_context() {
   if (sd) {
-    //TextureSystem::destroy(sd->textures);
+    TextureSystem::destroy(sd->textures);
     delete sd;
   }
 }

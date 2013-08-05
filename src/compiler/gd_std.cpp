@@ -301,6 +301,23 @@ extern "C" void gde_sample_get_2d(render_context::scene_data *sdata,
   *sample = sdata->samples.access_2d(static_cast<unsigned int>(idx));
 }
 
+//Texturing
+
+extern "C" bool gde_texture_2d(render_context::scene_data *sdata,
+			       gd_string_type *name, float2 *coords,
+			       /* out */ float4 *color) {
+  OpenImageIO::TextureOptions options;
+  options.nchannels = 4;
+
+  float result[4];  
+  bool status = sdata->textures->texture(OpenImageIO::ustring(name->data), options,
+					 coords->x, coords->y,
+					 0.0f, 0.0f, 0.0f, 0.0f,
+					 result);
+  *color = float4{result[0], result[1], result[2], result[3]};
+  return status;
+}
+
 //Render Output
 
 extern "C" void gde_write_pixel(int x, int y, int width, int height, float4 *color, void *out) {
