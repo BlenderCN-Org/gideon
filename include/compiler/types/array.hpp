@@ -42,11 +42,11 @@ namespace raytrace {
 
     virtual llvm::Type *llvm_type() const;
     
-    virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual code_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
 
-    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder,
-					 typed_value_vector &args, const type_conversion_table &conversions) const;
+    virtual code_value create(llvm::Module *module, llvm::IRBuilder<> &builder,
+			      typed_value_vector &args, const type_conversion_table &conversions) const;
 
     //array element access
     virtual type_spec element_type() const { return base; }
@@ -90,7 +90,7 @@ namespace raytrace {
 
     virtual llvm::Type *llvm_type() const;
     
-    virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual code_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
     
     //array element access
     virtual type_spec element_type() const { return base; }

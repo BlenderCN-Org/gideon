@@ -52,9 +52,9 @@ Type *ray_type::llvm_type() const {
   return type_value;
 }
 
-typed_value_container ray_type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args,
-				       const type_conversion_table &conversions) const {
-  return errors::codegen_call<typed_value_vector, typed_value_container>(args, [&] (vector<typed_value> &ctor_args) -> typed_value_container {
+code_value ray_type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args,
+			    const type_conversion_table &conversions) const {
+  return errors::codegen_call<typed_value_vector, code_value>(args, [&] (vector<typed_value> &ctor_args) -> code_value {
       if (ctor_args.size() != 4) {
 	stringstream err_ss;
 	err_ss << " Ray constructor expects 4 arguments, received " << ctor_args.size();
@@ -89,10 +89,10 @@ typed_value_container ray_type::create(Module *module, IRBuilder<> &builder, typ
 					     types->at("float"), module, builder);
       code_value max_t = conversions.convert(arg_types[3], ctor_args[3].get<0>().extract_value(),
 					     types->at("float"), module, builder);
-      boost::function<typed_value_container (value &, value &,
-					     value &, value &)> ctor = [this, module, &builder] (value &origin,
-												 value &direction,
-												 value &min_t, value &max_t) -> typed_value_container {
+      boost::function<code_value (value &, value &,
+				  value &, value &)> ctor = [this, module, &builder] (value &origin,
+										      value &direction,
+										      value &min_t, value &max_t) -> code_value {
 	Value *ray_val = UndefValue::get(type_value);
 	Value *o_val = origin.extract_value();
 	Value *d_val = direction.extract_value();
@@ -111,7 +111,7 @@ typed_value_container ray_type::create(Module *module, IRBuilder<> &builder, typ
 	
 	ray_val = builder.CreateInsertValue(ray_val, min_t.extract_value(), ArrayRef<unsigned int>(2));
 	ray_val = builder.CreateInsertValue(ray_val, max_t.extract_value(), ArrayRef<unsigned int>(3));
-	return typed_value(ray_val, types->at("ray"));
+	return ray_val;
       };
       
       return errors::codegen_apply(ctor, origin, direction, min_t, max_t);
@@ -144,7 +144,7 @@ Type *dfunc_type::llvm_type() const {
   return ArrayType::get(byte_type, sizeof(shade_tree::node_ptr));
 }
 
-typed_value_container dfunc_type::initialize(Module *, IRBuilder<> &) const {
+code_value dfunc_type::initialize(Module *, IRBuilder<> &) const {
   return errors::make_error<errors::error_message>("No default initialization for distributions.", 0, 0);
 }
 
@@ -171,10 +171,10 @@ codegen_void dfunc_type::destroy(Value *value, Module *module, IRBuilder<> &buil
   return empty_type();
 }
 
-typed_value_container dfunc_type::create(Module *module, IRBuilder<> &builder,
-					 typed_value_vector &args,
-					 const type_conversion_table &conversions) const {
-  boost::function<typed_value_container (vector<typed_value>&)> ctor = [this, module, &builder] (vector<typed_value> &args) -> typed_value_container {
+code_value dfunc_type::create(Module *module, IRBuilder<> &builder,
+			      typed_value_vector &args,
+			      const type_conversion_table &conversions) const {
+  boost::function<code_value (vector<typed_value>&)> ctor = [this, module, &builder] (vector<typed_value> &args) -> code_value {
     vector<Value*> shader_args;
     
     //ensure the argument types are {shader_handle, ray, vec2, isect}.
@@ -203,10 +203,10 @@ typed_value_container dfunc_type::create(Module *module, IRBuilder<> &builder,
       ++arg_it;
     }
 
-    return typed_value(builder.CreateCall(shader_func, shader_args), types->at("dfunc"));
+    return value(builder.CreateCall(shader_func, shader_args));
   };
 
-  return errors::codegen_call<typed_value_vector, typed_value_container>(args, ctor);
+  return errors::codegen_call<typed_value_vector, code_value>(args, ctor);
 }
 
 //Shader Flag
@@ -215,9 +215,9 @@ Type *shader_flag_type::llvm_type() const {
   return Type::getInt64Ty(getGlobalContext());
 }
 
-typed_value_container shader_flag_type::create(Module *module, IRBuilder<> &builder,
-					       typed_value_vector &args, const type_conversion_table &conversions) const {
-  auto build = [this, &conversions, module, &builder] (vector<typed_value> &args) -> typed_value_container {
+code_value shader_flag_type::create(Module *module, IRBuilder<> &builder,
+				    typed_value_vector &args, const type_conversion_table &conversions) const {
+  auto build = [this, &conversions, module, &builder] (vector<typed_value> &args) -> code_value {
     if (args.size() != 1) {
       stringstream err_ss;
       err_ss << name << " constructor expects one integer argument, received " << args.size();
@@ -234,17 +234,16 @@ typed_value_container shader_flag_type::create(Module *module, IRBuilder<> &buil
     code_value bit_idx = conversions.convert(arg.get<1>(), arg.get<0>().extract_value(),
 					     types->at("int"),
 					     module, builder);
-    return errors::codegen_call<code_value, typed_value_container>(bit_idx,
-								   [this, &builder] (value &v) -> typed_value_container {
-								     return typed_value(builder.CreateShl(ConstantInt::get(getGlobalContext(), APInt(64, 1, false)),
-													  v.extract_value(), "shifted_flag"),
-											types->at("shader_flag"));
-								   });
+    return errors::codegen_call<code_value, code_value>(bit_idx,
+							[this, &builder] (value &v) -> code_value {
+							  return value(builder.CreateShl(ConstantInt::get(getGlobalContext(), APInt(64, 1, false)),
+											 v.extract_value(), "shifted_flag"));
+							});
     
   };
 
   return errors::codegen_call<typed_value_vector,
-			      typed_value_container>(args, build);
+			      code_value>(args, build);
 }
 
 codegen_constant shader_flag_type::create_const(Module *module, IRBuilder<> &builder,
@@ -275,9 +274,8 @@ codegen_constant shader_flag_type::create_const(Module *module, IRBuilder<> &bui
 			      codegen_constant>(args, build);
 }
 
-typed_value_container shader_flag_type::initialize(Module *module, IRBuilder<> &builder) const {
-  return typed_value(ConstantInt::get(getGlobalContext(), APInt(64, 0, false)),
-		     types->at("shader_flag"));
+code_value shader_flag_type::initialize(Module *module, IRBuilder<> &builder) const {
+  return ConstantInt::get(getGlobalContext(), APInt(64, 0, false));
 }
 
 //Shader Handle

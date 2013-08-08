@@ -39,7 +39,6 @@ namespace raytrace {
   
   /* Describes an instance of a type. */
   class type;
-  //typedef std::shared_ptr<type> type_spec;
   typedef type* type_spec;
 
   std::size_t hash_value(const type_spec &ts);
@@ -95,8 +94,8 @@ namespace raytrace {
     
     //type information
     const std::string name, type_id;
-    const bool is_differentiable;
-
+    bool is_differentiable;
+    
     virtual bool is_iterator() const { return false; }
     virtual bool is_array() const { return false; }
     virtual bool is_void() const { return false; }
@@ -127,15 +126,15 @@ namespace raytrace {
     virtual void store(llvm::Value *value, llvm::Value *ptr, llvm::Module *module, llvm::IRBuilder<> &builder) const;
 
     //destruction/copy
-    virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const {
-      return typed_value(static_cast<llvm::Value*>(nullptr), types->at(name));
+    virtual code_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const {
+      return code_value(static_cast<llvm::Value*>(nullptr));
     }
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return empty_type(); }
     
     virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder) { return value; }
     
-    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args,
-					 const type_conversion_table &conversions) const;
+    virtual code_value create(llvm::Module *module, llvm::IRBuilder<> &builder, typed_value_vector &args,
+			      const type_conversion_table &conversions) const;
     virtual codegen_constant create_const(llvm::Module *module, llvm::IRBuilder<> &builder, codegen_const_vector &args,
 					  const type_conversion_table &conversions) const;
 

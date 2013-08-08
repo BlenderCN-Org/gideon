@@ -68,7 +68,7 @@ namespace raytrace {
 
     virtual llvm::Type *llvm_type() const;
     
-    virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual code_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
     virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
 
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);

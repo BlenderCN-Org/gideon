@@ -32,8 +32,8 @@ namespace raytrace {
     ray_type(type_table *types);
     virtual llvm::Type *llvm_type() const;
 
-    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder,
-					 typed_value_vector &args, const type_conversion_table &conversions) const;
+    virtual code_value create(llvm::Module *module, llvm::IRBuilder<> &builder,
+			      typed_value_vector &args, const type_conversion_table &conversions) const;
 
   private:
 
@@ -66,10 +66,10 @@ namespace raytrace {
     virtual llvm::Type *llvm_type() const;
 
     //creates a distribution from a shader
-    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder,
-					 typed_value_vector &args, const type_conversion_table &conversions) const;
+    virtual code_value create(llvm::Module *module, llvm::IRBuilder<> &builder,
+			      typed_value_vector &args, const type_conversion_table &conversions) const;
 
-    virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual code_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
     virtual llvm::Value *copy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
     virtual codegen_void destroy(llvm::Value *value, llvm::Module *module, llvm::IRBuilder<> &builder);
     
@@ -84,12 +84,12 @@ namespace raytrace {
     virtual llvm::Type *llvm_type() const;
 
     //initializes a flag from an integer argument (flag <- 2 ^ arg).
-    virtual typed_value_container create(llvm::Module *module, llvm::IRBuilder<> &builder,
-					 typed_value_vector &args, const type_conversion_table &conversions) const;
+    virtual code_value create(llvm::Module *module, llvm::IRBuilder<> &builder,
+			      typed_value_vector &args, const type_conversion_table &conversions) const;
     virtual codegen_constant create_const(llvm::Module *module, llvm::IRBuilder<> &builder,
 					  codegen_const_vector &args, const type_conversion_table &conversions) const;
 
-    virtual typed_value_container initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
+    virtual code_value initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const;
     
   };
 

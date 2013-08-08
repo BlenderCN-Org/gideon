@@ -51,13 +51,12 @@ string array_type::type_code(const type_spec &base, unsigned int N) {
   return ss.str();
 }
 
-typed_value_container array_type::initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const {
+code_value array_type::initialize(llvm::Module *module, llvm::IRBuilder<> &builder) const {
   Value *array_val = UndefValue::get(arr_type);
-  typed_value_container elem_init = base->initialize(module, builder);
+  code_value elem_init = base->initialize(module, builder);
 
-  boost::function<typed_value_container (typed_value &)> load_init = [this, array_val, module, &builder] (typed_value &arg) -> typed_value_container {
-    Value *init_val = arg.get<0>().extract_value();
-    type_spec init_ty = arg.get<1>();
+  boost::function<code_value (value &)> load_init = [this, array_val, module, &builder] (value &arg) -> code_value {
+    Value *init_val = arg.extract_value();
     Value *rt_val = array_val;
 
     if (init_val) {
@@ -66,7 +65,7 @@ typed_value_container array_type::initialize(llvm::Module *module, llvm::IRBuild
       }
     }
 
-    return typed_value(rt_val, types->get_array(base, N));
+    return rt_val;
   };
   
   return errors::codegen_call(elem_init, load_init);
@@ -110,9 +109,9 @@ typed_value_container array_type::access_element_ptr(Value *value_ptr, Value *el
   return typed_value(elem_ptr, base);
 }
 
-typed_value_container array_type::create(Module *module, IRBuilder<> &builder,
-					 typed_value_vector &args, const type_conversion_table &conversions) const {
-  boost::function<typed_value_container (vector<typed_value> &)> ctor = [this, module, &builder] (vector<typed_value> &args) -> typed_value_container {
+code_value array_type::create(Module *module, IRBuilder<> &builder,
+			      typed_value_vector &args, const type_conversion_table &conversions) const {
+  boost::function<code_value (vector<typed_value> &)> ctor = [this, module, &builder] (vector<typed_value> &args) -> code_value {
     //check arg vector size
     if (args.size() != N) {
       stringstream ss;
@@ -136,10 +135,10 @@ typed_value_container array_type::create(Module *module, IRBuilder<> &builder,
       array_val = builder.CreateInsertValue(array_val, it->get<0>().extract_value(), ArrayRef<unsigned int>(idx));
     }
     
-    return typed_value(array_val, types->get_array(base, N));
+    return array_val;
   };
 
-  return errors::codegen_call<typed_value_vector, typed_value_container>(args, ctor);
+  return errors::codegen_call<typed_value_vector, code_value>(args, ctor);
 }
 
 /** Array Reference **/
@@ -169,7 +168,7 @@ string array_reference_type::type_code(const type_spec &base) {
 
 Type *array_reference_type::llvm_type() const { return ref_type; }
 
-typed_value_container array_reference_type::initialize(Module *module, IRBuilder<> &builder) const {
+code_value array_reference_type::initialize(Module *module, IRBuilder<> &builder) const {
   return errors::make_error<errors::error_message>("No default initialization for array reference.", 0, 0);
 }
 

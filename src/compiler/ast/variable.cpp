@@ -42,7 +42,10 @@ raytrace::ast::variable_decl::variable_decl(parser_state *st, const string &name
 }
 
 typed_value_container ast::variable_decl::initialize_from_type(type_spec t, Module *module, IRBuilder<> &builder) {
-  return t->initialize(module, builder);
+  code_value v = t->initialize(module, builder);
+  return errors::codegen_call<code_value, typed_value_container>(v, [&t] (value &arg) -> typed_value_container {
+      return typed_value(arg, t);
+    });
 }
 
 codegen_void ast::variable_decl::declare_with_type(type_spec t, Module *module, IRBuilder<> &builder) {
@@ -211,13 +214,17 @@ typed_value_container ast::type_constructor::codegen(Module *module, IRBuilder<>
 	if (!args[i]->bound()) to_destroy.push_back(val);
       }
       
-      typed_value_container result = ty->create(module, builder, arg_values, state->type_conversions);
+      code_value result = ty->create(module, builder, arg_values, state->type_conversions);
       
       for (auto it = to_destroy.begin(); it != to_destroy.end(); ++it) {
 	expression::destroy_unbound(*it, module, builder);
       }
+
+      typed_value_container typed_result = errors::codegen_call<code_value, typed_value_container>(result, [ty] (value &v) -> typed_value_container {
+	  return typed_value(v, ty);
+	});
       
-      return result;
+      return typed_result;
     });
 }
 

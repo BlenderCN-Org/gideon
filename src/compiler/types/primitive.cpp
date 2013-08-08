@@ -62,10 +62,9 @@ string_type::string_type(type_table *types) :
 
 Type *string_type::llvm_type() const { return str_type_value; }
 
-typed_value_container string_type::initialize(Module *module, IRBuilder<> &builder) const {
-  return typed_value(builder.CreateInsertValue(UndefValue::get(llvm_type()),
-					       ConstantInt::get(getGlobalContext(), APInt(1, true, true)), ArrayRef<unsigned int>(0), "init_str"),
-		     types->at("string"));
+code_value string_type::initialize(Module *module, IRBuilder<> &builder) const {
+  return builder.CreateInsertValue(UndefValue::get(llvm_type()),
+				   ConstantInt::get(getGlobalContext(), APInt(1, true, true)), ArrayRef<unsigned int>(0), "init_str");
 }
 
 Value *string_type::copy(Value *value, Module *module, IRBuilder<> &builder) {

@@ -30,13 +30,13 @@ using namespace std;
 
 /* Vector Helper Functions */
 
-typed_value_container make_llvm_vec_N(Module *module, IRBuilder<> &builder, const string &vname, unsigned int N,
-				      Type *vec_type, type_spec result_type, type_spec elem_type, typed_value_vector &args,
-				      const type_conversion_table &conversions) {
-  boost::function<typed_value_container (vector<typed_value> &)> op = [vec_type, result_type,
-								       elem_type, &vname, N,
-								       &conversions,
-								       module, &builder] (vector<typed_value> &args) -> typed_value_container {
+code_value make_llvm_vec_N(Module *module, IRBuilder<> &builder, const string &vname, unsigned int N,
+			   Type *vec_type, type_spec result_type, type_spec elem_type, typed_value_vector &args,
+			   const type_conversion_table &conversions) {
+  boost::function<code_value (vector<typed_value> &)> op = [vec_type, result_type,
+							    elem_type, &vname, N,
+							    &conversions,
+							    module, &builder] (vector<typed_value> &args) -> code_value {
     //check argument count
     if (args.size() != N) {
       stringstream err_ss;
@@ -79,10 +79,10 @@ typed_value_container make_llvm_vec_N(Module *module, IRBuilder<> &builder, cons
       errors::codegen_call<code_value, codegen_void>(conv_v, insert_elem);
     }
 
-    return typed_value(v, result_type);
+    return value(v);
   };
 
-  errors::value_container_operation<typed_value_vector, typed_value_container> constructor(op);
+  errors::value_container_operation<typed_value_vector, code_value> constructor(op);
   return boost::apply_visitor(constructor, args);
 }
 
@@ -171,7 +171,7 @@ typed_value_container floatN_type::access_field_ptr(const string &field, Value *
   return typed_value(builder.CreateStructGEP(value_ptr, idx, "vec_elem"), types->at("float"));
 }
 
-typed_value_container floatN_type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args,
-					  const type_conversion_table &conversions) const {
+code_value floatN_type::create(Module *module, IRBuilder<> &builder, typed_value_vector &args,
+			       const type_conversion_table &conversions) const {
   return make_llvm_vec_N(module, builder, type_name(N), N, type_value, types->at(type_name(N)), types->at("float"), args, conversions);
 }
