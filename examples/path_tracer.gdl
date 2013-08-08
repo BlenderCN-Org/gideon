@@ -265,7 +265,6 @@ module start {
 			       vec3(0.0, 0.0, 0.0));
 	  vec3[2] d_dir;
 	  ray r = gideon.camera:shoot_ray(sample.x, sample.y);
-	  gideon.ray:differentials(r, d_dir[0], d_dir[1]);
 	  
 	  color += inv_samples * render.shade(r, min_path_length, max_path_length, num_light_samples,
 					      d_p, d_dir,
