@@ -108,6 +108,7 @@ module render {
   }
   
   function shade(ray r, int min_path, int path_length, int light_samples,
+		 vec3[2] ray_dp, vec3[2] ray_dd,
 		 int[] bsdf_sample_id_arr, int[] bsdf_select_id_arr,
 		 int[] light_pos_sample_id_arr, int[] light_idx_sample_id_arr) vec4 {
     vec4 Li = vec4(0.0, 0.0, 0.0, 0.0);
@@ -116,6 +117,9 @@ module render {
     float prob_continue = 0.5;
     float inv_prob = 1.0 / prob_continue;
     int L_samples = light_samples;
+
+    vec3[2] new_dp;
+    vec3[2] new_dd;
 
     for (int i = 0; i < path_length; i += 1) {
       int bsdf_sample_idx = -1;
@@ -257,9 +261,14 @@ module start {
 	  sample += pix;
 	  
 	  //shoot a ray from the camera to the scene
+	  vec3[2] d_p = vec3[](vec3(0.0, 0.0, 0.0),
+			       vec3(0.0, 0.0, 0.0));
+	  vec3[2] d_dir;
 	  ray r = gideon.camera:shoot_ray(sample.x, sample.y);
+	  gideon.ray:differentials(r, d_dir[0], d_dir[1]);
 	  
 	  color += inv_samples * render.shade(r, min_path_length, max_path_length, num_light_samples,
+					      d_p, d_dir,
 					      bsdf_sample_ids, bsdf_select_sample_ids, light_sample_ids, light_idx_sample_ids);
 	}
 	

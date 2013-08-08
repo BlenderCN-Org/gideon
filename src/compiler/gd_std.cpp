@@ -25,6 +25,7 @@
 
 #include "geometry/triangle.hpp"
 #include "math/sampling.hpp"
+#include "math/differential.hpp"
 
 #include "engine/context.hpp"
 
@@ -110,6 +111,16 @@ extern "C" bool gde_primitive_get_attribute_v2(render_context::scene_data *sdata
   return primitive_get_attribute<float2>(prim, *s, attr_name->data, *coords, *result);
 }
 
+extern "C" bool gde_primitive_get_attribute_v2_deriv(render_context::scene_data *sdata, int prim_id,
+						     gd_string_type *attr_name, float4 *coords,
+						     /* out */ float2 *result,
+						     /* out */ float2 *du, /* out */ float2 *dv) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[prim_id];
+
+  return primitive_get_attribute_deriv<float2>(prim, *s, attr_name->data, *coords, *result, *du, *dv);
+}
+
 extern "C" bool gde_primitive_get_attribute_v3(render_context::scene_data *sdata, int prim_id,
 					       gd_string_type *attr_name, float4 *coords,
 					       /* out */ float3 *result) {
@@ -155,6 +166,16 @@ extern "C" void gde_isect_smooth_normal(intersection *i, render_context::scene_d
 
 extern "C" int gde_isect_primitive_id(intersection *i) {
   return i->prim_idx;
+}
+
+extern "C" void gde_isect_dP(intersection *i, render_context::scene_data *sdata,
+			     /* out */ float3 *dPdu, /* out */ float3 *dPdv) {
+  scene *s = sdata->s;
+  primitive &prim = s->primitives[i->prim_idx];
+  int3 &tri = s->triangle_verts[prim.data_id];
+  vector<float3> &verts = s->vertices;
+
+  compute_triangle_dP(verts[tri.x], verts[tri.y], verts[tri.z], *dPdu, *dPdv);
 }
 
 /* Ray */
@@ -308,7 +329,9 @@ extern "C" bool gde_texture_2d(render_context::scene_data *sdata,
 			       /* out */ float4 *color) {
   OpenImageIO::TextureOptions options;
   options.nchannels = 4;
-
+  options.swrap = OpenImageIO::TextureOptions::WrapPeriodic;
+  options.twrap = OpenImageIO::TextureOptions::WrapPeriodic;
+  
   float result[4];  
   bool status = sdata->textures->texture(OpenImageIO::ustring(name->data), options,
 					 coords->x, coords->y,
@@ -316,6 +339,33 @@ extern "C" bool gde_texture_2d(render_context::scene_data *sdata,
 					 result);
   *color = float4{result[0], result[1], result[2], result[3]};
   return status;
+}
+
+extern "C" bool gde_texture_2d_deriv(render_context::scene_data *sdata,
+				     gd_string_type *name,
+				     float2 *coords, float2 *dx, float2 *dy,
+				     /* out */ float4 *color) {
+  OpenImageIO::TextureOptions options;
+  options.nchannels = 4;
+  options.swrap = OpenImageIO::TextureOptions::WrapPeriodic;
+  options.twrap = OpenImageIO::TextureOptions::WrapPeriodic;
+  
+  float result[4];  
+  bool status = sdata->textures->texture(OpenImageIO::ustring(name->data), options,
+					 coords->x, coords->y,
+					 dx->x, dx->y, dy->x, dy->y,
+					 result);
+  *color = float4{result[0], result[1], result[2], result[3]};
+  return status;
+}
+
+extern "C" void gde_differential_dudv(float3 *dPdx, float3 *dPdy,
+				      float3 *dPdu, float3 *dPdv,
+				      float3 *N,
+				      /* out */ float *dudx, /* out */ float *dudy,
+				      /* out */ float *dvdx, /* out */ float *dvdy) {
+  differential_dudv(*dPdx, *dPdy, *dPdu, *dPdv, *N,
+		    *dudx, *dudy, *dvdx, *dvdy);
 }
 
 //Render Output

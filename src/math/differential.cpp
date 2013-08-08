@@ -78,5 +78,5 @@ void raytrace::differential_dudv(const float3 &dPdx, const float3 &dPdy,
   dvdx = (dpdu.x*dpdx.y - dpdx.x*dpdu.y) * detA;
 
   dudy = (dpdy.x*dpdv.y - dpdv.x*dpdy.y) * detA;
-  dvdy = (dpdu.x*dpdy.y - dpdx.x*dpdu.y) * detA;
+  dvdy = (dpdu.x*dpdy.y - dpdy.x*dpdu.y) * detA;
 }

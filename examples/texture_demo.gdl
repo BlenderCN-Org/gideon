@@ -1,0 +1,83 @@
+load "gideon";
+
+//Renderer Entry Point
+module start {
+  
+  entry function texture_main(int x0, int y0, int width, int height, scene output_buffer) void {
+    int samples_per_pixel = 1;
+    float inv_samples = 1.0 / samples_per_pixel;
+    
+    gideon.sampler:setup(width, height, samples_per_pixel, "lhs");
+    
+    for (int y = 0; y < height; y += 1) {
+      for (int x = 0; x < width; x += 1) {
+	vec2 pix = vec2(x0 + x, y0 + y);
+	vec4 color = vec4(0.0, 0.0, 0.0, 0.0);
+	
+	for (int i = 0; i < samples_per_pixel; i += 1) {
+	  vec2 sample;
+   	  gideon.sampler:next_sample(x, y, sample);
+	  sample = pix;
+	  
+	  //shoot a ray from the camera to the scene
+	  vec3[2] d_p = vec3[](vec3(0.0, 0.0, 0.0),
+			       vec3(0.0, 0.0, 0.0));
+	  vec3[2] d_dir;
+	  ray r = gideon.camera:shoot_ray(sample.x, sample.y);
+
+	  //compute the ray differentials
+	  ray rx = gideon.camera:shoot_ray(sample.x + 1.0, sample.y);
+	  ray ry = gideon.camera:shoot_ray(sample.x, sample.y + 1.0);	  
+	  d_dir[0] = gideon.ray:direction(rx) - gideon.ray:direction(r);
+	  d_dir[1] = gideon.ray:direction(ry) - gideon.ray:direction(r);
+	  
+	  isect ray_hit;
+	  if (!gideon.trace(r, ray_hit)) continue; //hit nothing
+
+	  vec3[2] dp2;
+	  vec3[2] dd2;
+	  vec3 dPdu;
+	  vec3 dPdv;
+	  vec4 dudv;
+
+	  vec3 D = gideon.ray:direction(r);
+	  vec3 N = gideon.isect:smooth_normal(ray_hit);
+
+   	  gideon.ray:differential_transfer(d_p, d_dir, gideon.isect:distance(ray_hit),
+					   D, N,
+					   dp2, dd2);
+	  gideon.isect:dP(ray_hit, dPdu, dPdv);
+	  gideon.differential:dudv(dp2[0], dp2[1], dPdu, dPdv, N,
+				   dudv.x, dudv.y, dudv.z, dudv.w);
+
+	  vec2 isect_uv = gideon.isect:uv(ray_hit);
+	  vec2 tcoords;
+	  vec2 dtdu;
+	  vec2 dtdv;
+
+	  bool has_tcoords = gideon.primitive:get_attribute(gideon.isect:primitive_id(ray_hit),
+							    "uv:UVMap", vec4(isect_uv.x, isect_uv.y, 0.0, 0.0), tcoords, dtdu, dtdv);
+	  if (has_tcoords) {	    
+	    tcoords *= 5.0;
+	    dtdu *= 5.0;
+	    dtdv *= 5.0;
+
+	    vec2 dtdx = dudv.x * dtdu + dudv.z * dtdv;
+	    vec2 dtdy = dudv.y * dtdu + dudv.w * dtdv;
+	    
+	    vec4 tex_color = vec4(0.0, 0.0, 0.0, 1.0);
+	    
+
+	    gideon.texture_2d("/home/curtis/Projects/gideon/examples/textures/uv_grid.png", tcoords, dtdx, dtdy, tex_color);
+	    //gideon.texture_2d("/home/curtis/Projects/gideon/examples/textures/uv_grid.png", tcoords, tex_color);
+	    color += inv_samples * tex_color;
+	  }
+	}
+	
+	color.w = 1.0;
+	gideon.write_pixel(x, y, width, height, color, output_buffer);
+      }
+    }
+  }
+  
+}
