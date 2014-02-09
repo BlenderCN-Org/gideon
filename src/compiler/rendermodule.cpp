@@ -170,7 +170,7 @@ compiled_renderer::compiled_renderer(Module *module) :
   string error_str;
 
   TargetOptions options;
-  options.JITExceptionHandling = true;
+  //options.JITExceptionHandling = true;
   options.JITEmitDebugInfo = true;
 
   EngineBuilder builder(module);

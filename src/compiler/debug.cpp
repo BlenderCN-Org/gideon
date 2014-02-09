@@ -36,10 +36,10 @@ debug_state::debug_state(llvm::Module *m,
   file_info(dbg_builder.createFile(file_name, file_path))
 {
   if (enabled) {
-    dbg_builder.createCompileUnit(dwarf::DW_LANG_C_plus_plus,
-				  file_name, file_path,
-				  producer_name,
-				  do_optimize, "", 0);
+    dbg_cu = dbg_builder.createCompileUnit(dwarf::DW_LANG_C_plus_plus,
+					   file_name, file_path,
+					   producer_name,
+					   do_optimize, "", 0);
   }
 }
 
@@ -56,7 +56,7 @@ void debug_state::push_function(const function_entry &func,
 				unsigned int line_no, unsigned int column_no) {
   if (!enabled) return;
   
-  const MDNode *scope = (state.size() == 0) ? dbg_builder.getCU() : state.back();
+  const MDNode *scope = (state.size() == 0) ? dbg_cu : state.back();
   
   vector<Value*> func_param_ty;
   for (auto it = func.arguments.begin(); it != func.arguments.end(); ++it) {
@@ -76,8 +76,7 @@ void debug_state::set_location(IRBuilder<> &builder,
 			       unsigned int line_no, unsigned int column_no) {
   if (!enabled) return;
   
-  DICompileUnit cu(dbg_builder.getCU());
-  MDNode *scope = (state.size() == 0) ? cu : state.back();
+  MDNode *scope = (state.size() == 0) ? dbg_cu : state.back();
   
   builder.SetCurrentDebugLocation(DebugLoc::get(line_no, column_no, scope));
 }

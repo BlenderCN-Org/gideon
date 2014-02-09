@@ -59,6 +59,7 @@ namespace raytrace {
 
     llvm::DIBuilder dbg_builder;
     llvm::DIFile file_info;
+    llvm::DICompileUnit dbg_cu;
     
     std::vector<llvm::MDNode *> state;
     
