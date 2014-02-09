@@ -55,7 +55,7 @@
 %define api.pure
 %lex-param { void * scanner }
 %parse-param { void *scanner }
-%parse-param { ast::gideon_parser_data *gd_data }
+%parse-param { raytrace::ast::gideon_parser_data *gd_data }
 
 %error-verbose
 
@@ -63,6 +63,7 @@
   #ifndef RT_PARSER_NODE_DEF
   #define RT_PARSER_NODE_DEF
   #include "compiler/ast/ast.hpp"
+  #include "compiler/parser.hpp"
   
   typedef struct {
     int i;
