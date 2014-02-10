@@ -438,19 +438,91 @@ namespace raytrace {
       value_container_operation<arg_type, ResultType> op(func);
       return boost::apply_visitor(op, arg_list);
     }
+    
+    /* 
+       Wrapper around all the codegen_call* functions allowing the caller to pass function objects with an arbitrary number of arguments.
+       NOTE: "Arbitrary" at the moment means <= 5, I was having trouble getting boost::fusion::invoke working. I'll save the fix for compiler updates.
+     */
+    template<typename ResultType, typename... ArgTypes>
+    struct apply_helper;
+
+    template<typename ResultType, typename A0, typename A1>
+    struct apply_helper<ResultType, A0, A1> {
+      typedef typename errors::value_helper<A0>::value_type V0;
+      typedef typename errors::value_helper<A1>::value_type V1;
+      
+      typedef typename argument_value_join<A0, A1>::result_value_type arg_val_type;
+      typedef typename boost::function<ResultType (V0 &, V1 &)> func_type;
+
+      ResultType operator()(const func_type &func, arg_val_type &arg) {
+	return func(get<0>(arg), get<1>(arg));
+      }
+    };
+
+    template<typename ResultType, typename A0, typename A1, typename A2>
+    struct apply_helper<ResultType, A0, A1, A2> {
+      typedef typename errors::value_helper<A0>::value_type V0;
+      typedef typename errors::value_helper<A1>::value_type V1;
+      typedef typename errors::value_helper<A2>::value_type V2;
+
+      typedef typename argument_value_join<A0, A1, A2>::result_value_type arg_val_type;
+      typedef typename boost::function<ResultType (V0 &, V1 &, V2 &)> func_type;
+
+      ResultType operator()(const func_type &func, arg_val_type &arg) {
+	return func(get<0>(arg), get<1>(arg), get<2>(arg));
+      }
+    };
+
+    template<typename ResultType, typename A0, typename A1, typename A2, typename A3>
+    struct apply_helper<ResultType, A0, A1, A2, A3> {
+      typedef typename errors::value_helper<A0>::value_type V0;
+      typedef typename errors::value_helper<A1>::value_type V1;
+      typedef typename errors::value_helper<A2>::value_type V2;
+      typedef typename errors::value_helper<A3>::value_type V3;
+
+      typedef typename argument_value_join<A0, A1, A2, A3>::result_value_type arg_val_type;
+      typedef typename boost::function<ResultType (V0 &, V1 &, V2 &, V3 &)> func_type;
+
+      ResultType operator()(const func_type &func, arg_val_type &arg) {
+	return func(get<0>(arg), get<1>(arg), get<2>(arg), get<3>(arg));
+      }
+    };
+
+    template<typename ResultType, typename A0, typename A1, typename A2, typename A3, typename A4>
+    struct apply_helper<ResultType, A0, A1, A2, A3, A4> {
+      typedef typename errors::value_helper<A0>::value_type V0;
+      typedef typename errors::value_helper<A1>::value_type V1;
+      typedef typename errors::value_helper<A2>::value_type V2;
+      typedef typename errors::value_helper<A3>::value_type V3;
+      typedef typename errors::value_helper<A4>::value_type V4;
+
+      typedef typename argument_value_join<A0, A1, A2, A3, A4>::result_value_type arg_val_type;
+      typedef typename boost::function<ResultType (V0 &, V1 &, V2 &, V3 &, V4)> func_type;
+
+      ResultType operator()(const func_type &func, arg_val_type &arg) {
+	return func(get<0>(arg), get<1>(arg), get<2>(arg), get<3>(arg), get<4>(arg));
+      }
+    };
 
     template<typename ResultType, typename... ArgTypes>
-    ResultType codegen_apply(const boost::function<ResultType (typename errors::value_helper<ArgTypes>::value_type &...)> &func,
+    ResultType codegen_apply(boost::function<ResultType (typename errors::value_helper<ArgTypes>::value_type &...)> &func,
 			     ArgTypes&... args) {
       typedef typename errors::argument_value_join<ArgTypes...>::result_value_type arg_val_type;
+      
       boost::function<ResultType (arg_val_type &)> joined_func = [&func] (arg_val_type &arg) -> ResultType {
-	return boost::fusion::invoke(func, arg);
+	apply_helper<ResultType, ArgTypes...> helper;
+	return helper(func, arg);
       };
       
       return errors::codegen_call_args(joined_func, args...);
     }
 
-
+    template<typename ResultType, typename A0>
+    ResultType codegen_apply(boost::function<ResultType (typename errors::value_helper<A0>::value_type &)> &func,
+			     A0 &arg) {
+      return codegen_call(arg, func);
+    }
+    
     //Merges two void values.
     codegen_void merge_void_values(codegen_void &v0, codegen_void &v1);
 
